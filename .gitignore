@@ -1,0 +1,120 @@
+img/
+# ============================================
+# Python
+# ============================================
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyo
+*.pyd
+*.pdb
+*.pkl
+*.egg
+*.egg-info/
+.eggs/
+build/
+develop-eggs/
+dist/
+downloads/
+wheels/
+*.manifest
+*.spec
+
+# Virtual environments
+*/venv/
+*/.env/
+*/.venv/
+*/env/
+*/ENV/
+*/pip-wheel-metadata/
+*/*.sqlite3
+
+# Byte-compiled / temporary files
+*.log
+*.tmp
+*.bak
+*.swp
+*.swo
+*.DS_Store
+
+# ============================================
+# Config / Secrets
+# ============================================
+# Local environment variables
+.env
+.env.*
+# Kube configs
+*.kubeconfig
+.kube/
+# Local Docker config
+docker-compose.override.yml
+# Helm cache
+.helm/
+helm-chart/
+
+# ============================================
+# Docker
+# ============================================
+# Ignore docker build output and volumes
+**/docker-data/
+**/tmp/
+**/prometheus/data/
+**/grafana/data/
+**/loki/data/
+**/volumes/
+**/logs/
+**/.docker/
+**/containerfs/
+
+# ============================================
+# IDEs and editors
+# ============================================
+# PyCharm
+.idea/
+*.iml
+# VSCode
+.vscode/
+.history/
+# Visual Studio
+.vs/
+# MacOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# ============================================
+# System / OS
+# ============================================
+Thumbs.db
+Desktop.ini
+ehthumbs.db
+Icon?
+*.stackdump
+
+# ============================================
+# Test / coverage
+# ============================================
+.pytest_cache/
+.tox/
+.coverage
+coverage.xml
+htmlcov/
+nosetests.xml
+junit.xml
+test-results/
+.cache/
+.mypy_cache/
+.pyre/
+.pytype/
+
+# ============================================
+# Project-specific (Kind / K8s / Compose)
+# ============================================
+# Kind-generated state
+kind-logs/
+kind-config-backup.yaml
+# Kubernetes outputs
+k8s/exported/
+k8s/generated/
+# Docker-compose build cache
+**/.compose/
