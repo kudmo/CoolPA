@@ -1,0 +1,45 @@
+# docker-compose.yml
+version: '3.8'
+
+services:
+  smartautoscaler:
+    build:
+      context: ./smartautoscaler
+      dockerfile: Dockerfile
+    container_name: smartautoscaler
+    ports:
+      - "8088:8088"
+    networks:
+      - monitoring
+  test-go-app:
+    build:
+      context: ./test-go-app
+      dockerfile: Dockerfile
+    container_name: test-go-app
+    ports:
+      - "8080:8080"
+    networks:
+      - monitoring
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--web.enable-lifecycle'
+    ports:
+      - "9090:9090"
+    networks:
+      - monitoring
+    restart: unless-stopped
+    depends_on:
+      - test-go-app
+
+volumes:
+  prometheus_data:
+
+networks:
+  monitoring:
+    driver: bridge
