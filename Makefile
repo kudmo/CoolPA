@@ -16,6 +16,8 @@ K8S_DIR ?= k8s
 
 KUBECTL := kubectl --context=$(KCTX)
 
+METRICS_URL ?= https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
+
 .PHONY: help
 help:
 	@echo "Основные цели:"
@@ -120,11 +122,9 @@ build:
 kind-load:
 	set -euo pipefail; \
 	docker pull k8s.gcr.io/kube-state-metrics/kube-state-metrics:v2.8.0; \
-	docker pull k8s.gcr.io/metrics-server/metrics-server:v0.6.3; \
 	kind load docker-image $(TEST_APP_IMAGE) --name $(CLUSTER_NAME); \
 	kind load docker-image $(AUTOSCALER_IMAGE) --name $(CLUSTER_NAME); \
-	kind load docker-image k8s.gcr.io/kube-state-metrics/kube-state-metrics:v2.8.0 --name $(CLUSTER_NAME); \
-	kind load docker-image k8s.gcr.io/metrics-server/metrics-server:v0.6.3 --name $(CLUSTER_NAME);
+	kind load docker-image k8s.gcr.io/kube-state-metrics/kube-state-metrics:v2.8.0 --name $(CLUSTER_NAME);
 
 # =========================
 # DEPLOY
@@ -133,7 +133,11 @@ kind-load:
 .PHONY: deploy
 deploy:
 	$(KUBECTL) apply -f $(K8S_DIR)/namespace.yaml
-	$(KUBECTL) apply -f $(K8S_DIR)/ --recursive
+	$(KUBECTL) apply -f $(K8S_DIR)/prometheus/
+	$(KUBECTL) apply -f $(K8S_DIR)/smartautoscaler/
+	$(KUBECTL) apply -f $(K8S_DIR)/test-go-app/
+	$(KUBECTL) apply -f $(K8S_DIR)/monitoring/kube-state-metrics.yaml
+	$(KUBECTL) apply -k $(K8S_DIR)/monitoring/metrics-server
 
 .PHONY: undeploy
 undeploy:

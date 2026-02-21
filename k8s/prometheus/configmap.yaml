@@ -14,12 +14,6 @@ data:
       - job_name: 'kube-state-metrics'
         static_configs:
           - targets: ['kube-state-metrics.kube-system.svc.cluster.local:8080']
-      - job_name: 'metrics-server'
-        scheme: https
-        tls_config:
-          insecure_skip_verify: true
-        static_configs:
-          - targets: ['metrics-server.kube-system.svc.cluster.local:443']
 
       # Test Go App
       - job_name: 'test-go-app'
