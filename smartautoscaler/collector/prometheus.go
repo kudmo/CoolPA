@@ -79,99 +79,106 @@ func WithHandler(handler MetricHandler) PrometheusOption {
 }
 
 func (pc *PrometheusCollector) Collect(ctx context.Context) ([]MetricResult, error) {
+
 	ctx, cancel := context.WithTimeout(ctx, pc.config.Timeout)
 	defer cancel()
 
-	var results []MetricResult
+	var allResults []MetricResult
+
 	for _, query := range pc.config.Queries {
-		result, err := pc.collectQuery(ctx, query)
+
+		results, err := pc.collectQuery(ctx, query)
 		if err != nil {
 			pc.logger.Printf("Failed to collect metric %s: %v", query.Name, err)
-			result.Error = err
+			continue
 		}
 
-		results = append(results, result)
+		allResults = append(allResults, results...)
 
 		if pc.handler != nil {
-			pc.handler.Handle(result)
+			pc.handler.HandleBatch(results)
 		}
 	}
 
-	return results, nil
+	return allResults, nil
 }
-
-func (pc *PrometheusCollector) CollectSingle(ctx context.Context, query MetricQuery) (MetricResult, error) {
-	ctx, cancel := context.WithTimeout(ctx, pc.config.Timeout)
-	defer cancel()
-
-	return pc.collectQuery(ctx, query)
-}
-
-func (pc *PrometheusCollector) collectQuery(ctx context.Context, query MetricQuery) (MetricResult, error) {
-	result := MetricResult{
-		QueryName: query.Name,
-		Help:      query.Help,
-		Timestamp: time.Now(),
-	}
+func (pc *PrometheusCollector) collectQuery(ctx context.Context, query MetricQuery) ([]MetricResult, error) {
 
 	promResult, warnings, err := pc.client.Query(ctx, query.Query, time.Now())
 	if err != nil {
-		return result, fmt.Errorf("query failed: %w", err)
+		return nil, fmt.Errorf("query failed: %w", err)
 	}
 
 	if len(warnings) > 0 {
 		pc.logger.Printf("Warnings for query %s: %v", query.Name, warnings)
 	}
 
-	value, labels, err := extractValueAndLabels(promResult)
-	if err != nil {
-		return result, fmt.Errorf("failed to extract value: %w", err)
-	}
-
-	result.Value = value
-	result.Labels = labels
-
-	pc.logger.Printf("Collected metric %s = %f", query.Name, value)
-	return result, nil
+	return extractResults(query, promResult)
 }
 
-func extractValueAndLabels(val model.Value) (float64, map[string]string, error) {
-	labels := make(map[string]string)
+func extractResults(query MetricQuery, val model.Value) ([]MetricResult, error) {
+	now := time.Now()
+	var results []MetricResult
 
 	switch val.Type() {
+
 	case model.ValScalar:
 		scalar := val.(*model.Scalar)
-		return float64(scalar.Value), labels, nil
+		results = append(results, MetricResult{
+			QueryName: query.Name,
+			Help:      query.Help,
+			Value:     float64(scalar.Value),
+			Timestamp: now,
+			Labels:    map[string]string{},
+		})
 
 	case model.ValVector:
 		vector := val.(model.Vector)
-		if len(vector) == 0 {
-			return 0, labels, fmt.Errorf("no data in vector")
-		}
 
-		for name, value := range vector[0].Metric {
-			labels[string(name)] = string(value)
-		}
+		for _, sample := range vector {
+			labels := make(map[string]string)
+			for name, value := range sample.Metric {
+				labels[string(name)] = string(value)
+			}
 
-		return float64(vector[0].Value), labels, nil
+			results = append(results, MetricResult{
+				QueryName: query.Name,
+				Help:      query.Help,
+				Value:     float64(sample.Value),
+				Timestamp: now,
+				Labels:    labels,
+			})
+		}
 
 	case model.ValMatrix:
 		matrix := val.(model.Matrix)
-		if len(matrix) == 0 || len(matrix[0].Values) == 0 {
-			return 0, labels, fmt.Errorf("no data in matrix")
-		}
 
-		// Берем последнее значение из первого ряда
-		lastValue := matrix[0].Values[len(matrix[0].Values)-1]
-		for name, value := range matrix[0].Metric {
-			labels[string(name)] = string(value)
-		}
+		for _, series := range matrix {
+			if len(series.Values) == 0 {
+				continue
+			}
 
-		return float64(lastValue.Value), labels, nil
+			last := series.Values[len(series.Values)-1]
+
+			labels := make(map[string]string)
+			for name, value := range series.Metric {
+				labels[string(name)] = string(value)
+			}
+
+			results = append(results, MetricResult{
+				QueryName: query.Name,
+				Help:      query.Help,
+				Value:     float64(last.Value),
+				Timestamp: now,
+				Labels:    labels,
+			})
+		}
 
 	default:
-		return 0, labels, fmt.Errorf("unsupported value type: %s", val.Type())
+		return nil, fmt.Errorf("unsupported value type: %s", val.Type())
 	}
+
+	return results, nil
 }
 
 func (pc *PrometheusCollector) Start(ctx context.Context) error {
