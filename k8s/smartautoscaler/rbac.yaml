@@ -1,0 +1,31 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: smartautoscaler
+  namespace: autoscale-test
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  namespace: autoscale-test
+  name: smartautoscaler
+rules:
+  - apiGroups: ["apps"]
+    resources: ["deployments/scale"]
+    verbs: ["get", "update"]
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["list", "get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: smartautoscaler
+  namespace: autoscale-test
+subjects:
+  - kind: ServiceAccount
+    name: smartautoscaler
+roleRef:
+  kind: Role
+  name: smartautoscaler
+  apiGroup: rbac.authorization.k8s.io

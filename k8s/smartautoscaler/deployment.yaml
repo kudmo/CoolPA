@@ -1,0 +1,22 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: smartautoscaler
+  namespace: autoscale-test
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: smartautoscaler
+  template:
+    metadata:
+      labels:
+        app: smartautoscaler
+    spec:
+      serviceAccountName: smartautoscaler
+      containers:
+        - name: smartautoscaler
+          image: smartautoscaler:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8088
