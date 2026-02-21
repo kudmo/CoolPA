@@ -6,49 +6,32 @@ metadata:
 data:
   prometheus.yml: |
     global:
-      scrape_interval: 5s
-      evaluation_interval: 5s
-
-    rule_files:
-      - /etc/prometheus/rules.yml
+      scrape_interval: 15s
+      evaluation_interval: 15s
 
     scrape_configs:
-      - job_name: test-go-app
-        kubernetes_sd_configs:
-          - role: endpoints
-        relabel_configs:
-          - source_labels: [__meta_kubernetes_service_name]
-            action: keep
-            regex: test-go-app
-
-      - job_name: smartautoscaler
-        kubernetes_sd_configs:
-          - role: endpoints
-        relabel_configs:
-          - source_labels: [__meta_kubernetes_service_name]
-            action: keep
-            regex: smartautoscaler
-
-      - job_name: kube-state-metrics
+      # Kubelet / node / pod metrics
+      - job_name: 'kube-state-metrics'
         static_configs:
-          - targets:
-              - kube-state-metrics.kube-system.svc:8080
+          - targets: ['kube-state-metrics.kube-system.svc.cluster.local:8080']
+      - job_name: 'metrics-server'
+        scheme: https
+        tls_config:
+          insecure_skip_verify: true
+        static_configs:
+          - targets: ['metrics-server.kube-system.svc.cluster.local:443']
 
-  rules.yml: |
-    groups:
-      - name: pbscaler
-        interval: 5s
-        rules:
-          - record: app:rps
-            expr: sum(rate(http_requests_total[1m]))
+      # Test Go App
+      - job_name: 'test-go-app'
+        static_configs:
+          - targets: ['test-go-app.autoscale-test.svc.cluster.local:8080']
 
-          - record: app:p95
-            expr: histogram_quantile(
-                    0.95,
-                    sum by (le)(
-                      rate(http_request_duration_seconds_bucket[1m])
-                    )
-                  )
+      # Prometheus
+      - job_name: 'prometheus'
+        static_configs:
+          - targets: ['prometheus.autoscale-test.svc.cluster.local:9090']
 
-          - record: app:pressure
-            expr: app:rps * app:p95
+      # Istio (если включён)
+      - job_name: 'istio-mesh'
+        static_configs:
+          - targets: ['istio-proxy-metrics.kube-system.svc.cluster.local:15090']

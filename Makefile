@@ -51,6 +51,42 @@ help:
 	@echo "Масштабирование:"
 	@echo "  scale-up        - масштабировать test-go-app до 3 реплик"
 	@echo "  scale-down      - вернуть 1 реплику"
+	@echo ""
+	@echo "Istio:"
+	@echo "  istio-install         - установить Istio"
+	@echo "  istio-uninstall       - удалить Istio"
+	@echo "  istio-status          - статус компонентов Istio"
+	@echo "  istio-label-ns        - включить sidecar injection для namespace"
+
+
+# =========================
+# Istio
+# =========================
+
+.PHONY: istio-install
+istio-install:
+	@echo "Installing Istio (profile=$(ISTIO_PROFILE))..."
+	$(ISTIOCTL) install \
+		--set profile=$(ISTIO_PROFILE) \
+		--set values.global.proxy.resources.requests.cpu=10m \
+		--set values.global.proxy.resources.requests.memory=64Mi \
+		-y
+
+.PHONY: istio-uninstall
+istio-uninstall:
+	@echo "Removing Istio..."
+	-$(ISTIOCTL) uninstall --purge -y || true
+	-@kubectl delete namespace $(ISTIO_NS) --ignore-not-found
+
+.PHONY: istio-status
+istio-status:
+	@kubectl -n $(ISTIO_NS) get pods
+	@kubectl -n $(ISTIO_NS) get svc
+
+.PHONY: istio-label-ns
+istio-label-ns:
+	@echo "Enabling sidecar injection in namespace $(NS)..."
+	@kubectl label namespace $(NS) istio-injection=enabled --overwrite
 
 # =========================
 # КЛАСТЕР
@@ -83,8 +119,12 @@ build:
 .PHONY: kind-load
 kind-load:
 	set -euo pipefail; \
+	docker pull k8s.gcr.io/kube-state-metrics/kube-state-metrics:v2.8.0; \
+	docker pull k8s.gcr.io/metrics-server/metrics-server:v0.6.3; \
 	kind load docker-image $(TEST_APP_IMAGE) --name $(CLUSTER_NAME); \
-	kind load docker-image $(AUTOSCALER_IMAGE) --name $(CLUSTER_NAME)
+	kind load docker-image $(AUTOSCALER_IMAGE) --name $(CLUSTER_NAME); \
+	kind load docker-image k8s.gcr.io/kube-state-metrics/kube-state-metrics:v2.8.0 --name $(CLUSTER_NAME); \
+	kind load docker-image k8s.gcr.io/metrics-server/metrics-server:v0.6.3 --name $(CLUSTER_NAME);
 
 # =========================
 # DEPLOY
