@@ -41,5 +41,27 @@ func (h *LogHandler) HandleBatch(results []MetricResult) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 
+	if len(results) == 0 {
+		h.logger.Println("No metrics collected")
+		return
+	}
+
 	h.logger.Printf("📦 Collected %d metrics", len(results))
+
+	seen := make(map[string]bool)
+
+	for _, result := range results {
+		labelStr := ""
+		if len(result.Labels) > 0 {
+			labelStr = fmt.Sprintf("%v", result.Labels)
+		}
+		key := fmt.Sprintf("%s|%s", result.QueryName, labelStr)
+
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+
+		h.logger.Printf("📊 %s%s: %s = %.4f", result.QueryName, labelStr, result.Help, result.Value)
+	}
 }
