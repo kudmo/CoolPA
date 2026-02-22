@@ -42,7 +42,30 @@ data:
         static_configs:
           - targets: ['prometheus.autoscale-test.svc.cluster.local:9090']
 
-      # Istio (если включён)
-      - job_name: 'istio-mesh'
-        static_configs:
-          - targets: ['istio-proxy-metrics.kube-system.svc.cluster.local:15090']
+      # Istio sidecar (Envoy proxy metrics)
+      - job_name: 'istio-envoy'
+        kubernetes_sd_configs:
+          - role: pod
+        relabel_configs:
+          # только pods с контейнером istio-proxy
+          - source_labels: [__meta_kubernetes_pod_container_name]
+            action: keep
+            regex: istio-proxy
+
+          # использовать pod IP
+          - source_labels: [__meta_kubernetes_pod_ip]
+            target_label: __address__
+            replacement: $1:15090
+
+          - target_label: __metrics_path__
+            replacement: /stats/prometheus
+
+          # добавить namespace/pod как labels
+          - action: labelmap
+            regex: __meta_kubernetes_pod_label_(.+)
+
+          - source_labels: [__meta_kubernetes_namespace]
+            target_label: namespace
+
+          - source_labels: [__meta_kubernetes_pod_name]
+            target_label: pod

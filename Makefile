@@ -77,6 +77,8 @@ istio-install:
 		--set values.global.proxy.resources.requests.cpu=10m \
 		--set values.global.proxy.resources.requests.memory=64Mi \
 		-y
+	$(KUBECTL) label namespace $(NS) istio.io/rev=default --overwrite
+	$(KUBECTL) rollout restart deployment -n $(NS)
 
 .PHONY: istio-uninstall
 istio-uninstall:

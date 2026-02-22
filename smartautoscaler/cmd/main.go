@@ -69,24 +69,51 @@ func main() {
 				Help:  "Network transmit bytes per pod",
 			},
 			{
-				Name:  "istio_request_duration",
-				Query: `sum by (destination_workload) (rate(istio_request_duration_milliseconds_bucket[1m]))`,
-				Help:  "Istio request duration histogram buckets",
+				Name: "istio_request_duration_p95",
+				Query: `
+histogram_quantile(
+0.95,
+sum by (le, destination_workload) (
+	rate(istio_request_duration_milliseconds_bucket{
+	reporter="destination",
+	destination_workload!=""
+	}[1m])
+)
+)`,
+				Help: "Istio P95 request latency per workload",
 			},
 			{
-				Name:  "istio_requests",
-				Query: `sum by (destination_workload) (rate(istio_requests_total[1m]))`,
-				Help:  "Istio requests per workload",
+				Name: "istio_requests",
+				Query: `
+sum by (destination_workload) (
+  rate(istio_requests_total{
+    reporter="destination",
+    destination_workload!=""
+  }[1m])
+)`,
+				Help: "Istio HTTP requests per workload (RPS)",
 			},
 			{
-				Name:  "istio_tcp_received",
-				Query: `sum by (destination_workload) (rate(istio_tcp_received_bytes_total[1m]))`,
-				Help:  "Istio TCP received bytes",
+				Name: "istio_tcp_received",
+				Query: `
+sum by (destination_workload) (
+  rate(istio_tcp_received_bytes_total{
+    reporter="destination",
+    destination_workload!=""
+  }[1m])
+)`,
+				Help: "Istio TCP received bytes per workload",
 			},
 			{
-				Name:  "istio_tcp_sent",
-				Query: `sum by (destination_workload) (rate(istio_tcp_sent_bytes_total[1m]))`,
-				Help:  "Istio TCP sent bytes",
+				Name: "istio_tcp_sent",
+				Query: `
+sum by (destination_workload) (
+  rate(istio_tcp_sent_bytes_total{
+    reporter="destination",
+    destination_workload!=""
+  }[1m])
+)`,
+				Help: "Istio TCP sent bytes per workload",
 			},
 		},
 	}
