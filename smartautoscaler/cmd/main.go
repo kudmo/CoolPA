@@ -14,7 +14,7 @@ import (
 
 func main() {
 	config := collector.Config{
-		PrometheusURL: "http://prometheus:9090",
+		PrometheusURL: "http://prometheus.autoscale-test.svc.cluster.local:9090",
 		Interval:      15 * time.Second,
 		Timeout:       10 * time.Second,
 		Queries: []collector.MetricQuery{

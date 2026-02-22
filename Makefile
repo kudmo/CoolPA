@@ -18,6 +18,10 @@ KUBECTL := kubectl --context=$(KCTX)
 
 METRICS_URL ?= https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
 
+ISTIO_PROFILE ?= demo
+ISTIO_NS ?= istio-system
+ISTIOCTL ?= istioctl
+
 .PHONY: help
 help:
 	@echo "Основные цели:"
