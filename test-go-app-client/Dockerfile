@@ -1,4 +1,4 @@
-# test-go-app-client/Dockerfile
+# test-go-app/Dockerfile
 FROM golang:1.21-alpine AS builder
 
 WORKDIR /app

@@ -10,6 +10,7 @@ KCTX ?= kind-$(CLUSTER_NAME)
 NS ?= autoscale-test
 
 TEST_APP_IMAGE ?= test-go-app:latest
+TEST_APP_CLIENT_IMAGE ?= test-go-app-client:latest
 AUTOSCALER_IMAGE ?= smartautoscaler:latest
 
 K8S_DIR ?= k8s
@@ -122,6 +123,7 @@ cluster-status:
 build:
 	set -euo pipefail; \
 	docker build -t $(TEST_APP_IMAGE) ./test-go-app; \
+	docker build -t $(TEST_APP_CLIENT_IMAGE) ./test-go-app-client; \
 	docker build -t $(AUTOSCALER_IMAGE) ./smartautoscaler
 
 .PHONY: kind-load
@@ -129,6 +131,7 @@ kind-load:
 	set -euo pipefail; \
 	docker pull k8s.gcr.io/kube-state-metrics/kube-state-metrics:v2.8.0; \
 	kind load docker-image $(TEST_APP_IMAGE) --name $(CLUSTER_NAME); \
+	kind load docker-image $(TEST_APP_CLIENT_IMAGE) --name $(CLUSTER_NAME); \
 	kind load docker-image $(AUTOSCALER_IMAGE) --name $(CLUSTER_NAME); \
 	kind load docker-image k8s.gcr.io/kube-state-metrics/kube-state-metrics:v2.8.0 --name $(CLUSTER_NAME);
 
@@ -142,6 +145,7 @@ deploy:
 	$(KUBECTL) apply -f $(K8S_DIR)/prometheus/
 	$(KUBECTL) apply -f $(K8S_DIR)/smartautoscaler/
 	$(KUBECTL) apply -f $(K8S_DIR)/test-go-app/
+	$(KUBECTL) apply -f $(K8S_DIR)/test-go-app-client/
 	$(KUBECTL) apply -f $(K8S_DIR)/monitoring/kube-state-metrics.yaml
 	$(KUBECTL) apply -k $(K8S_DIR)/monitoring/metrics-server
 

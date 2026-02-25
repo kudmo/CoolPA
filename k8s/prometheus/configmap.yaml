@@ -36,6 +36,10 @@ data:
       - job_name: 'test-go-app'
         static_configs:
           - targets: ['test-go-app.autoscale-test.svc.cluster.local:8080']
+      # Test Go App Client
+      - job_name: 'test-go-app-client'
+        static_configs:
+          - targets: ['test-go-app-client.autoscale-test.svc.cluster.local:8080']
 
       # Prometheus
       - job_name: 'prometheus'
