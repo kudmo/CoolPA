@@ -6,7 +6,7 @@ import (
 )
 
 func TestWindowStore_AddAndRotate(t *testing.T) {
-	ws := NewWindowStore(3, time.Minute)
+	ws := NewTimeWindow(3, time.Minute)
 
 	now := time.Now()
 
@@ -28,7 +28,7 @@ func TestWindowStore_AddAndRotate(t *testing.T) {
 }
 
 func TestWindowStore_RPSCalculation(t *testing.T) {
-	ws := NewWindowStore(2, time.Minute)
+	ws := NewTimeWindow(2, time.Minute)
 	now := time.Now()
 
 	ws.AddPoint(now, 120)
@@ -45,7 +45,7 @@ func TestWindowStore_RPSCalculation(t *testing.T) {
 }
 
 func TestServiceStore_AddAndGet(t *testing.T) {
-	store := NewServiceStore()
+	store := NewServiceMetricsStore()
 	now := time.Now()
 
 	store.Add("svcA", now, 100)

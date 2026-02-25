@@ -9,7 +9,7 @@ import (
 )
 
 func TestIntegration_RPSUnderutilization(t *testing.T) {
-	store := storage.NewServiceStore()
+	store := storage.NewServiceMetricsStore()
 	now := time.Now()
 
 	// baseline — высокая нагрузка с небольшим разбросом
@@ -46,7 +46,7 @@ func TestIntegration_RPSUnderutilization(t *testing.T) {
 }
 
 func TestIntegration_NoUnderutilization(t *testing.T) {
-	store := storage.NewServiceStore()
+	store := storage.NewServiceMetricsStore()
 	now := time.Now()
 
 	// baseline и current имеют схожие значения

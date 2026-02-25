@@ -9,86 +9,139 @@ const DefaultBucketDuration = time.Minute
 
 type Bucket struct {
 	Timestamp time.Time
-	Metrics   float64
+	Value     float64
 }
 
-type WindowStore struct {
+type TimeWindow struct {
 	buckets        []Bucket
 	bucketDuration time.Duration
 	maxBuckets     int
 	lock           sync.Mutex
 }
 
-func NewWindowStore(maxBuckets int, bucketDuration time.Duration) *WindowStore {
-	return &WindowStore{
+func NewTimeWindow(maxBuckets int, bucketDuration time.Duration) *TimeWindow {
+	return &TimeWindow{
 		buckets:        make([]Bucket, 0, maxBuckets),
 		bucketDuration: bucketDuration,
 		maxBuckets:     maxBuckets,
 	}
 }
 
-func (w *WindowStore) AddPoint(timestamp time.Time, metrics float64) {
+func (w *TimeWindow) AddPoint(timestamp time.Time, value float64) {
 	w.lock.Lock()
 	defer w.lock.Unlock()
 
-	if len(w.buckets) == 0 ||
-		timestamp.Sub(w.buckets[len(w.buckets)-1].Timestamp) >= w.bucketDuration {
-
+	if len(w.buckets) == 0 || timestamp.Sub(w.buckets[len(w.buckets)-1].Timestamp) >= w.bucketDuration {
 		if len(w.buckets) == w.maxBuckets {
 			w.buckets = w.buckets[1:]
 		}
-
 		w.buckets = append(w.buckets, Bucket{
 			Timestamp: timestamp,
-			Metrics:   metrics,
+			Value:     value,
 		})
 		return
 	}
 
-	w.buckets[len(w.buckets)-1].Metrics += metrics
+	w.buckets[len(w.buckets)-1].Value += value
 }
 
-func (w *WindowStore) Values() []float64 {
+func (w *TimeWindow) Values() []float64 {
 	w.lock.Lock()
 	defer w.lock.Unlock()
 
 	out := make([]float64, len(w.buckets))
 	for i := range w.buckets {
-		out[i] = w.buckets[i].Metrics / w.bucketDuration.Seconds()
+		out[i] = w.buckets[i].Value / w.bucketDuration.Seconds()
 	}
 	return out
 }
 
-type ServiceStore struct {
+type ServiceMetricsStore struct {
 	lock    sync.RWMutex
-	windows map[string]*WindowStore
+	metrics map[string]*TimeWindow
 }
 
-func NewServiceStore() *ServiceStore {
-	return &ServiceStore{
-		windows: make(map[string]*WindowStore),
+func NewServiceMetricsStore() *ServiceMetricsStore {
+	return &ServiceMetricsStore{
+		metrics: make(map[string]*TimeWindow),
 	}
 }
 
-func (s *ServiceStore) Add(service string, t time.Time, reqs float64) {
+func (s *ServiceMetricsStore) Add(metricName string, t time.Time, value float64) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
-	ws, ok := s.windows[service]
+	win, ok := s.metrics[metricName]
 	if !ok {
-		ws = NewWindowStore(60, DefaultBucketDuration)
-		s.windows[service] = ws
+		win = NewTimeWindow(60, DefaultBucketDuration)
+		s.metrics[metricName] = win
 	}
-	ws.AddPoint(t, reqs)
+	win.AddPoint(t, value)
 }
 
-func (s *ServiceStore) GetValues(service string) []float64 {
+func (s *ServiceMetricsStore) GetValues(metricName string) []float64 {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
 
-	ws, ok := s.windows[service]
+	win, ok := s.metrics[metricName]
 	if !ok {
 		return nil
 	}
-	return ws.Values()
+	return win.Values()
+}
+
+func (s *ServiceMetricsStore) MetricNames() []string {
+	s.lock.RLock()
+	defer s.lock.RUnlock()
+
+	names := make([]string, 0, len(s.metrics))
+	for name := range s.metrics {
+		names = append(names, name)
+	}
+	return names
+}
+
+type AppMetricsStore struct {
+	lock     sync.RWMutex
+	services map[string]*ServiceMetricsStore
+}
+
+func NewAppMetricsStore() *AppMetricsStore {
+	return &AppMetricsStore{
+		services: make(map[string]*ServiceMetricsStore),
+	}
+}
+
+func (a *AppMetricsStore) Add(serviceName, metricName string, t time.Time, value float64) {
+	a.lock.Lock()
+	defer a.lock.Unlock()
+
+	svc, ok := a.services[serviceName]
+	if !ok {
+		svc = NewServiceMetricsStore()
+		a.services[serviceName] = svc
+	}
+	svc.Add(metricName, t, value)
+}
+
+func (a *AppMetricsStore) GetValues(serviceName, metricName string) []float64 {
+	a.lock.RLock()
+	defer a.lock.RUnlock()
+
+	svc, ok := a.services[serviceName]
+	if !ok {
+		return nil
+	}
+	return svc.GetValues(metricName)
+}
+
+func (a *AppMetricsStore) ServiceNames() []string {
+	a.lock.RLock()
+	defer a.lock.RUnlock()
+
+	names := make([]string, 0, len(a.services))
+	for name := range a.services {
+		names = append(names, name)
+	}
+	return names
 }
