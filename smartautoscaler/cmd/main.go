@@ -69,55 +69,24 @@ func main() {
 				Help:  "Network transmit bytes per pod",
 			},
 			{
-				Name: "istio_request_duration_p95",
-				Query: `
-histogram_quantile(
-0.95,
-sum by (le, destination_workload) (
-	rate(istio_request_duration_milliseconds_bucket{
-	reporter="destination",
-	destination_workload!="",
-	destination_namespace="autoscale-test"
-	}[1m])
-)
-)`,
-				Help: "Istio P95 request latency per workload",
+				Name:  "istio_request_duration_p95",
+				Query: `histogram_quantile(0.95, sum (rate(istio_request_duration_milliseconds_bucket{namespace="autoscale-test", destination_workload!=""}[1m])) by (le, destination_workload))`,
+				Help:  "Istio P95 request latency per workload",
 			},
 			{
-				Name: "istio_requests",
-				Query: `
-sum by (destination_workload) (
-  rate(istio_requests_total{
-    reporter="destination",
-    destination_workload!="",
-    destination_namespace="autoscale-test"
-  }[1m])
-)`,
-				Help: "Istio HTTP requests per workload (RPS)",
+				Name:  "istio_requests_total",
+				Query: `sum(rate(istio_requests_total{destination_workload!="", namespace="autoscale-test", reporter="destination"}[1m])) by (destination_workload, source_workload)`,
+				Help:  "Istio HTTP requests per workload (RPS)",
 			},
 			{
-				Name: "istio_tcp_received",
-				Query: `
-sum by (destination_workload) (
-  rate(istio_tcp_received_bytes_total{
-    reporter="destination",
-    destination_workload!="",
-    destination_namespace="autoscale-test"
-  }[1m])
-)`,
-				Help: "Istio TCP received bytes per workload",
+				Name:  "istio_tcp_received_bytes_total",
+				Query: `sum(rate(istio_tcp_received_bytes_total{namespace="autoscale-test", destination_workload!=""}[1m])) by (source_workload, destination_workload)`,
+				Help:  "Istio TCP received bytes per workload",
 			},
 			{
-				Name: "istio_tcp_sent",
-				Query: `
-sum by (destination_workload) (
-  rate(istio_tcp_sent_bytes_total{
-    reporter="destination",
-    destination_workload!="",
-    destination_namespace="autoscale-test"
-  }[1m])
-)`,
-				Help: "Istio TCP sent bytes per workload",
+				Name:  "istio_tcp_sent_bytes_total",
+				Query: `sum(rate(istio_tcp_sent_bytes_total{namespace="autoscale-test", destination_workload!=""}[1m])) by (source_workload, destination_workload)`,
+				Help:  "Istio TCP sent bytes per workload",
 			},
 		},
 	}
