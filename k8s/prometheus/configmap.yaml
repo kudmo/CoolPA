@@ -51,25 +51,34 @@ data:
         kubernetes_sd_configs:
           - role: pod
         relabel_configs:
-          # только pods с контейнером istio-proxy
           - source_labels: [__meta_kubernetes_pod_container_name]
             action: keep
             regex: istio-proxy
 
-          # использовать pod IP
           - source_labels: [__meta_kubernetes_pod_ip]
             target_label: __address__
-            replacement: $1:15090
+            replacement: "${1}:15090"
+
+          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_port]
+            action: replace
+            regex: (.+)
+            target_label: __tmp_port
+            replacement: $1
+
+          - source_labels: [__meta_kubernetes_pod_ip, __tmp_port]
+            action: replace
+            regex: (.+);(.+)
+            target_label: __address__
+            replacement: $1:$2
+            # ВАЖНО: это правило перезапишет предыдущее, если есть __tmp_port
 
           - target_label: __metrics_path__
             replacement: /stats/prometheus
 
-          # добавить namespace/pod как labels
           - action: labelmap
             regex: __meta_kubernetes_pod_label_(.+)
 
           - source_labels: [__meta_kubernetes_namespace]
             target_label: namespace
-
           - source_labels: [__meta_kubernetes_pod_name]
             target_label: pod
