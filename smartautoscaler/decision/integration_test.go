@@ -9,7 +9,7 @@ import (
 )
 
 func TestIntegration_RPSUnderutilization(t *testing.T) {
-	store := storage.NewServiceMetricsStore()
+	store := storage.NewStorage()
 	now := time.Now()
 
 	// baseline — высокая нагрузка с небольшим разбросом
@@ -19,14 +19,14 @@ func TestIntegration_RPSUnderutilization(t *testing.T) {
 	currentValues := []float64{120, 130, 110, 125, 115}
 
 	for i, v := range baselineValues {
-		store.Add("svcA", now.Add(time.Duration(i)*time.Minute), v)
+		store.MetricsStore.Add("svcA", "rps", now.Add(time.Duration(i)*time.Minute), v)
 	}
 
 	for i, v := range currentValues {
-		store.Add("svcA", now.Add(time.Duration(i+len(baselineValues))*time.Minute), v)
+		store.MetricsStore.Add("svcA", "rps", now.Add(time.Duration(i+len(baselineValues))*time.Minute), v)
 	}
 
-	values := store.GetValues("svcA")
+	values := store.MetricsStore.GetValues("svcA", "rps")
 	if len(values) < 10 {
 		t.Fatal("insufficient window data")
 	}
@@ -46,7 +46,7 @@ func TestIntegration_RPSUnderutilization(t *testing.T) {
 }
 
 func TestIntegration_NoUnderutilization(t *testing.T) {
-	store := storage.NewServiceMetricsStore()
+	store := storage.NewStorage()
 	now := time.Now()
 
 	// baseline и current имеют схожие значения
@@ -54,14 +54,14 @@ func TestIntegration_NoUnderutilization(t *testing.T) {
 	currentValues := []float64{498, 515, 508, 490, 502}
 
 	for i, v := range baselineValues {
-		store.Add("svcA", now.Add(time.Duration(i)*time.Minute), v)
+		store.MetricsStore.Add("svcA", "rps", now.Add(time.Duration(i)*time.Minute), v)
 	}
 
 	for i, v := range currentValues {
-		store.Add("svcA", now.Add(time.Duration(i+len(baselineValues))*time.Minute), v)
+		store.MetricsStore.Add("svcA", "rps", now.Add(time.Duration(i+len(baselineValues))*time.Minute), v)
 	}
 
-	values := store.GetValues("svcA")
+	values := store.MetricsStore.GetValues("svcA", "rps")
 	if len(values) < 10 {
 		t.Fatal("insufficient window data")
 	}

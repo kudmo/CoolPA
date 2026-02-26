@@ -1,13 +1,15 @@
-package storage
+package graph
 
 import (
 	"math"
 	"testing"
 	"time"
+
+	"github.com/kudmo/CoolPA/storage/metrics"
 )
 
 func TestAppMetricsStore_AddGetValues(t *testing.T) {
-	app := NewAppMetricsStore()
+	app := metrics.NewAppMetricsStore()
 	now := time.Now()
 
 	// Добавляем метрики для двух сервисов
@@ -45,7 +47,7 @@ func TestPearson(t *testing.T) {
 }
 
 func TestBuildCorrelationGraph(t *testing.T) {
-	app := NewAppMetricsStore()
+	app := metrics.NewAppMetricsStore()
 	now := time.Now()
 
 	for i := 0; i < 5; i++ {

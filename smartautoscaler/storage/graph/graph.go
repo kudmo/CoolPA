@@ -1,14 +1,11 @@
-package storage
+package graph
 
 import (
 	"math"
 	"sync"
-)
 
-type Edge struct {
-	Src, Dst string
-	Weight   float64
-}
+	"github.com/kudmo/CoolPA/storage/metrics"
+)
 
 type CorrelationGraph struct {
 	lock  sync.RWMutex
@@ -71,7 +68,7 @@ func Pearson(xs, ys []float64) float64 {
 }
 
 func BuildCorrelationGraph(
-	appMetrics *AppMetricsStore,
+	appMetrics *metrics.AppMetricsStore,
 	structuralGraph map[string][]string,
 	metricName string,
 	threshold float64) *CorrelationGraph {
