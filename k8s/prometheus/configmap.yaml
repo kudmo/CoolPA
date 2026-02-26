@@ -10,7 +10,7 @@ data:
       evaluation_interval: 15s
 
     scrape_configs:
-      # Kubelet (cAdvisor container metrics)
+      # Kubelet
       - job_name: 'kubelet'
         scheme: https
         tls_config:
@@ -32,20 +32,32 @@ data:
         static_configs:
           - targets: ['kube-state-metrics.kube-system.svc.cluster.local:8080']
 
-      # Test Go App
-      - job_name: 'test-go-app'
-        static_configs:
-          - targets: ['test-go-app.autoscale-test.svc.cluster.local:8080']
-      # Test Go App Client
-      - job_name: 'test-go-app-client'
-        static_configs:
-          - targets: ['test-go-app-client.autoscale-test.svc.cluster.local:8080']
+      - job_name: 'autoscaled-apps'
+        kubernetes_sd_configs:
+          - role: pod
+            namespaces:
+              names:
+                - autoscale-test
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_pod_label_autoscaling_enabled]
+            action: keep
+            regex: "true"
+          - source_labels: [__meta_kubernetes_pod_ip]
+            target_label: __address__
+            replacement: ${1}:8080
+          - action: labelmap
+            regex: __meta_kubernetes_pod_label_(.+)
+          - source_labels: [__meta_kubernetes_namespace]
+            target_label: namespace
+          - source_labels: [__meta_kubernetes_pod_name]
+            target_label: pod
 
       # Prometheus
       - job_name: 'prometheus'
         static_configs:
           - targets: ['prometheus.autoscale-test.svc.cluster.local:9090']
 
+      # Istio sidecar (Envoy proxy metrics)
       # Istio sidecar (Envoy proxy metrics)
       - job_name: 'istio-envoy'
         kubernetes_sd_configs:
