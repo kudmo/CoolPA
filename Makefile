@@ -213,7 +213,7 @@ scale-down:
 # =========================
 
 .PHONY: up
-up: cluster-up build kind-load deploy
+up: cluster-up build kind-load deploy istio-install
 	@echo "Cluster + Prometheus + test-go-app + smartautoscaler запущены."
 
 .PHONY: down

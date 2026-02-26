@@ -25,37 +25,37 @@ func main() {
 			},
 			{
 				Name:  "container_cpu_usage",
-				Query: `sum by (namespace,pod,container) (rate(container_cpu_usage_seconds_total{namespace="autoscale-test"}[1m]))`,
+				Query: `sum by (namespace,pod,container) (rate(container_cpu_usage_seconds_total{namespace="autoscale-test", container!=""}[1m]))`,
 				Help:  "CPU usage per container (cores)",
 			},
 			{
 				Name:  "container_memory_usage",
-				Query: `sum by (namespace,pod,container) (container_memory_usage_bytes{namespace="autoscale-test"})`,
+				Query: `sum by (namespace,pod,container) (container_memory_usage_bytes{namespace="autoscale-test", container!=""})`,
 				Help:  "Memory usage per container (bytes)",
 			},
 			{
 				Name:  "container_cpu_quota",
-				Query: `sum by (namespace,pod,container) (container_spec_cpu_quota{namespace="autoscale-test"})`,
+				Query: `sum by (namespace,pod,container) (container_spec_cpu_quota{namespace="autoscale-test", container!=""})`,
 				Help:  "CPU quota per container",
 			},
 			{
 				Name:  "container_memory_limit",
-				Query: `sum by (namespace,pod,container) (container_spec_memory_limit_bytes{namespace="autoscale-test"})`,
+				Query: `sum by (namespace,pod,container) (container_spec_memory_limit_bytes{namespace="autoscale-test", container!=""})`,
 				Help:  "Memory limit per container (bytes)",
 			},
 			{
 				Name:  "container_fs_usage",
-				Query: `sum by (namespace,pod,container) (container_fs_usage_bytes{namespace="autoscale-test"})`,
+				Query: `sum by (namespace,pod,container) (container_fs_usage_bytes{namespace="autoscale-test", container!=""})`,
 				Help:  "Filesystem usage per container (bytes)",
 			},
 			{
 				Name:  "container_fs_write",
-				Query: `sum by (namespace,pod,container) (rate(container_fs_write_seconds_total{namespace="autoscale-test"}[1m]))`,
+				Query: `sum by (namespace,pod,container) (rate(container_fs_writes_bytes_total{namespace="autoscale-test", container!=""}[1m]))`,
 				Help:  "Filesystem write time per container",
 			},
 			{
 				Name:  "container_fs_read",
-				Query: `sum by (namespace,pod,container) (rate(container_fs_read_seconds_total{namespace="autoscale-test"}[1m]))`,
+				Query: `sum by (namespace,pod,container) (rate(container_fs_reads_bytes_total{namespace="autoscale-test"}[1m]))`,
 				Help:  "Filesystem read time per container",
 			},
 			{
