@@ -5,399 +5,448 @@ import (
 	"time"
 )
 
-func TestRawTimeWindow_AddAndRotate(t *testing.T) {
-	// Храним максимум 3 точки
-	window := NewRawTimeWindow(3)
-	now := time.Now()
-
-	// Добавляем 5 точек (должны остаться только последние 3)
-	window.Add(now, 60.0)
-	window.Add(now.Add(30*time.Second), 60.0)
-	window.Add(now.Add(1*time.Minute), 120.0)
-	window.Add(now.Add(2*time.Minute), 180.0)
-	window.Add(now.Add(3*time.Minute), 240.0)
-
-	points := window.GetAll()
-	if len(points) != 3 {
-		t.Fatalf("expected 3 points after rotation, got %d", len(points))
+func getLogicalBuckets(r *RingWindow) []float64 {
+	count := len(r.buckets)
+	out := make([]float64, count)
+	for i := 0; i < count; i++ {
+		idx := (r.head + 1 + i) % count // старый → новый
+		out[i] = r.buckets[idx].Value
 	}
+	return out
+}
 
-	// Проверяем, что остались последние 3 (с минутами 1,2,3)
-	expectedMinutes := []int{1, 2, 3}
-	for i, p := range points {
-		gotMin := int(p.Timestamp.Sub(now).Minutes())
-		if gotMin != expectedMinutes[i] {
-			t.Errorf("expected point at minute %d, got minute %d", expectedMinutes[i], gotMin)
-		}
-	}
+func TestRingWindowBasicInsert(t *testing.T) {
+	step := 10 * time.Second
+	window := 30 * time.Second // 3 bucket
+	r := NewRingWindow(window, step)
 
-	// Проверяем значения
-	expectedValues := []float64{120.0, 180.0, 240.0}
-	for i, v := range expectedValues {
-		if points[i].Value != v {
-			t.Errorf("expected value %.2f at position %d, got %.2f", v, i, points[i].Value)
+	base := time.Now().Truncate(step)
+
+	// Добавляем 3 значения
+	r.Add(base, 1)                     // bucket 0
+	r.Add(base.Add(10*time.Second), 2) // bucket 1
+	r.Add(base.Add(20*time.Second), 3) // bucket 2
+
+	expected := []float64{1, 2, 3}
+	for i := range r.buckets {
+		v := r.buckets[i].Value
+		if v != expected[i] {
+			t.Fatalf("bucket %d: expected %v, got %v", i, expected[i], v)
 		}
 	}
 }
 
-func TestRawTimeWindow_GetRange(t *testing.T) {
-	window := NewRawTimeWindow(10)
-	now := time.Now()
+func TestRingWindowWraparound(t *testing.T) {
+	step := 10 * time.Second
+	window := 30 * time.Second // 3 bucket
+	r := NewRingWindow(window, step)
 
-	// Добавляем точки каждые 15 секунд в течение 2 минут
-	for i := 0; i < 8; i++ {
-		window.Add(now.Add(time.Duration(i)*15*time.Second), float64(i*10))
+	base := time.Now().Truncate(step)
+
+	// Заполняем первые 3 bucket
+	r.Add(base, 1)
+	r.Add(base.Add(10*time.Second), 2)
+	r.Add(base.Add(20*time.Second), 3)
+
+	// Добавляем 4-й — должен перезаписать первый bucket
+	r.Add(base.Add(30*time.Second), 4)
+
+	expected := []float64{4, 2, 3} // head=0 после advance
+	for i := range r.buckets {
+		v := r.buckets[i].Value
+		if v != expected[i] {
+			t.Fatalf("wraparound bucket %d: expected %v, got %v", i, expected[i], v)
+		}
 	}
 
-	// Запрашиваем интервал с 30 секунд до 90 секунд
-	from := now.Add(30 * time.Second)
-	to := now.Add(90 * time.Second)
-	rangePoints := window.GetRange(from, to)
+	// Добавляем ещё один — перезаписывается второй
+	r.Add(base.Add(40*time.Second), 5)
 
-	// Ожидаем точки на 30, 45, 60, 75 секундах (4 точки)
-	if len(rangePoints) != 4 {
-		t.Fatalf("expected 4 points in range, got %d", len(rangePoints))
-	}
-
-	// Проверяем, что все точки внутри интервала
-	for _, p := range rangePoints {
-		if p.Timestamp.Before(from) || !p.Timestamp.Before(to) {
-			t.Errorf("point at %v outside range [%v, %v)", p.Timestamp, from, to)
+	expected = []float64{4, 5, 3}
+	for i := range r.buckets {
+		v := r.buckets[i].Value
+		if v != expected[i] {
+			t.Fatalf("second wraparound bucket %d: expected %v, got %v", i, expected[i], v)
 		}
 	}
 }
 
-func TestRawTimeWindow_GetLast(t *testing.T) {
-	window := NewRawTimeWindow(10)
-	now := time.Now()
+func TestRingWindowFullCycle(t *testing.T) {
+	step := 5 * time.Second
+	window := 20 * time.Second // 4 buckets
+	r := NewRingWindow(window, step)
 
-	// Добавляем 5 точек
-	for i := 0; i < 5; i++ {
-		window.Add(now.Add(time.Duration(i)*time.Minute), float64(i*100))
+	base := time.Now().Truncate(step)
+
+	// Добавляем 6 значений — должны храниться последние 4
+	values := []float64{1, 2, 3, 4, 5, 6}
+	for i, v := range values {
+		r.Add(base.Add(time.Duration(i)*step), v)
 	}
 
-	// Получаем последние 3 точки
-	last3 := window.GetLast(3)
-	if len(last3) != 3 {
-		t.Fatalf("expected 3 last points, got %d", len(last3))
-	}
+	expected := []float64{3, 4, 5, 6} // последние 4 логически
+	actual := getLogicalBuckets(r)
 
-	// Проверяем, что это действительно последние
-	expectedValues := []float64{200.0, 300.0, 400.0} // индексы 2,3,4
-	for i, v := range expectedValues {
-		if last3[i].Value != v {
-			t.Errorf("expected last point value %.2f, got %.2f", v, last3[i].Value)
-		}
-	}
-
-	// Запрашиваем больше, чем есть
-	last10 := window.GetLast(10)
-	if len(last10) != 5 {
-		t.Fatalf("expected all 5 points when requesting more, got %d", len(last10))
-	}
-}
-
-func TestRawTimeWindow_GetValues(t *testing.T) {
-	window := NewRawTimeWindow(5)
-	now := time.Now()
-
-	// Добавляем точки
-	for i := 0; i < 3; i++ {
-		window.Add(now.Add(time.Duration(i)*time.Minute), float64(i*50))
-	}
-
-	values := window.GetValues()
-	if len(values) != 3 {
-		t.Fatalf("expected 3 values, got %d", len(values))
-	}
-
-	expected := []float64{0.0, 50.0, 100.0}
-	for i, v := range expected {
-		if values[i] != v {
-			t.Errorf("expected value %.2f at position %d, got %.2f", v, i, values[i])
+	for i, v := range actual {
+		if v != expected[i] {
+			t.Fatalf("full cycle bucket %d: expected %v, got %v", i, expected[i], v)
 		}
 	}
 }
 
-func TestRawTimeWindow_Aggregate(t *testing.T) {
-	window := NewRawTimeWindow(20)
-	now := time.Now().Truncate(time.Hour) // фиксируем начало часа для предсказуемости
+func TestMetricStoreAddAndRetrievePod(t *testing.T) {
+	window := 30 * time.Second
+	step := 10 * time.Second
+	store := NewMetricStore(window, step)
 
-	// Добавляем точки каждые 15 секунд в течение 3 минут (12 точек)
-	for i := 0; i < 12; i++ {
-		window.Add(now.Add(time.Duration(i)*15*time.Second), float64(i*5))
+	serviceName := "svc1"
+	podName := "pod1"
+	metric := CPUUsage
+	ts := time.Now()
+	value := 42.0
+
+	err := store.AddSample(serviceName, podName, metric, ts, value)
+	if err != nil {
+		t.Fatalf("AddSample returned error: %v", err)
 	}
 
-	// Агрегируем по минутам с функцией среднего
-	minuteAvg := window.Aggregate(time.Minute, func(vals []float64) float64 {
-		sum := 0.0
-		for _, v := range vals {
-			sum += v
-		}
-		return sum / float64(len(vals))
-	})
-
-	// Ожидаем 3 бакета (минуты 0,1,2)
-	if len(minuteAvg) != 3 {
-		t.Fatalf("expected 3 aggregated buckets, got %d", len(minuteAvg))
+	// Проверяем, что сервис создан
+	svc, ok := store.services[serviceName]
+	if !ok {
+		t.Fatal("service not created")
 	}
 
-	// Проверяем средние значения
-	// Минута 0: точки 0-3 (значения 0,5,10,15) среднее = 7.5
-	// Минута 1: точки 4-7 (значения 20,25,30,35) среднее = 27.5
-	// Минута 2: точки 8-11 (значения 40,45,50,55) среднее = 47.5
-	expectedAvg := []float64{7.5, 27.5, 47.5}
-	for i, v := range expectedAvg {
-		if minuteAvg[i].Value != v {
-			t.Errorf("minute %d: expected avg %.2f, got %.2f", i, v, minuteAvg[i].Value)
+	// Проверяем, что под создан
+	pod, ok := svc.pods[podName]
+	if !ok {
+		t.Fatal("pod not created")
+	}
+
+	// Проверяем, что метрика записана в bucket
+	bucket := pod.metrics[metric].buckets[pod.metrics[metric].head].Value
+	if bucket != value {
+		t.Fatalf("expected bucket value %v, got %v", value, bucket)
+	}
+
+	// Проверяем lastSeen
+	if !pod.lastSeen.Equal(ts) {
+		t.Fatalf("expected lastSeen %v, got %v", ts, pod.lastSeen)
+	}
+}
+
+func TestMetricStoreRemovePod(t *testing.T) {
+	window := 30 * time.Second
+	step := 10 * time.Second
+	store := NewMetricStore(window, step)
+
+	serviceName := "svc1"
+	podName1 := "pod1"
+	podName2 := "pod2"
+	metric := CPUUsage
+	ts := time.Now()
+
+	store.AddSample(serviceName, podName1, metric, ts, 10)
+	store.AddSample(serviceName, podName2, metric, ts, 20)
+
+	svc := store.services[serviceName]
+
+	// Под1 должен существовать
+	if _, ok := svc.pods[podName1]; !ok {
+		t.Fatal("pod1 not created")
+	}
+
+	store.RemovePod(serviceName, podName1)
+
+	if _, ok := svc.pods[podName1]; ok {
+		t.Fatal("pod1 was not removed")
+	}
+
+	// Под2 всё ещё существует
+	if _, ok := svc.pods[podName2]; !ok {
+		t.Fatal("pod2 should still exist")
+	}
+}
+
+func TestMetricStoreSyncPods(t *testing.T) {
+	window := 30 * time.Second
+	step := 10 * time.Second
+	store := NewMetricStore(window, step)
+
+	serviceName := "svc1"
+	pods := []string{"pod1", "pod2", "pod3"}
+	ts := time.Now()
+
+	for _, pod := range pods {
+		store.AddSample(serviceName, pod, CPUUsage, ts, float64(len(pod)*10))
+	}
+
+	svc := store.services[serviceName]
+
+	// Проверяем, что все 3 пода существуют
+	if len(svc.pods) != 3 {
+		t.Fatalf("expected 3 pods, got %d", len(svc.pods))
+	}
+
+	// Синхронизируем, оставляем только pod2
+	store.SyncPods(serviceName, []string{"pod2"})
+
+	if len(svc.pods) != 1 {
+		t.Fatalf("expected 1 pod after sync, got %d", len(svc.pods))
+	}
+
+	if _, ok := svc.pods["pod2"]; !ok {
+		t.Fatal("pod2 should exist after sync")
+	}
+}
+
+func TestMetricStoreMultipleMetrics(t *testing.T) {
+	window := 30 * time.Second
+	step := 10 * time.Second
+	store := NewMetricStore(window, step)
+
+	serviceName := "svc1"
+	podName := "pod1"
+	ts := time.Now()
+
+	values := map[MetricID]float64{
+		CPUUsage:        10,
+		MemoryUsage:     50,
+		NetworkReceive:  100,
+		NetworkTransmit: 200,
+	}
+
+	for m, v := range values {
+		err := store.AddSample(serviceName, podName, m, ts, v)
+		if err != nil {
+			t.Fatalf("AddSample error: %v", err)
 		}
 	}
 
-	// Агрегируем с функцией максимума
-	minuteMax := window.Aggregate(time.Minute, func(vals []float64) float64 {
-		max := vals[0]
-		for _, v := range vals[1:] {
-			if v > max {
-				max = v
-			}
-		}
-		return max
-	})
+	pod := store.services[serviceName].pods[podName]
 
-	expectedMax := []float64{15.0, 35.0, 55.0}
-	for i, v := range expectedMax {
-		if minuteMax[i].Value != v {
-			t.Errorf("minute %d: expected max %.2f, got %.2f", i, v, minuteMax[i].Value)
+	for m, v := range values {
+		bucket := pod.metrics[m].buckets[pod.metrics[m].head].Value
+		if bucket != v {
+			t.Fatalf("metric %v: expected %v, got %v", m, v, bucket)
 		}
 	}
 }
 
-func TestServiceMetricsStore_AddAndGet(t *testing.T) {
-	windowSize := 5 * time.Minute
-	period := 15 * time.Second
-	store := NewServiceMetricsStore(windowSize, period)
-	now := time.Now()
+func TestMetricStoreAddSampleInvalidMetric(t *testing.T) {
+	window := 30 * time.Second
+	step := 10 * time.Second
+	store := NewMetricStore(window, step)
 
-	// Добавляем несколько точек для разных метрик
-	store.Add("rps", now, 100.0)
-	store.Add("rps", now.Add(15*time.Second), 120.0)
-	store.Add("rps", now.Add(30*time.Second), 110.0)
-
-	store.Add("latency_p99", now, 50.0)
-	store.Add("latency_p99", now.Add(15*time.Second), 55.0)
-
-	// Проверяем GetValues
-	rpsValues := store.GetValues("rps")
-	if len(rpsValues) != 3 {
-		t.Fatalf("expected 3 rps values, got %d", len(rpsValues))
+	err := store.AddSample("svc1", "pod1", MetricID(100), time.Now(), 1)
+	if err == nil {
+		t.Fatal("expected error for invalid metric, got nil")
 	}
-	expectedRPS := []float64{100.0, 120.0, 110.0}
-	for i, v := range expectedRPS {
-		if rpsValues[i] != v {
-			t.Errorf("rps[%d]: expected %.2f, got %.2f", i, v, rpsValues[i])
-		}
-	}
-
-	// Проверяем GetPoints
-	latPoints := store.GetPoints("latency_p99")
-	if len(latPoints) != 2 {
-		t.Fatalf("expected 2 latency points, got %d", len(latPoints))
-	}
-
-	// Проверяем неизвестную метрику
-	if store.GetValues("unknown") != nil {
-		t.Error("expected nil for unknown metric")
-	}
-
-	// Проверяем MetricNames
-	names := store.MetricNames()
-	expectedNames := map[string]bool{"rps": true, "latency_p99": true}
-	if len(names) != 2 {
-		t.Fatalf("expected 2 metric names, got %d", len(names))
-	}
-	for _, name := range names {
-		if !expectedNames[name] {
-			t.Errorf("unexpected metric name: %s", name)
-		}
+	if err != ErrInvalidMetric {
+		t.Fatalf("expected ErrInvalidMetric, got %v", err)
 	}
 }
 
-func TestServiceMetricsStore_GetRange(t *testing.T) {
-	windowSize := 5 * time.Minute
-	period := 15 * time.Second
-	store := NewServiceMetricsStore(windowSize, period)
-	now := time.Now()
+func TestRingWindow_SumRange(t *testing.T) {
+	// Создаём окно с 4 корзинами по 10 секунд (всего 40 секунд)
+	w := NewRingWindow(40*time.Second, 10*time.Second)
 
-	// Добавляем точки каждые 15 секунд в течение 2 минут
-	for i := 0; i < 8; i++ {
-		store.Add("test_metric", now.Add(time.Duration(i)*15*time.Second), float64(i*10))
+	// Начальное состояние: startTs = 0
+	if got := w.SumRange(time.Unix(100, 0), time.Unix(200, 0)); got != 0 {
+		t.Errorf("SumRange on empty window = %v, want 0", got)
 	}
 
-	// Запрашиваем интервал с 30 секунд до 90 секунд
-	from := now.Add(30 * time.Second)
-	to := now.Add(90 * time.Second)
-	rangePoints := store.GetRange("test_metric", from, to)
+	// Добавляем данные в корзины с известными значениями
+	// Время: 100, 110, 120, 130 секунд (начала корзин)
+	// Корзина 0 (время 100) -> 10
+	// Корзина 1 (время 110) -> 20
+	// Корзина 2 (время 120) -> 30
+	// Корзина 3 (время 130) -> 40
+	w.Add(time.Unix(100, 0), 10) // создаст start = 100
+	w.Add(time.Unix(110, 0), 20)
+	w.Add(time.Unix(120, 0), 30)
+	w.Add(time.Unix(130, 0), 40)
 
-	if len(rangePoints) != 4 {
-		t.Fatalf("expected 4 points in range, got %d", len(rangePoints))
-	}
-}
-
-func TestServiceMetricsStore_GetLast(t *testing.T) {
-	windowSize := 5 * time.Minute
-	period := 15 * time.Second
-	store := NewServiceMetricsStore(windowSize, period)
-	now := time.Now()
-
-	// Добавляем 5 точек
-	for i := 0; i < 5; i++ {
-		store.Add("test_metric", now.Add(time.Duration(i)*time.Minute), float64(i*100))
+	// Полная сумма всех корзин
+	if got := w.SumRange(time.Unix(100, 0), time.Unix(140, 0)); got != 100 {
+		t.Errorf("SumRange(100,140) = %v, want 100", got)
 	}
 
-	// Получаем последние 3 точки
-	last3 := store.GetLast("test_metric", 3)
-	if len(last3) != 3 {
-		t.Fatalf("expected 3 last points, got %d", len(last3))
+	// Частичный диапазон, включающий две корзины
+	if got := w.SumRange(time.Unix(110, 0), time.Unix(130, 0)); got != 20+30 { // корзины 110 и 120
+		t.Errorf("SumRange(110,130) = %v, want 50", got)
 	}
 
-	expectedValues := []float64{200.0, 300.0, 400.0}
-	for i, v := range expectedValues {
-		if last3[i].Value != v {
-			t.Errorf("expected last point value %.2f, got %.2f", v, last3[i].Value)
-		}
-	}
-}
-
-func TestServiceMetricsStore_Aggregate(t *testing.T) {
-	windowSize := 5 * time.Minute
-	period := 15 * time.Second
-	store := NewServiceMetricsStore(windowSize, period)
-	now := time.Now().Truncate(time.Hour)
-
-	// Добавляем точки каждые 15 секунд
-	for i := 0; i < 12; i++ {
-		store.Add("test_metric", now.Add(time.Duration(i)*15*time.Second), float64(i*5))
+	// Диапазон, начинающийся между корзинами
+	// 105-115: должна попасть корзина 110 (20), корзина 100 (10) не попадает, т.к. её начало 100 < 105
+	if got := w.SumRange(time.Unix(105, 0), time.Unix(115, 0)); got != 20 {
+		t.Errorf("SumRange(105,115) = %v, want 20", got)
 	}
 
-	// Агрегируем по минутам со средним
-	minuteAvg := store.Aggregate("test_metric", time.Minute, func(vals []float64) float64 {
-		sum := 0.0
-		for _, v := range vals {
-			sum += v
-		}
-		return sum / float64(len(vals))
-	})
+	// Диапазон, полностью лежащий внутри одной корзины (начало корзины вне интервала)
+	if got := w.SumRange(time.Unix(111, 0), time.Unix(119, 0)); got != 0 {
+		t.Errorf("SumRange(111,119) = %v, want 0", got)
+	}
 
-	if len(minuteAvg) != 3 {
-		t.Fatalf("expected 3 aggregated buckets, got %d", len(minuteAvg))
+	// Диапазон, не пересекающий окно (позже)
+	if got := w.SumRange(time.Unix(200, 0), time.Unix(210, 0)); got != 0 {
+		t.Errorf("SumRange(200,210) = %v, want 0", got)
+	}
+
+	// Диапазон, не пересекающий окно (раньше)
+	if got := w.SumRange(time.Unix(0, 0), time.Unix(10, 0)); got != 0 {
+		t.Errorf("SumRange(0,10) = %v, want 0", got)
+	}
+
+	// from >= to
+	if got := w.SumRange(time.Unix(150, 0), time.Unix(140, 0)); got != 0 {
+		t.Errorf("SumRange(150,140) = %v, want 0", got)
 	}
 }
 
-func TestAppMetricsStore_Integration(t *testing.T) {
-	windowSize := 5 * time.Minute
-	period := 15 * time.Second
-	app := NewAppMetricsStore(windowSize, period)
-	now := time.Now()
+func TestRingWindow_AvgRange(t *testing.T) {
+	w := NewRingWindow(40*time.Second, 10*time.Second)
 
-	// Добавляем метрики для разных сервисов
-	app.Add("frontend", "rps", now, 100.0)
-	app.Add("frontend", "rps", now.Add(15*time.Second), 120.0)
-	app.Add("frontend", "latency", now, 50.0)
-
-	app.Add("cart", "rps", now, 200.0)
-	app.Add("cart", "cpu", now, 0.5)
-
-	// Проверяем список сервисов
-	services := app.ServiceNames()
-	if len(services) != 2 {
-		t.Fatalf("expected 2 services, got %d", len(services))
+	// Пустое окно
+	if got := w.AvgRange(time.Unix(100, 0), time.Unix(200, 0)); got != 0 {
+		t.Errorf("AvgRange on empty window = %v, want 0", got)
 	}
 
-	// Проверяем метрики для frontend
-	frontendMetrics := app.MetricNamesForService("frontend")
-	if len(frontendMetrics) != 2 {
-		t.Fatalf("expected 2 metrics for frontend, got %d", len(frontendMetrics))
+	w.Add(time.Unix(100, 0), 10)
+	w.Add(time.Unix(110, 0), 20)
+	w.Add(time.Unix(120, 0), 30)
+	w.Add(time.Unix(130, 0), 40)
+
+	// Полный диапазон
+	if got := w.AvgRange(time.Unix(100, 0), time.Unix(140, 0)); got != (10+20+30+40)/4 {
+		t.Errorf("AvgRange(100,140) = %v, want %v", got, (10+20+30+40)/4)
 	}
 
-	// Проверяем значения
-	rpsValues := app.GetServiceValues("frontend", "rps")
-	if len(rpsValues) != 2 {
-		t.Fatalf("expected 2 rps values for frontend, got %d", len(rpsValues))
+	// Две корзины
+	if got := w.AvgRange(time.Unix(110, 0), time.Unix(130, 0)); got != (20+30)/2 {
+		t.Errorf("AvgRange(110,130) = %v, want %v", got, (20+30)/2)
 	}
 
-	// Проверяем GetServicePoints
-	points := app.GetServicePoints("cart", "rps")
-	if len(points) != 1 {
-		t.Fatalf("expected 1 point for cart rps, got %d", len(points))
+	// Одна корзина
+	if got := w.AvgRange(time.Unix(120, 0), time.Unix(130, 0)); got != 30 {
+		t.Errorf("AvgRange(120,130) = %v, want 30", got)
 	}
 
-	// Проверяем неизвестный сервис
-	if app.GetServiceValues("unknown", "metric") != nil {
-		t.Error("expected nil for unknown service")
+	// Нет корзин
+	if got := w.AvgRange(time.Unix(200, 0), time.Unix(210, 0)); got != 0 {
+		t.Errorf("AvgRange(200,210) = %v, want 0", got)
 	}
 
-	// Проверяем неизвестную метрику
-	if app.GetServiceValues("frontend", "unknown") != nil {
-		t.Error("expected nil for unknown metric")
+	// from >= to
+	if got := w.AvgRange(time.Unix(150, 0), time.Unix(140, 0)); got != 0 {
+		t.Errorf("AvgRange(150,140) = %v, want 0", got)
 	}
 }
 
-func TestAppMetricsStore_ConcurrentAccess(t *testing.T) {
-	windowSize := 5 * time.Minute
-	period := 15 * time.Second
-	app := NewAppMetricsStore(windowSize, period)
-	done := make(chan bool)
+func TestRingWindow_MaxRange(t *testing.T) {
+	w := NewRingWindow(40*time.Second, 10*time.Second)
 
-	// Пишущие горутины
-	for i := 0; i < 10; i++ {
-		go func(id int) {
-			for j := 0; j < 100; j++ {
-				now := time.Now()
-				app.Add("service", "metric", now, float64(j))
-			}
-			done <- true
-		}(i)
+	// Пустое окно
+	if got := w.MaxRange(time.Unix(100, 0), time.Unix(200, 0)); got != 0 {
+		t.Errorf("MaxRange on empty window = %v, want 0", got)
 	}
 
-	// Читающие горутины
-	for i := 0; i < 10; i++ {
-		go func() {
-			for j := 0; j < 100; j++ {
-				app.GetServiceValues("service", "metric")
-				app.ServiceNames()
-				app.MetricNamesForService("service")
-			}
-			done <- true
-		}()
+	w.Add(time.Unix(100, 0), 10)
+	w.Add(time.Unix(110, 0), 20)
+	w.Add(time.Unix(120, 0), 30)
+	w.Add(time.Unix(130, 0), 40)
+
+	// Полный диапазон
+	if got := w.MaxRange(time.Unix(100, 0), time.Unix(140, 0)); got != 40 {
+		t.Errorf("MaxRange(100,140) = %v, want 40", got)
 	}
 
-	// Ждём завершения
-	for i := 0; i < 20; i++ {
-		<-done
+	// Две корзины
+	if got := w.MaxRange(time.Unix(110, 0), time.Unix(130, 0)); got != 30 {
+		t.Errorf("MaxRange(110,130) = %v, want 30", got)
+	}
+
+	// Одна корзина
+	if got := w.MaxRange(time.Unix(120, 0), time.Unix(130, 0)); got != 30 {
+		t.Errorf("MaxRange(120,130) = %v, want 30", got)
+	}
+
+	// Нет корзин
+	if got := w.MaxRange(time.Unix(200, 0), time.Unix(210, 0)); got != 0 {
+		t.Errorf("MaxRange(200,210) = %v, want 0", got)
+	}
+
+	// from >= to
+	if got := w.MaxRange(time.Unix(150, 0), time.Unix(140, 0)); got != 0 {
+		t.Errorf("MaxRange(150,140) = %v, want 0", got)
 	}
 }
 
-func TestAppMetricsStore_AggregateService(t *testing.T) {
-	windowSize := 5 * time.Minute
-	period := 15 * time.Second
-	app := NewAppMetricsStore(windowSize, period)
-	now := time.Now().Truncate(time.Hour)
+func TestRingWindow_RangeAfterAdvance(t *testing.T) {
+	// Проверяем, что после продвижения окна старые данные не учитываются
+	w := NewRingWindow(30*time.Second, 10*time.Second) // 3 корзины
 
-	// Добавляем точки для сервиса
-	for i := 0; i < 12; i++ {
-		app.Add("frontend", "rps", now.Add(time.Duration(i)*15*time.Second), float64(i*10))
+	// Добавляем в корзины с временем 100, 110, 120
+	w.Add(time.Unix(100, 0), 10)
+	w.Add(time.Unix(110, 0), 20)
+	w.Add(time.Unix(120, 0), 30)
+
+	// Сумма всего окна сейчас: 60
+	if got := w.SumRange(time.Unix(100, 0), time.Unix(130, 0)); got != 60 {
+		t.Errorf("before advance: SumRange(100,130)=%v, want 60", got)
 	}
 
-	// Агрегируем по минутам
-	minuteAvg := app.AggregateService("frontend", "rps", time.Minute, func(vals []float64) float64 {
-		sum := 0.0
-		for _, v := range vals {
-			sum += v
-		}
-		return sum / float64(len(vals))
-	})
+	// Добавляем новое значение с временем 200, что сдвинет окно вперёд и обнулит все корзины,
+	// так как шаг > размера окна (70 секунд разницы > 30 секунд)
+	w.Add(time.Unix(200, 0), 100)
 
-	if len(minuteAvg) != 3 {
-		t.Fatalf("expected 3 aggregated buckets, got %d", len(minuteAvg))
+	// Теперь окно должно содержать только корзину с временем 200 (значение 100),
+	// остальные обнулены. startTs должен стать 200 (200-200%10=200)
+	// Проверим сумму за период 100-130: старых данных нет
+	if got := w.SumRange(time.Unix(100, 0), time.Unix(130, 0)); got != 0 {
+		t.Errorf("after advance: SumRange(100,130)=%v, want 0", got)
+	}
+
+	// Сумма за период, включающий новую корзину
+	if got := w.SumRange(time.Unix(200, 0), time.Unix(210, 0)); got != 100 {
+		t.Errorf("after advance: SumRange(200,210)=%v, want 100", got)
+	}
+
+	// Среднее за новое окно
+	if got := w.AvgRange(time.Unix(200, 0), time.Unix(210, 0)); got != 100 {
+		t.Errorf("after advance: AvgRange(200,210)=%v, want 100", got)
+	}
+}
+
+func TestRingWindow_EdgeCases(t *testing.T) {
+	// Проверяем граничные случаи с нулевыми значениями и частичным перекрытием
+	w := NewRingWindow(20*time.Second, 10*time.Second) // 2 корзины
+
+	// Заполняем корзины со временем 100 и 110
+	w.Add(time.Unix(100, 0), 5)  // корзина 100
+	w.Add(time.Unix(110, 0), 15) // корзина 110
+
+	// Диапазон [100,110): должна войти только корзина 100 (5)
+	if got := w.SumRange(time.Unix(100, 0), time.Unix(110, 0)); got != 5 {
+		t.Errorf("SumRange(100,110) = %v, want 5", got)
+	}
+
+	// Диапазон [100,100) пустой
+	if got := w.SumRange(time.Unix(100, 0), time.Unix(100, 0)); got != 0 {
+		t.Errorf("SumRange(100,100) = %v, want 0", got)
+	}
+
+	// Диапазон [110,120): корзина 110 (15)
+	if got := w.SumRange(time.Unix(110, 0), time.Unix(120, 0)); got != 15 {
+		t.Errorf("SumRange(110,120) = %v, want 15", got)
+	}
+
+	// Диапазон [105,115): попадают обе корзины? корзина 100 начинается в 100, заканчивается в 110, её начало 100 < 105? Нет, она не попадает, т.к. её начало < from. Корзина 110 начинается в 110, что >=105 и <115 => попадает только 110. Итог 15.
+	if got := w.SumRange(time.Unix(105, 0), time.Unix(115, 0)); got != 15 {
+		t.Errorf("SumRange(105,115) = %v, want 15", got)
+	}
+
+	// Диапазон [90, 120): обе корзины попадают (100 и 110)
+	if got := w.SumRange(time.Unix(90, 0), time.Unix(120, 0)); got != 20 {
+		t.Errorf("SumRange(90,120) = %v, want 20", got)
 	}
 }

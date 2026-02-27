@@ -1,318 +1,365 @@
 package metrics
 
 import (
-	"sync"
+	"errors"
 	"time"
 )
 
-type Point struct {
+/*
+Package metrics provides an in-memory sliding window metric store
+designed for autoscaling controllers.
+
+Design goals:
+
+  - Fixed metric set (no dynamic maps per metric)
+  - Bucketed sliding window with constant memory usage
+  - Pod-level source of truth
+  - Incremental service-level aggregation
+  - Deterministic pod removal after scale down
+  - O(1) update complexity
+
+Concurrency model:
+
+  The store assumes single-writer semantics.
+  External synchronization must be applied if accessed concurrently.
+*/
+
+type MetricID uint8
+
+const (
+	CPUUsage MetricID = iota
+	MemoryUsage
+	CPUQuota
+	MemoryLimit
+	FSUsage
+	FSWrite
+	FSRead
+	NetworkReceive
+	NetworkTransmit
+
+	MetricCount
+)
+
+var ErrInvalidMetric = errors.New("invalid metric id")
+
+// RingWindow represents a fixed-size bucketed sliding time window.
+type RingWindow struct {
+	buckets []Bucket
+	head    int
+	start   time.Time     // start time of current head bucket
+	step    time.Duration // bucket size
+}
+
+type Bucket struct {
 	Timestamp time.Time
 	Value     float64
 }
 
-type RawTimeWindow struct {
-	points    []Point
-	maxPoints int
-	lock      sync.Mutex
-}
-
-func NewRawTimeWindow(maxPoints int) *RawTimeWindow {
-	return &RawTimeWindow{
-		points:    make([]Point, 0, maxPoints),
-		maxPoints: maxPoints,
+// NewRingWindow creates a new sliding window.
+//
+// windowSize - total window duration
+// step       - bucket resolution
+//
+// Example: window=5m, step=10s -> 30 buckets
+func NewRingWindow(windowSize, step time.Duration) *RingWindow {
+	bucketCount := int(windowSize / step)
+	return &RingWindow{
+		buckets: make([]Bucket, bucketCount),
+		head:    0,
+		start:   time.Time{},
+		step:    step,
 	}
 }
 
-func (w *RawTimeWindow) Add(timestamp time.Time, value float64) {
-	w.lock.Lock()
-	defer w.lock.Unlock()
-
-	if len(w.points) == w.maxPoints {
-		w.points = w.points[1:]
+// advance moves the head forward according to timestamp.
+func (r *RingWindow) advance(ts time.Time) {
+	if r.start.IsZero() {
+		r.start = ts.Truncate(r.step)
+		return
 	}
-	w.points = append(w.points, Point{
-		Timestamp: timestamp,
-		Value:     value,
-	})
+
+	diff := ts.Sub(r.start)
+	steps := int64(diff / r.step)
+	if steps <= 0 {
+		return
+	}
+
+	if steps >= int64(len(r.buckets)) {
+		// window fully expired
+		for i := range r.buckets {
+			r.buckets[i] = Bucket{}
+		}
+		r.head = 0
+		r.start = ts.Truncate(r.step)
+		return
+	}
+
+	for i := int64(0); i < steps; i++ {
+		r.head = (r.head + 1) % len(r.buckets)
+		r.buckets[r.head] = Bucket{}
+	}
+	r.start = r.start.Add(time.Duration(steps) * r.step)
 }
 
-func (w *RawTimeWindow) GetAll() []Point {
-	w.lock.Lock()
-	defer w.lock.Unlock()
-
-	out := make([]Point, len(w.points))
-	copy(out, w.points)
-	return out
+// Add sets value in current bucket and returns previous value.
+func (r *RingWindow) Add(ts time.Time, value float64) float64 {
+	r.advance(ts)
+	old := r.buckets[r.head].Value
+	r.buckets[r.head] = Bucket{Timestamp: r.start, Value: value}
+	return old
 }
 
-func (w *RawTimeWindow) GetRange(from, to time.Time) []Point {
-	w.lock.Lock()
-	defer w.lock.Unlock()
+// AddDelta adds delta to current bucket.
+func (r *RingWindow) AddDelta(ts time.Time, delta float64) {
+	r.advance(ts)
+	// ensure timestamp set for this bucket
+	r.buckets[r.head].Timestamp = r.start
+	r.buckets[r.head].Value += delta
+}
 
-	var result []Point
-	for _, p := range w.points {
-		if (p.Timestamp.Equal(from) || p.Timestamp.After(from)) && p.Timestamp.Before(to) {
-			result = append(result, p)
+// Sum returns sum across window.
+func (r *RingWindow) Sum() float64 {
+	var s float64
+	for _, v := range r.buckets {
+		s += v.Value
+	}
+	return s
+}
+
+// Avg returns arithmetic mean across buckets.
+func (r *RingWindow) Avg() float64 {
+	if len(r.buckets) == 0 {
+		return 0
+	}
+	return r.Sum() / float64(len(r.buckets))
+}
+
+// Max returns maximum value across buckets.
+func (r *RingWindow) Max() float64 {
+	var m float64
+	for i, v := range r.buckets {
+		if i == 0 || v.Value > m {
+			m = v.Value
 		}
 	}
-	return result
+	return m
 }
 
-func (w *RawTimeWindow) GetLast(n int) []Point {
-	w.lock.Lock()
-	defer w.lock.Unlock()
-
-	if n <= 0 || len(w.points) == 0 {
-		return nil
+func (r *RingWindow) SumRange(from, to time.Time) float64 {
+	if r.start.IsZero() || !from.Before(to) {
+		return 0
 	}
-	if n >= len(w.points) {
-		out := make([]Point, len(w.points))
-		copy(out, w.points)
-		return out
+	var sum float64
+	n := len(r.buckets)
+	if n == 0 {
+		return 0
 	}
-	out := make([]Point, n)
-	copy(out, w.points[len(w.points)-n:])
-	return out
+	oldestIdx := (r.head + 1) % n
+	for i := 0; i < n; i++ {
+		idx := (oldestIdx + i) % n
+		b := r.buckets[idx]
+		if b.Timestamp.IsZero() {
+			continue
+		}
+		if (!b.Timestamp.Before(from)) && b.Timestamp.Before(to) {
+			sum += b.Value
+		}
+	}
+	return sum
 }
 
-func (w *RawTimeWindow) GetValues() []float64 {
-	w.lock.Lock()
-	defer w.lock.Unlock()
-
-	out := make([]float64, len(w.points))
-	for i, p := range w.points {
-		out[i] = p.Value
+func (r *RingWindow) AvgRange(from, to time.Time) float64 {
+	if r.start.IsZero() || !from.Before(to) {
+		return 0
 	}
-	return out
+	var sum float64
+	var count int
+	n := len(r.buckets)
+	if n == 0 {
+		return 0
+	}
+	oldestIdx := (r.head + 1) % n
+	for i := 0; i < n; i++ {
+		idx := (oldestIdx + i) % n
+		b := r.buckets[idx]
+		if b.Timestamp.IsZero() {
+			continue
+		}
+		if (!b.Timestamp.Before(from)) && b.Timestamp.Before(to) {
+			sum += b.Value
+			count++
+		}
+	}
+	if count == 0 {
+		return 0
+	}
+	return sum / float64(count)
 }
 
-func (w *RawTimeWindow) Aggregate(interval time.Duration, aggFunc func([]float64) float64) []Point {
-	w.lock.Lock()
-	defer w.lock.Unlock()
-
-	if len(w.points) == 0 {
-		return nil
+func (r *RingWindow) MaxRange(from, to time.Time) float64 {
+	if r.start.IsZero() || !from.Before(to) {
+		return 0
 	}
-
-	buckets := make(map[time.Time][]float64)
-	for _, p := range w.points {
-		bucketTime := p.Timestamp.Truncate(interval)
-		buckets[bucketTime] = append(buckets[bucketTime], p.Value)
+	var max float64
+	first := true
+	n := len(r.buckets)
+	if n == 0 {
+		return 0
 	}
-
-	result := make([]Point, 0, len(buckets))
-	for bucketTime, values := range buckets {
-		result = append(result, Point{
-			Timestamp: bucketTime,
-			Value:     aggFunc(values),
-		})
-	}
-
-	for i := 0; i < len(result)-1; i++ {
-		for j := i + 1; j < len(result); j++ {
-			if result[i].Timestamp.After(result[j].Timestamp) {
-				result[i], result[j] = result[j], result[i]
+	oldestIdx := (r.head + 1) % n
+	for i := 0; i < n; i++ {
+		idx := (oldestIdx + i) % n
+		b := r.buckets[idx]
+		if b.Timestamp.IsZero() {
+			continue
+		}
+		if (!b.Timestamp.Before(from)) && b.Timestamp.Before(to) {
+			if first || b.Value > max {
+				max = b.Value
+				first = false
 			}
 		}
 	}
-
-	return result
-}
-
-type ServiceMetricsStore struct {
-	lock          sync.RWMutex
-	metrics       map[string]*RawTimeWindow
-	windowSize    time.Duration
-	metricsPeriod time.Duration
-}
-
-func NewServiceMetricsStore(windowSize, metricsPeriod time.Duration) *ServiceMetricsStore {
-	return &ServiceMetricsStore{
-		metrics:       make(map[string]*RawTimeWindow),
-		windowSize:    windowSize,
-		metricsPeriod: metricsPeriod,
+	if first {
+		return 0
 	}
+	return max
 }
 
-func (s *ServiceMetricsStore) Add(metricName string, t time.Time, value float64) {
-	s.lock.Lock()
-	defer s.lock.Unlock()
-
-	win, ok := s.metrics[metricName]
-	if !ok {
-		win = NewRawTimeWindow(int(s.windowSize / s.metricsPeriod))
-		s.metrics[metricName] = win
-	}
-	win.Add(t, value)
-}
-
-func (s *ServiceMetricsStore) GetPoints(metricName string) []Point {
-	s.lock.RLock()
-	defer s.lock.RUnlock()
-
-	win, ok := s.metrics[metricName]
-	if !ok {
+func (r *RingWindow) ValuesRange(from, to time.Time) []float64 {
+	if r.start.IsZero() || !from.Before(to) {
 		return nil
 	}
-	return win.GetAll()
-}
-
-func (s *ServiceMetricsStore) GetRange(metricName string, from, to time.Time) []Point {
-	s.lock.RLock()
-	defer s.lock.RUnlock()
-
-	win, ok := s.metrics[metricName]
-	if !ok {
+	n := len(r.buckets)
+	if n == 0 {
 		return nil
 	}
-	return win.GetRange(from, to)
-}
-
-func (s *ServiceMetricsStore) GetLast(metricName string, n int) []Point {
-	s.lock.RLock()
-	defer s.lock.RUnlock()
-
-	win, ok := s.metrics[metricName]
-	if !ok {
+	// Индекс самой старой корзины (с наименьшим временем начала)
+	oldestIdx := (r.head + 1) % n
+	// Время начала самой старой корзины
+	values := make([]float64, 0, n)
+	for i := 0; i < n; i++ {
+		idx := (oldestIdx + i) % n
+		b := r.buckets[idx]
+		if b.Timestamp.IsZero() {
+			continue
+		}
+		if (!b.Timestamp.Before(from)) && b.Timestamp.Before(to) {
+			values = append(values, b.Value)
+		}
+	}
+	if len(values) == 0 {
 		return nil
 	}
-	return win.GetLast(n)
+	return values
 }
 
-func (s *ServiceMetricsStore) GetValues(metricName string) []float64 {
-	s.lock.RLock()
-	defer s.lock.RUnlock()
+type PodStore struct {
+	metrics  [MetricCount]*RingWindow
+	lastSeen time.Time
+}
 
-	win, ok := s.metrics[metricName]
+type ServiceStore struct {
+	pods map[string]*PodStore
+}
+
+type MetricStore struct {
+	services map[string]*ServiceStore
+
+	window time.Duration
+	step   time.Duration
+}
+
+// NewMetricStore creates a new store.
+func NewMetricStore(window, step time.Duration) *MetricStore {
+	return &MetricStore{
+		services: make(map[string]*ServiceStore),
+		window:   window,
+		step:     step,
+	}
+}
+
+func (s *MetricStore) getOrCreateService(name string) *ServiceStore {
+	svc, ok := s.services[name]
+	if ok {
+		return svc
+	}
+
+	svc = &ServiceStore{
+		pods: make(map[string]*PodStore),
+	}
+
+	s.services[name] = svc
+	return svc
+}
+
+func (svc *ServiceStore) getOrCreatePod(name string, window, step time.Duration) *PodStore {
+	p, ok := svc.pods[name]
+	if ok {
+		return p
+	}
+
+	p = &PodStore{}
+	for i := MetricID(0); i < MetricCount; i++ {
+		p.metrics[i] = NewRingWindow(window, step)
+	}
+
+	svc.pods[name] = p
+	return p
+}
+
+// AddSample inserts a metric sample.
+func (s *MetricStore) AddSample(
+	service string,
+	pod string,
+	metric MetricID,
+	ts time.Time,
+	value float64,
+) error {
+
+	if metric >= MetricCount {
+		return ErrInvalidMetric
+	}
+
+	svc := s.getOrCreateService(service)
+	p := svc.getOrCreatePod(pod, s.window, s.step)
+
+	p.metrics[metric].Add(ts, value)
+
+	p.lastSeen = ts
+	return nil
+}
+
+// RemovePod removes pod and subtracts its contribution.
+func (s *MetricStore) RemovePod(service, pod string) {
+	svc, ok := s.services[service]
 	if !ok {
-		return nil
+		return
 	}
-	return win.GetValues()
-}
 
-func (s *ServiceMetricsStore) Aggregate(metricName string, interval time.Duration, aggFunc func([]float64) float64) []Point {
-	s.lock.RLock()
-	defer s.lock.RUnlock()
-
-	win, ok := s.metrics[metricName]
+	_, ok = svc.pods[pod]
 	if !ok {
-		return nil
+		return
 	}
-	return win.Aggregate(interval, aggFunc)
+
+	delete(svc.pods, pod)
 }
 
-func (s *ServiceMetricsStore) MetricNames() []string {
-	s.lock.RLock()
-	defer s.lock.RUnlock()
-
-	names := make([]string, 0, len(s.metrics))
-	for name := range s.metrics {
-		names = append(names, name)
-	}
-	return names
-}
-
-// AppMetricsStore хранит метрики всех сервисов.
-type AppMetricsStore struct {
-	lock          sync.RWMutex
-	services      map[string]*ServiceMetricsStore
-	windowSize    time.Duration
-	metricsPeriod time.Duration
-}
-
-func NewAppMetricsStore(windowSize, metricsPeriod time.Duration) *AppMetricsStore {
-	return &AppMetricsStore{
-		services:      make(map[string]*ServiceMetricsStore),
-		windowSize:    windowSize,
-		metricsPeriod: metricsPeriod,
-	}
-}
-
-func (a *AppMetricsStore) Add(serviceName, metricName string, t time.Time, value float64) {
-	a.lock.Lock()
-	defer a.lock.Unlock()
-
-	svc, ok := a.services[serviceName]
+// SyncPods removes pods not in active list.
+func (s *MetricStore) SyncPods(service string, active []string) {
+	svc, ok := s.services[service]
 	if !ok {
-		svc = NewServiceMetricsStore(a.windowSize, a.metricsPeriod)
-		a.services[serviceName] = svc
+		return
 	}
-	svc.Add(metricName, t, value)
-}
 
-func (a *AppMetricsStore) GetServicePoints(serviceName, metricName string) []Point {
-	a.lock.RLock()
-	defer a.lock.RUnlock()
-
-	svc, ok := a.services[serviceName]
-	if !ok {
-		return nil
+	activeSet := make(map[string]struct{}, len(active))
+	for _, p := range active {
+		activeSet[p] = struct{}{}
 	}
-	return svc.GetPoints(metricName)
-}
 
-func (a *AppMetricsStore) GetServiceRange(serviceName, metricName string, from, to time.Time) []Point {
-	a.lock.RLock()
-	defer a.lock.RUnlock()
-
-	svc, ok := a.services[serviceName]
-	if !ok {
-		return nil
+	for pod := range svc.pods {
+		if _, ok := activeSet[pod]; !ok {
+			s.RemovePod(service, pod)
+		}
 	}
-	return svc.GetRange(metricName, from, to)
-}
-
-func (a *AppMetricsStore) GetServiceLast(serviceName, metricName string, n int) []Point {
-	a.lock.RLock()
-	defer a.lock.RUnlock()
-
-	svc, ok := a.services[serviceName]
-	if !ok {
-		return nil
-	}
-	return svc.GetLast(metricName, n)
-}
-
-func (a *AppMetricsStore) GetServiceValues(serviceName, metricName string) []float64 {
-	a.lock.RLock()
-	defer a.lock.RUnlock()
-
-	svc, ok := a.services[serviceName]
-	if !ok {
-		return nil
-	}
-	return svc.GetValues(metricName)
-}
-
-func (a *AppMetricsStore) AggregateService(serviceName, metricName string, interval time.Duration, aggFunc func([]float64) float64) []Point {
-	a.lock.RLock()
-	defer a.lock.RUnlock()
-
-	svc, ok := a.services[serviceName]
-	if !ok {
-		return nil
-	}
-	return svc.Aggregate(metricName, interval, aggFunc)
-}
-
-func (a *AppMetricsStore) ServiceNames() []string {
-	a.lock.RLock()
-	defer a.lock.RUnlock()
-
-	names := make([]string, 0, len(a.services))
-	for name := range a.services {
-		names = append(names, name)
-	}
-	return names
-}
-
-func (a *AppMetricsStore) MetricNamesForService(serviceName string) []string {
-	a.lock.RLock()
-	defer a.lock.RUnlock()
-
-	svc, ok := a.services[serviceName]
-	if !ok {
-		return nil
-	}
-	return svc.MetricNames()
 }

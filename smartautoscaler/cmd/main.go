@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/kudmo/CoolPA/collector"
-	"github.com/kudmo/CoolPA/storage"
 )
 
 func main() {
@@ -185,12 +184,11 @@ func main() {
 			},
 		},
 	}
-	handler := storage.StorageHandler{}
-	handler.Store = storage.NewStorage()
+	handler := collector.NewLogHandler(log.Default())
 
 	promCollector, err := collector.NewPrometheusCollector(
 		config,
-		collector.WithHandler(&handler),
+		collector.WithHandler(handler),
 	)
 	if err != nil {
 		log.Fatalf("Failed to create collector: %v", err)
