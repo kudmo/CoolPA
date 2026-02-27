@@ -1,15 +1,19 @@
 package storage
 
-import "github.com/kudmo/CoolPA/storage/metrics"
+import (
+	"time"
+
+	"github.com/kudmo/CoolPA/storage/metrics"
+)
 
 type Storage struct {
 	MetricsStore *metrics.AppMetricsStore
-	CallGraph    map[string]string
+	CallGraph    map[string][]string
 }
 
 func NewStorage() *Storage {
 	return &Storage{
-		MetricsStore: metrics.NewAppMetricsStore(),
-		CallGraph:    make(map[string]string),
+		MetricsStore: metrics.NewAppMetricsStore(time.Duration(time.Second*300), time.Duration(time.Second*15)),
+		CallGraph:    make(map[string][]string),
 	}
 }

@@ -26,7 +26,7 @@ func TestIntegration_RPSUnderutilization(t *testing.T) {
 		store.MetricsStore.Add("svcA", "rps", now.Add(time.Duration(i+len(baselineValues))*time.Minute), v)
 	}
 
-	values := store.MetricsStore.GetValues("svcA", "rps")
+	values := store.MetricsStore.GetServiceValues("svcA", "rps")
 	if len(values) < 10 {
 		t.Fatal("insufficient window data")
 	}
@@ -61,7 +61,7 @@ func TestIntegration_NoUnderutilization(t *testing.T) {
 		store.MetricsStore.Add("svcA", "rps", now.Add(time.Duration(i+len(baselineValues))*time.Minute), v)
 	}
 
-	values := store.MetricsStore.GetValues("svcA", "rps")
+	values := store.MetricsStore.GetServiceValues("svcA", "rps")
 	if len(values) < 10 {
 		t.Fatal("insufficient window data")
 	}
