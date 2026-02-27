@@ -13,7 +13,7 @@ type StorageHandler struct {
 
 func (h *StorageHandler) handleResourceMetrics(result collector.MetricResult) {
 	h.Store.MetricsStore.Add(
-		result.Labels["container"],
+		result.Labels["pod"],
 		result.QueryName,
 		result.Timestamp,
 		result.Value,
@@ -21,7 +21,7 @@ func (h *StorageHandler) handleResourceMetrics(result collector.MetricResult) {
 }
 
 func (h *StorageHandler) Handle(result collector.MetricResult) {
-	if _, ok := result.Labels["container"]; ok {
+	if _, ok := result.Labels["pod"]; ok {
 		h.handleResourceMetrics(result)
 	}
 }
