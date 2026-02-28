@@ -9,7 +9,7 @@ func getLogicalBuckets(r *RingWindow) []float64 {
 	count := len(r.buckets)
 	out := make([]float64, count)
 	for i := 0; i < count; i++ {
-		idx := (r.head + 1 + i) % count // старый → новый
+		idx := (r.head + 1 + i) % count
 		out[i] = r.buckets[idx].Value
 	}
 	return out
@@ -448,5 +448,81 @@ func TestRingWindow_EdgeCases(t *testing.T) {
 	// Диапазон [90, 120): обе корзины попадают (100 и 110)
 	if got := w.SumRange(time.Unix(90, 0), time.Unix(120, 0)); got != 20 {
 		t.Errorf("SumRange(90,120) = %v, want 20", got)
+	}
+}
+
+func TestGetServicesAndPodsAndLastSeen(t *testing.T) {
+	w := 30 * time.Second
+	s := NewMetricStore(w, 10*time.Second)
+
+	svcA := "svcA"
+	svcB := "svcB"
+	pod1 := "p1"
+	pod2 := "p2"
+
+	ts1 := time.Now()
+	ts2 := ts1.Add(1 * time.Minute)
+
+	if err := s.AddSample(svcA, pod1, CPUUsage, ts1, 1); err != nil {
+		t.Fatalf("AddSample failed: %v", err)
+	}
+	if err := s.AddSample(svcA, pod2, MemoryUsage, ts2, 2); err != nil {
+		t.Fatalf("AddSample failed: %v", err)
+	}
+	if err := s.AddSample(svcB, pod1, CPUUsage, ts1, 3); err != nil {
+		t.Fatalf("AddSample failed: %v", err)
+	}
+
+	services := s.GetServices()
+	foundA := false
+	foundB := false
+	for _, v := range services {
+		if v == svcA {
+			foundA = true
+		}
+		if v == svcB {
+			foundB = true
+		}
+	}
+	if !foundA || !foundB {
+		t.Fatalf("GetServices missing entries: got=%v", services)
+	}
+
+	pods := s.GetServicePods(svcA)
+	if pods == nil || len(pods) != 2 {
+		t.Fatalf("GetServicePods(svcA) expected 2 pods, got %v", pods)
+	}
+
+	// last seen checks
+	if ls, ok := s.GetPodLastSeen(svcA, pod1); !ok || !ls.Equal(ts1) {
+		t.Fatalf("GetPodLastSeen mismatch for %s/%s: got=%v ok=%v want=%v", svcA, pod1, ls, ok, ts1)
+	}
+	if ls, ok := s.GetPodLastSeen(svcA, pod2); !ok || !ls.Equal(ts2) {
+		t.Fatalf("GetPodLastSeen mismatch for %s/%s: got=%v ok=%v want=%v", svcA, pod2, ls, ok, ts2)
+	}
+}
+
+func TestGetPodMetricHeadValueInvalidMetric(t *testing.T) {
+	s := NewMetricStore(30*time.Second, 10*time.Second)
+	_, ok, err := s.GetPodMetricHeadValue("no", "no", MetricID(255))
+	if err == nil {
+		t.Fatal("expected error for invalid metric id")
+	}
+	if err != ErrInvalidMetric {
+		t.Fatalf("expected ErrInvalidMetric, got %v", err)
+	}
+	if ok {
+		t.Fatal("ok should be false for missing service/pod")
+	}
+}
+
+func TestGetPodMetricHeadValueNotFound(t *testing.T) {
+	s := NewMetricStore(30*time.Second, 10*time.Second)
+	v, ok, err := s.GetPodMetricHeadValue("svcX", "podX", CPUUsage)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if ok {
+		t.Fatalf("expected ok=false for non-existing pod, got value=%v", v)
 	}
 }

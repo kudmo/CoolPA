@@ -363,3 +363,57 @@ func (s *MetricStore) SyncPods(service string, active []string) {
 		}
 	}
 }
+
+// GetServices returns the list of known services.
+func (s *MetricStore) GetServices() []string {
+	out := make([]string, 0, len(s.services))
+	for name := range s.services {
+		out = append(out, name)
+	}
+	return out
+}
+
+// GetServicePods returns list of pods for a service, or nil if service unknown.
+func (s *MetricStore) GetServicePods(service string) []string {
+	svc, ok := s.services[service]
+	if !ok {
+		return nil
+	}
+	out := make([]string, 0, len(svc.pods))
+	for p := range svc.pods {
+		out = append(out, p)
+	}
+	return out
+}
+
+// GetPodMetricHeadValue returns the current head bucket value for given pod metric.
+// Returns (value, true, nil) when found, (0, false, nil) when service/pod not found,
+// or (0,false,ErrInvalidMetric) when metric is invalid.
+func (s *MetricStore) GetPodMetricHeadValue(service, pod string, metric MetricID) (float64, bool, error) {
+	if metric >= MetricCount {
+		return 0, false, ErrInvalidMetric
+	}
+	svc, ok := s.services[service]
+	if !ok {
+		return 0, false, nil
+	}
+	p, ok := svc.pods[pod]
+	if !ok {
+		return 0, false, nil
+	}
+	rw := p.metrics[metric]
+	return rw.buckets[rw.head].Value, true, nil
+}
+
+// GetPodLastSeen returns last seen timestamp for a pod.
+func (s *MetricStore) GetPodLastSeen(service, pod string) (time.Time, bool) {
+	svc, ok := s.services[service]
+	if !ok {
+		return time.Time{}, false
+	}
+	p, ok := svc.pods[pod]
+	if !ok {
+		return time.Time{}, false
+	}
+	return p.lastSeen, true
+}
