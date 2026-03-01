@@ -94,12 +94,11 @@ func (pc *PrometheusCollector) Collect(ctx context.Context) ([]MetricResult, err
 		}
 
 		allResults = append(allResults, results...)
-
-		if pc.handler != nil {
-			pc.handler.HandleBatch(results)
-		}
 	}
 
+	if pc.handler != nil {
+		pc.handler.HandleBatch(allResults)
+	}
 	return allResults, nil
 }
 func (pc *PrometheusCollector) collectQuery(ctx context.Context, query MetricQuery) ([]MetricResult, error) {

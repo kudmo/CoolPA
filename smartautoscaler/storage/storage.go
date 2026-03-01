@@ -11,6 +11,7 @@ import (
 type Storage struct {
 	Graph           *graph.CallGraph
 	ResourceMetrics *metrics.MetricStore
+	ServicePods     map[string][]string
 }
 
 // NewStorage creates a new storage with given window and step for internal windows.
@@ -18,6 +19,7 @@ func NewStorage(window, step time.Duration) *Storage {
 	return &Storage{
 		Graph:           graph.NewCallGraph(window, step),
 		ResourceMetrics: metrics.NewMetricStore(window, step),
+		ServicePods:     make(map[string][]string),
 	}
 }
 

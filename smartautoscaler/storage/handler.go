@@ -142,8 +142,14 @@ func metricIDToName(metricID metrics.MetricID) string {
 		return "unknown_metric"
 	}
 }
+
 func (h *StorageHandler) handleResource(result collector.MetricResult) {
-	pod := result.Labels["pod"]
+	pod, ok := result.Labels["pod"]
+	if !ok {
+		fmt.Printf("Missing pod label for resource metric: %s\n", result.QueryName)
+		return
+	}
+
 	service := h.parser.ExtractServiceName(pod)
 	metricID, ok := extractResourceMetricID(result.QueryName)
 	if !ok {
@@ -152,8 +158,29 @@ func (h *StorageHandler) handleResource(result collector.MetricResult) {
 	h.Store.AddResourceSample(service, pod, metricID, result.Timestamp, result.Value)
 }
 
+func extractIstioMetricID(metricName string) (graph.MetricID, bool) {
+	switch metricName {
+	case "istio_request_duration_p95":
+		return graph.EdgeLatency95, true
+	case "istio_request_duration_p50":
+		return graph.EdgeLatency50, true
+	case "istio_requests_total":
+		return graph.ServiceRequestCount, true
+	case "istio_tcp_sent_bytes_total":
+		return graph.ServiceBytesSent, true
+	case "istio_tcp_received_bytes_total":
+		return graph.ServiceBytesReceived, true
+	default:
+		return 0, false
+	}
+}
+
 func (h *StorageHandler) handleIstio(result collector.MetricResult) {
-	dst := result.Labels["destination_app"]
+	dst, ok := result.Labels["destination_app"]
+	if !ok {
+		fmt.Printf("Missing destination_app label for istio metric: %s\n", result.QueryName)
+		return
+	}
 
 	switch result.QueryName {
 	case "istio_request_duration_p95":
@@ -181,20 +208,34 @@ func (h *StorageHandler) handleIstio(result collector.MetricResult) {
 	}
 }
 
+func (h *StorageHandler) handlePodsInfo(result collector.MetricResult) {
+	pod := result.Labels["pod"]
+	service := h.parser.ExtractServiceName(pod)
+	h.Store.ServicePods[service] = append(h.Store.ServicePods[service], pod)
+}
+
 func (h *StorageHandler) Handle(result collector.MetricResult) {
-	if _, ok := result.Labels["pod"]; ok {
+	if _, ok := extractResourceMetricID(result.QueryName); ok {
 		h.handleResource(result)
-	} else if _, ok := result.Labels["destination_app"]; ok {
+	} else if _, ok := extractIstioMetricID(result.QueryName); ok {
 		h.handleIstio(result)
+	} else if result.QueryName == "kube_pod_info" {
+		h.handlePodsInfo(result)
 	} else {
-		fmt.Printf("Unknown metric type for result: %v\n", result)
+		fmt.Printf("Unknown metric type for: %s\n", result.QueryName)
 	}
 }
 
 func (h *StorageHandler) HandleBatch(results []collector.MetricResult) {
+	for _, s := range h.Store.Graph.GetServices() {
+		h.Store.ServicePods[s] = make([]string, 0)
+	}
+
 	for _, result := range results {
 		h.Handle(result)
 	}
+
+	h.Store.Sync(h.Store.ServicePods)
 
 	fmt.Printf("[DEBUG]: \n")
 	for _, svc := range h.Store.ResourceMetrics.GetServices() {
