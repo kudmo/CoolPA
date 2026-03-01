@@ -1,6 +1,7 @@
 package graph
 
 import (
+	"fmt"
 	"sync"
 	"time"
 
@@ -19,16 +20,29 @@ type ServiceNode struct {
 	InboundEdges  map[string]*ServiceEdgeMetrics
 	OutboundEdges map[string]*ServiceEdgeMetrics
 
-	RequestCount    *metrics.RingWindow // istio_requests_total
-	RequestDuration *metrics.RingWindow // istio_request_duration_seconds
-	BytesSent       *metrics.RingWindow // istio_tcp_sent_bytes_total
-	BytesReceived   *metrics.RingWindow // istio_tcp_received_bytes_total
+	RequestCount  *metrics.RingWindow // istio_requests_total
+	BytesSent     *metrics.RingWindow // istio_tcp_sent_bytes_total
+	BytesReceived *metrics.RingWindow // istio_tcp_received_bytes_total
 }
 
 type ServiceEdgeMetrics struct {
 	Latency95 *metrics.RingWindow // istio_request_duration_p95
 	Latency50 *metrics.RingWindow // istio_request_duration_p50
 }
+
+// MetricID identifies types of metrics stored in the call graph.
+type MetricID uint8
+
+const (
+	// Service-level metrics
+	ServiceRequestCount MetricID = iota
+	ServiceBytesSent
+	ServiceBytesReceived
+
+	// Edge-level metrics
+	EdgeLatency95
+	EdgeLatency50
+)
 
 // NewCallGraph creates a new call graph with given window and step for internal RingWindows.
 func NewCallGraph(window, step time.Duration) *CallGraph {
@@ -37,6 +51,15 @@ func NewCallGraph(window, step time.Duration) *CallGraph {
 		step:   step,
 		nodes:  make(map[string]*ServiceNode),
 	}
+}
+
+// GetServices returns the list of known services.
+func (g *CallGraph) GetServices() []string {
+	out := make([]string, 0, len(g.nodes))
+	for name := range g.nodes {
+		out = append(out, name)
+	}
+	return out
 }
 
 // getOrCreateNode returns existing node or creates a new one.
@@ -50,13 +73,12 @@ func (g *CallGraph) getOrCreateNode(name string) *ServiceNode {
 	}
 
 	n = &ServiceNode{
-		Name:            name,
-		InboundEdges:    make(map[string]*ServiceEdgeMetrics),
-		OutboundEdges:   make(map[string]*ServiceEdgeMetrics),
-		RequestCount:    metrics.NewRingWindow(g.window, g.step),
-		RequestDuration: metrics.NewRingWindow(g.window, g.step),
-		BytesSent:       metrics.NewRingWindow(g.window, g.step),
-		BytesReceived:   metrics.NewRingWindow(g.window, g.step),
+		Name:          name,
+		InboundEdges:  make(map[string]*ServiceEdgeMetrics),
+		OutboundEdges: make(map[string]*ServiceEdgeMetrics),
+		RequestCount:  metrics.NewRingWindow(g.window, g.step),
+		BytesSent:     metrics.NewRingWindow(g.window, g.step),
+		BytesReceived: metrics.NewRingWindow(g.window, g.step),
 	}
 
 	g.nodes[name] = n
@@ -69,18 +91,6 @@ func (g *CallGraph) GetNode(name string) (*ServiceNode, bool) {
 	defer g.mu.RUnlock()
 	n, ok := g.nodes[name]
 	return n, ok
-}
-
-// AddServiceSample records service-level metrics (requests, duration, bytes) at given timestamp.
-func (g *CallGraph) AddServiceSample(service string, ts time.Time, requests, duration, bytesSent, bytesReceived float64) {
-	n := g.getOrCreateNode(service)
-
-	// update ring windows (single-writer semantics expected for each window)
-	n.RequestCount.AddDelta(ts, requests)
-	// store average duration as a value for this bucket; user may store sum or avg as desired
-	n.RequestDuration.Add(ts, duration)
-	n.BytesSent.AddDelta(ts, bytesSent)
-	n.BytesReceived.AddDelta(ts, bytesReceived)
 }
 
 // ensureEdge makes sure edge metrics exist for given node and peer
@@ -97,28 +107,60 @@ func (g *CallGraph) ensureEdge(n *ServiceNode, peer string) *ServiceEdgeMetrics 
 	return em
 }
 
-// AddEdgeSample records latency metrics for a call from `from` -> `to` at timestamp `ts`.
-func (g *CallGraph) AddEdgeSample(from, to string, ts time.Time, p95, p50 float64) {
-	// create nodes if necessary
+// AddServiceMetric records a service-level metric identified by MetricID.
+// For counter-like metrics use AddDelta semantics, for gauge-like metrics use Add.
+func (g *CallGraph) AddServiceMetric(service string, ts time.Time, id MetricID, value float64) error {
+	n := g.getOrCreateNode(service)
+	switch id {
+	case ServiceRequestCount:
+		n.RequestCount.AddDelta(ts, value)
+	case ServiceBytesSent:
+		n.BytesSent.AddDelta(ts, value)
+	case ServiceBytesReceived:
+		n.BytesReceived.AddDelta(ts, value)
+	default:
+		return fmt.Errorf("invalid service metric id: %d", id)
+	}
+	return nil
+}
+
+// AddEdgeMetric records an edge-level metric (latency p95/p50) for a call from->to.
+func (g *CallGraph) AddEdgeMetric(from, to string, ts time.Time, id MetricID, value float64) error {
 	src := g.getOrCreateNode(from)
 	dst := g.getOrCreateNode(to)
 
-	// outbound from source
-	out := g.ensureEdge(src, to)
-	out.Latency95.Add(ts, p95)
-	out.Latency50.Add(ts, p50)
+	switch id {
+	case EdgeLatency95:
+		out := g.ensureEdge(src, to)
+		out.Latency95.Add(ts, value)
 
-	// inbound to destination (mirror)
-	in, ok := dst.InboundEdges[from]
-	if !ok {
-		in = &ServiceEdgeMetrics{
-			Latency95: metrics.NewRingWindow(g.window, g.step),
-			Latency50: metrics.NewRingWindow(g.window, g.step),
+		in, ok := dst.InboundEdges[from]
+		if !ok {
+			in = &ServiceEdgeMetrics{
+				Latency95: metrics.NewRingWindow(g.window, g.step),
+				Latency50: metrics.NewRingWindow(g.window, g.step),
+			}
+			dst.InboundEdges[from] = in
 		}
-		dst.InboundEdges[from] = in
+		in.Latency95.Add(ts, value)
+	case EdgeLatency50:
+		out := g.ensureEdge(src, to)
+		out.Latency50.Add(ts, value)
+
+		in, ok := dst.InboundEdges[from]
+		if !ok {
+			in = &ServiceEdgeMetrics{
+				Latency95: metrics.NewRingWindow(g.window, g.step),
+				Latency50: metrics.NewRingWindow(g.window, g.step),
+			}
+			dst.InboundEdges[from] = in
+		}
+		in.Latency50.Add(ts, value)
+	default:
+		return fmt.Errorf("invalid edge metric id: %d", id)
 	}
-	in.Latency95.Add(ts, p95)
-	in.Latency50.Add(ts, p50)
+
+	return nil
 }
 
 // RemoveService removes a service node and its edges.

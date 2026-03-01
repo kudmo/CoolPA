@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/kudmo/CoolPA/storage/graph"
 	"github.com/kudmo/CoolPA/storage/metrics"
 )
 
@@ -32,7 +33,7 @@ func TestAddResourceSampleAndInvalidMetric(t *testing.T) {
 	ts := time.Now()
 
 	// valid metric
-	err := s.AddResourceSample(svc, pod, metrics.CPUUsage, ts, 42)
+	err := s.AddResourceMetric(svc, pod, metrics.CPUUsage, ts, 42)
 	if err != nil {
 		t.Fatalf("AddResourceSample returned error: %v", err)
 	}
@@ -51,7 +52,7 @@ func TestAddResourceSampleAndInvalidMetric(t *testing.T) {
 	}
 
 	// invalid metric
-	err = s.AddResourceSample(svc, pod, metrics.MetricID(99), ts, 1)
+	err = s.AddResourceMetric(svc, pod, metrics.MetricID(99), ts, 1)
 	if err == nil {
 		t.Fatal("expected error for invalid metric, got nil")
 	}
@@ -67,7 +68,16 @@ func TestAddIstioServiceAndEdgeSamples(t *testing.T) {
 
 	ts := time.Now().Truncate(step)
 
-	s.AddIstioServiceSample("svc-1", ts, 3, 99.9, 1000, 2000)
+	// add service metrics by id
+	if err := s.AddIstioServiceMetric("svc-1", ts, graph.ServiceRequestCount, 3); err != nil {
+		t.Fatalf("AddIstioServiceMetric error: %v", err)
+	}
+	if err := s.AddIstioServiceMetric("svc-1", ts, graph.ServiceBytesSent, 1000); err != nil {
+		t.Fatalf("AddIstioServiceMetric error: %v", err)
+	}
+	if err := s.AddIstioServiceMetric("svc-1", ts, graph.ServiceBytesReceived, 2000); err != nil {
+		t.Fatalf("AddIstioServiceMetric error: %v", err)
+	}
 
 	n, ok := s.Graph.GetNode("svc-1")
 	if !ok {
@@ -76,12 +86,14 @@ func TestAddIstioServiceAndEdgeSamples(t *testing.T) {
 	if got := n.RequestCount.Sum(); got != 3 {
 		t.Fatalf("expected RequestCount 3, got %v", got)
 	}
-	if got := n.RequestDuration.Sum(); got != 99.9 {
-		t.Fatalf("expected RequestDuration 99.9, got %v", got)
-	}
 
-	// edge sample
-	s.AddIstioEdgeSample("a", "b", ts, 55, 22)
+	// edge sample (add both metrics)
+	if err := s.AddIstioEdgeMetric("a", "b", ts, graph.EdgeLatency95, 55); err != nil {
+		t.Fatalf("AddIstioEdgeMetric error: %v", err)
+	}
+	if err := s.AddIstioEdgeMetric("a", "b", ts, graph.EdgeLatency50, 22); err != nil {
+		t.Fatalf("AddIstioEdgeMetric error: %v", err)
+	}
 	src, ok := s.Graph.GetNode("a")
 	if !ok {
 		t.Fatal("a missing")
@@ -115,13 +127,13 @@ func TestSyncRemovesGraphNodesAndSyncsPods(t *testing.T) {
 	ts := time.Now().Truncate(step)
 
 	// resource pods for svcA
-	s.AddResourceSample("svcA", "pod1", metrics.CPUUsage, ts, 1)
-	s.AddResourceSample("svcA", "pod2", metrics.CPUUsage, ts, 2)
+	s.AddResourceMetric("svcA", "pod1", metrics.CPUUsage, ts, 1)
+	s.AddResourceMetric("svcA", "pod2", metrics.CPUUsage, ts, 2)
 
-	// graph services
-	s.AddIstioServiceSample("x", ts, 1, 1, 1, 1)
-	s.AddIstioServiceSample("y", ts, 1, 1, 1, 1)
-	s.AddIstioServiceSample("z", ts, 1, 1, 1, 1)
+	// graph services (add minimal service metric(s))
+	s.AddIstioServiceMetric("x", ts, graph.ServiceRequestCount, 1)
+	s.AddIstioServiceMetric("y", ts, graph.ServiceRequestCount, 1)
+	s.AddIstioServiceMetric("z", ts, graph.ServiceRequestCount, 1)
 
 	// sync: keep only svcA with pod1 and service y
 	active := map[string][]string{
@@ -164,13 +176,13 @@ func TestSyncRemovesGraphNodesAndSyncsPods(t *testing.T) {
 func TestNilStorageReceiversDontPanic(t *testing.T) {
 	var s *Storage
 	// these calls should not panic and should be safe no-ops (or return error for resources)
-	// Resource sample on nil receiver should return nil (we implemented early return)
-	if err := s.AddResourceSample("svc", "pod", metrics.CPUUsage, time.Now(), 1); err != nil {
-		t.Fatalf("expected nil error when calling AddResourceSample on nil receiver, got %v", err)
+	// Resource metric on nil receiver should return nil (we implemented early return)
+	if err := s.AddResourceMetric("svc", "pod", metrics.CPUUsage, time.Now(), 1); err != nil {
+		t.Fatalf("expected nil error when calling AddResourceMetric on nil receiver, got %v", err)
 	}
 	// Istio methods should be safe no-ops
-	s.AddIstioServiceSample("svc", time.Now(), 1, 1, 1, 1)
-	s.AddIstioEdgeSample("a", "b", time.Now(), 1, 1)
+	s.AddIstioServiceMetric("svc", time.Now(), graph.ServiceRequestCount, 1)
+	s.AddIstioEdgeMetric("a", "b", time.Now(), graph.EdgeLatency95, 1)
 	// Sync on nil receiver should not panic
 	s.Sync(map[string][]string{"x": {"p"}})
 }
@@ -179,10 +191,10 @@ func TestSyncWithEmptyActiveRemovesGraphButLeavesResourceMetrics(t *testing.T) {
 	s := NewStorage(30*time.Second, 10*time.Second)
 
 	// create resource metric
-	s.AddResourceSample("svcR", "p1", metrics.CPUUsage, time.Now(), 5)
+	s.AddResourceMetric("svcR", "p1", metrics.CPUUsage, time.Now(), 5)
 	// create graph nodes
-	s.AddIstioServiceSample("g1", time.Now(), 1, 1, 1, 1)
-	s.AddIstioServiceSample("g2", time.Now(), 1, 1, 1, 1)
+	s.AddIstioServiceMetric("g1", time.Now(), graph.ServiceRequestCount, 1)
+	s.AddIstioServiceMetric("g2", time.Now(), graph.ServiceRequestCount, 1)
 
 	// sync with empty map
 	s.Sync(map[string][]string{})

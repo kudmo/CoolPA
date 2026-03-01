@@ -12,7 +12,16 @@ func TestAddServiceSample(t *testing.T) {
 
 	base := time.Now().Truncate(step)
 
-	g.AddServiceSample("svc1", base, 5, 123.4, 1000, 2000)
+	// use new AddServiceMetric API
+	if err := g.AddServiceMetric("svc1", base, ServiceRequestCount, 5); err != nil {
+		t.Fatalf("AddServiceMetric error: %v", err)
+	}
+	if err := g.AddServiceMetric("svc1", base, ServiceBytesSent, 1000); err != nil {
+		t.Fatalf("AddServiceMetric error: %v", err)
+	}
+	if err := g.AddServiceMetric("svc1", base, ServiceBytesReceived, 2000); err != nil {
+		t.Fatalf("AddServiceMetric error: %v", err)
+	}
 
 	n, ok := g.GetNode("svc1")
 	if !ok {
@@ -22,9 +31,6 @@ func TestAddServiceSample(t *testing.T) {
 	if got := n.RequestCount.Sum(); got != 5 {
 		t.Fatalf("RequestCount.Sum() = %v, want 5", got)
 	}
-	if got := n.RequestDuration.Sum(); got != 123.4 {
-		t.Fatalf("RequestDuration.Sum() = %v, want 123.4", got)
-	}
 	if got := n.BytesSent.Sum(); got != 1000 {
 		t.Fatalf("BytesSent.Sum() = %v, want 1000", got)
 	}
@@ -33,7 +39,16 @@ func TestAddServiceSample(t *testing.T) {
 	}
 
 	// adding another delta should accumulate for RequestCount and bytes
-	g.AddServiceSample("svc1", base, 2, 10, 5, 10) // duration will overwrite bucket
+	if err := g.AddServiceMetric("svc1", base, ServiceRequestCount, 2); err != nil {
+		t.Fatalf("AddServiceMetric error: %v", err)
+	}
+	if err := g.AddServiceMetric("svc1", base, ServiceBytesSent, 5); err != nil {
+		t.Fatalf("AddServiceMetric error: %v", err)
+	}
+	if err := g.AddServiceMetric("svc1", base, ServiceBytesReceived, 10); err != nil {
+		t.Fatalf("AddServiceMetric error: %v", err)
+	}
+
 	if got := n.RequestCount.Sum(); got != 7 {
 		t.Fatalf("after second sample RequestCount.Sum() = %v, want 7", got)
 	}
@@ -46,7 +61,12 @@ func TestAddEdgeSampleCreatesBothSides(t *testing.T) {
 
 	base := time.Now().Truncate(step)
 
-	g.AddEdgeSample("svc-a", "svc-b", base, 50, 20)
+	if err := g.AddEdgeMetric("svc-a", "svc-b", base, EdgeLatency95, 50); err != nil {
+		t.Fatalf("AddEdgeMetric error: %v", err)
+	}
+	if err := g.AddEdgeMetric("svc-a", "svc-b", base, EdgeLatency50, 20); err != nil {
+		t.Fatalf("AddEdgeMetric error: %v", err)
+	}
 
 	src, ok := g.GetNode("svc-a")
 	if !ok {
@@ -80,8 +100,18 @@ func TestRemoveServiceAndEdgeCleanup(t *testing.T) {
 
 	base := time.Now().Truncate(step)
 
-	g.AddEdgeSample("a", "b", base, 1, 1)
-	g.AddEdgeSample("c", "b", base, 2, 2)
+	if err := g.AddEdgeMetric("a", "b", base, EdgeLatency95, 1); err != nil {
+		t.Fatalf("AddEdgeMetric error: %v", err)
+	}
+	if err := g.AddEdgeMetric("a", "b", base, EdgeLatency50, 1); err != nil {
+		t.Fatalf("AddEdgeMetric error: %v", err)
+	}
+	if err := g.AddEdgeMetric("a", "b", base, EdgeLatency95, 2); err != nil {
+		t.Fatalf("AddEdgeMetric error: %v", err)
+	}
+	if err := g.AddEdgeMetric("c", "b", base, EdgeLatency50, 2); err != nil {
+		t.Fatalf("AddEdgeMetric error: %v", err)
+	}
 
 	// ensure nodes present
 	if _, ok := g.GetNode("b"); !ok {
@@ -112,9 +142,17 @@ func TestSyncServicesKeepsOnlyActive(t *testing.T) {
 
 	base := time.Now().Truncate(step)
 
-	g.AddEdgeSample("x", "y", base, 1, 1)
-	g.AddEdgeSample("y", "z", base, 2, 2)
-	g.AddServiceSample("w", base, 1, 1, 1, 1)
+	// create graph: x->y and y->z, and a standalone service w
+	if err := g.AddEdgeMetric("x", "y", base, EdgeLatency95, 1); err != nil {
+		t.Fatalf("AddEdgeMetric error: %v", err)
+	}
+	if err := g.AddEdgeMetric("y", "z", base, EdgeLatency95, 2); err != nil {
+		t.Fatalf("AddEdgeMetric error: %v", err)
+	}
+	// create service w with at least one metric
+	if err := g.AddServiceMetric("w", base, ServiceRequestCount, 1); err != nil {
+		t.Fatalf("AddServiceMetric error: %v", err)
+	}
 
 	// keep only y
 	g.SyncServices([]string{"y"})

@@ -127,8 +127,10 @@ func main() {
 				Help: "Istio P95 request latency per app (both source and destination must have autoscaling-enabled)",
 			},
 			{
-				Name: "istio_requests_total",
-				Query: `sum by (destination_app, source_app) (rate(istio_requests_total{destination_workload!="", reporter="destination"}[1m])) 
+				Name: "istio_request_duration_p50",
+				Query: `histogram_quantile(0.50, 
+					sum by (le, destination_app, source_app) (rate(istio_request_duration_milliseconds_bucket{destination_workload!=""}[1m])) 
+				) 
 				* on (source_app) group_left()
 				max by (source_app) (
 					label_replace(
@@ -136,6 +138,18 @@ func main() {
 					"source_app", "$1", "label_app", "(.*)"
 					)
 				)
+				* on (destination_app) group_left()
+				max by (destination_app) (
+					label_replace(
+					kube_pod_labels{label_autoscaling_enabled="true"},
+					"destination_app", "$1", "label_app", "(.*)"
+					)
+				)`,
+				Help: "Istio P95 request latency per app (both source and destination must have autoscaling-enabled)",
+			},
+			{
+				Name: "istio_requests_total",
+				Query: `sum by (destination_app) (rate(istio_requests_total{destination_workload!="", reporter="destination"}[1m])) 
 				* on (destination_app) group_left()
 				max by (destination_app) (
 					label_replace(
@@ -147,14 +161,7 @@ func main() {
 			},
 			{
 				Name: "istio_tcp_received_bytes_total",
-				Query: `sum by (source_app, destination_app) (rate(istio_tcp_received_bytes_total{destination_workload!=""}[1m])) 
-				* on (source_app) group_left()
-				max by (source_app) (
-					label_replace(
-					kube_pod_labels{label_autoscaling_enabled="true"},
-					"source_app", "$1", "label_app", "(.*)"
-					)
-				)
+				Query: `sum by (destination_app) (rate(istio_tcp_received_bytes_total{destination_workload!=""}[1m])) 
 				* on (destination_app) group_left()
 				max by (destination_app) (
 					label_replace(
@@ -166,14 +173,7 @@ func main() {
 			},
 			{
 				Name: "istio_tcp_sent_bytes_total",
-				Query: `sum by (source_app, destination_app) (rate(istio_tcp_sent_bytes_total{destination_workload!=""}[1m])) 
-				* on (source_app) group_left()
-				max by (source_app) (
-					label_replace(
-					kube_pod_labels{label_autoscaling_enabled="true"},
-					"source_app", "$1", "label_app", "(.*)"
-					)
-				)
+				Query: `sum by (destination_app) (rate(istio_tcp_sent_bytes_total{destination_workload!=""}[1m])) 
 				* on (destination_app) group_left()
 				max by (destination_app) (
 					label_replace(

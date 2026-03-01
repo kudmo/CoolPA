@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/kudmo/CoolPA/collector"
+	"github.com/kudmo/CoolPA/storage/graph"
 	"github.com/kudmo/CoolPA/storage/metrics"
 )
 
@@ -151,11 +152,43 @@ func (h *StorageHandler) handleResource(result collector.MetricResult) {
 	h.Store.AddResourceSample(service, pod, metricID, result.Timestamp, result.Value)
 }
 
+func (h *StorageHandler) handleIstio(result collector.MetricResult) {
+	dst := result.Labels["destination_app"]
+
+	switch result.QueryName {
+	case "istio_request_duration_p95":
+		src, ok := result.Labels["source_app"]
+		if !ok {
+			fmt.Printf("Missing source_app label for istio_request_duration_p95\n")
+			return
+		}
+		h.Store.AddIstioEdgeMetric(src, dst, result.Timestamp, graph.EdgeLatency95, result.Value)
+	case "istio_request_duration_p50":
+		src, ok := result.Labels["source_app"]
+		if !ok {
+			fmt.Printf("Missing source_app label for istio_request_duration_p50\n")
+			return
+		}
+		h.Store.AddIstioEdgeMetric(src, dst, result.Timestamp, graph.EdgeLatency50, result.Value)
+	case "istio_requests_total":
+		h.Store.AddIstioServiceMetric(dst, result.Timestamp, graph.ServiceRequestCount, result.Value)
+	case "istio_tcp_sent_bytes_total":
+		h.Store.AddIstioServiceMetric(dst, result.Timestamp, graph.ServiceBytesSent, result.Value)
+	case "istio_tcp_received_bytes_total":
+		h.Store.AddIstioServiceMetric(dst, result.Timestamp, graph.ServiceBytesReceived, result.Value)
+	default:
+		fmt.Printf("Unknown istio metric: %s\n", result.QueryName)
+	}
+}
+
 func (h *StorageHandler) Handle(result collector.MetricResult) {
 	if _, ok := result.Labels["pod"]; ok {
 		h.handleResource(result)
+	} else if _, ok := result.Labels["destination_app"]; ok {
+		h.handleIstio(result)
+	} else {
+		fmt.Printf("Unknown metric type for result: %v\n", result)
 	}
-
 }
 
 func (h *StorageHandler) HandleBatch(results []collector.MetricResult) {
@@ -179,6 +212,19 @@ func (h *StorageHandler) HandleBatch(results []collector.MetricResult) {
 					fmt.Printf("\t  Metric: %v (%s), No data\n", metricID, metricIDToName(metricID))
 				}
 			}
+		}
+	}
+
+	for _, svc := range h.Store.Graph.GetServices() {
+		node, _ := h.Store.Graph.GetNode(svc)
+		fmt.Printf("Service: %s\n", svc)
+		fmt.Printf("\tRequestCount: %f\n", node.RequestCount.Avg())
+		fmt.Printf("\tBytesSent: %f\n", node.BytesSent.Sum())
+		fmt.Printf("\tBytesReceived: %f\n", node.BytesReceived.Sum())
+		for dst, edge := range node.OutboundEdges {
+			fmt.Printf("\tEdge to %s:\n", dst)
+			fmt.Printf("\t  Latency95: %f\n", edge.Latency95.Avg())
+			fmt.Printf("\t  Latency50: %f\n", edge.Latency50.Avg())
 		}
 	}
 }

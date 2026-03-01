@@ -29,20 +29,28 @@ func (s *Storage) AddResourceSample(service, pod string, metric metrics.MetricID
 	return s.ResourceMetrics.AddSample(service, pod, metric, ts, value)
 }
 
-// AddIstioServiceSample records service-level istio metrics into the call graph.
-func (s *Storage) AddIstioServiceSample(service string, ts time.Time, requests, duration, bytesSent, bytesReceived float64) {
-	if s == nil || s.Graph == nil {
-		return
+// AddResourceMetric forwards a resource metric sample to the resource metric store.
+func (s *Storage) AddResourceMetric(service, pod string, metric metrics.MetricID, ts time.Time, value float64) error {
+	if s == nil || s.ResourceMetrics == nil {
+		return nil
 	}
-	s.Graph.AddServiceSample(service, ts, requests, duration, bytesSent, bytesReceived)
+	return s.ResourceMetrics.AddSample(service, pod, metric, ts, value)
 }
 
-// AddIstioEdgeSample records edge (from->to) istio latency metrics into the call graph.
-func (s *Storage) AddIstioEdgeSample(from, to string, ts time.Time, p95, p50 float64) {
+// AddIstioServiceMetric records a service-level istio metric (by id) into the call graph.
+func (s *Storage) AddIstioServiceMetric(service string, ts time.Time, id graph.MetricID, value float64) error {
 	if s == nil || s.Graph == nil {
-		return
+		return nil
 	}
-	s.Graph.AddEdgeSample(from, to, ts, p95, p50)
+	return s.Graph.AddServiceMetric(service, ts, id, value)
+}
+
+// AddIstioEdgeMetric records an edge-level istio metric (by id) into the call graph.
+func (s *Storage) AddIstioEdgeMetric(from, to string, ts time.Time, id graph.MetricID, value float64) error {
+	if s == nil || s.Graph == nil {
+		return nil
+	}
+	return s.Graph.AddEdgeMetric(from, to, ts, id, value)
 }
 
 // Sync synchronizes active services and their pods. The input map maps service->list of active pods.
