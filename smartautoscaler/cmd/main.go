@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/kudmo/CoolPA/collector"
+	"github.com/kudmo/CoolPA/storage"
 )
 
 func main() {
@@ -184,7 +185,7 @@ func main() {
 			},
 		},
 	}
-	handler := collector.NewLogHandler(log.Default())
+	handler := storage.NewStorageHandler(config.Interval*10, config.Interval)
 
 	promCollector, err := collector.NewPrometheusCollector(
 		config,
