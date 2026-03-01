@@ -526,3 +526,85 @@ func TestGetPodMetricHeadValueNotFound(t *testing.T) {
 		t.Fatalf("expected ok=false for non-existing pod, got value=%v", v)
 	}
 }
+
+func TestRingWindow_SeriesRangeAligned(t *testing.T) {
+	w := NewRingWindow(40*time.Second, 10*time.Second)
+
+	// add buckets at 100,110,120,130
+	w.Add(time.Unix(100, 0), 10)
+	w.Add(time.Unix(110, 0), 20)
+	w.Add(time.Unix(120, 0), 30)
+	w.Add(time.Unix(130, 0), 40)
+
+	got := w.SeriesRange(time.Unix(100, 0), time.Unix(140, 0))
+	want := []float64{10, 20, 30, 40}
+	if got == nil {
+		t.Fatalf("SeriesRange returned nil, want %v", want)
+	}
+	if len(got) != len(want) {
+		t.Fatalf("SeriesRange length = %d, want %d", len(got), len(want))
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("SeriesRange[%d] = %v, want %v", i, got[i], want[i])
+		}
+	}
+}
+
+func TestRingWindow_SeriesRangeWithMissingBuckets(t *testing.T) {
+	w := NewRingWindow(40*time.Second, 10*time.Second)
+
+	// add only bucket 100 and 120
+	w.Add(time.Unix(100, 0), 10)
+	w.Add(time.Unix(120, 0), 30)
+
+	got := w.SeriesRange(time.Unix(100, 0), time.Unix(140, 0))
+	want := []float64{10, 0, 30, 0}
+	if got == nil {
+		t.Fatalf("SeriesRange returned nil, want %v", want)
+	}
+	if len(got) != len(want) {
+		t.Fatalf("SeriesRange length = %d, want %d", len(got), len(want))
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("SeriesRange[%d] = %v, want %v", i, got[i], want[i])
+		}
+	}
+}
+
+func TestRingWindow_SeriesRangeUnalignedFromAndEmpty(t *testing.T) {
+	w := NewRingWindow(40*time.Second, 10*time.Second)
+
+	// add buckets at 100,110,120,130
+	w.Add(time.Unix(100, 0), 10)
+	w.Add(time.Unix(110, 0), 20)
+	w.Add(time.Unix(120, 0), 30)
+	w.Add(time.Unix(130, 0), 40)
+
+	// from is unaligned (105), expect series of 4 steps: 105..145 -> buckets 110,120,130 present
+	got := w.SeriesRange(time.Unix(105, 0), time.Unix(145, 0))
+	want := []float64{20, 30, 40, 0}
+	if got == nil {
+		t.Fatalf("SeriesRange returned nil, want %v", want)
+	}
+	if len(got) != len(want) {
+		t.Fatalf("SeriesRange length = %d, want %d", len(got), len(want))
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("SeriesRange[%d] = %v, want %v", i, got[i], want[i])
+		}
+	}
+
+	// empty window (start not initialized) should return nil
+	e := NewRingWindow(40*time.Second, 10*time.Second)
+	if got := e.SeriesRange(time.Unix(100, 0), time.Unix(140, 0)); got != nil {
+		t.Fatalf("expected nil for empty window, got %v", got)
+	}
+
+	// from >= to -> nil
+	if got := w.SeriesRange(time.Unix(150, 0), time.Unix(140, 0)); got != nil {
+		t.Fatalf("expected nil for from>=to, got %v", got)
+	}
+}

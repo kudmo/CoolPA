@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
-	"time"
 
 	"github.com/kudmo/CoolPA/collector"
 	"github.com/kudmo/CoolPA/storage/graph"
@@ -86,9 +85,9 @@ type StorageHandler struct {
 	parser *PodNameParser
 }
 
-func NewStorageHandler(window, step time.Duration) *StorageHandler {
+func NewStorageHandler(store *Storage) *StorageHandler {
 	return &StorageHandler{
-		Store:  NewStorage(window, step),
+		Store:  store,
 		parser: NewPodNameParser(),
 	}
 }

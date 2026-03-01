@@ -254,6 +254,47 @@ func (r *RingWindow) ValuesRange(from, to time.Time) []float64 {
 	return values
 }
 
+// SeriesRange returns a time-aligned series of values for the interval [from, to)
+// with resolution equal to the window step. The returned slice has length
+// int((to-from)/r.step) and contains zeros for buckets with no data.
+func (r *RingWindow) SeriesRange(from, to time.Time) []float64 {
+	if r.start.IsZero() || !from.Before(to) {
+		return nil
+	}
+	n := len(r.buckets)
+	if n == 0 {
+		return nil
+	}
+
+	// number of discrete steps in requested interval
+	totalSteps := int(to.Sub(from) / r.step)
+	if totalSteps <= 0 {
+		return nil
+	}
+
+	series := make([]float64, totalSteps)
+
+	// iterate all buckets and place values into corresponding slot
+	oldestIdx := (r.head + 1) % n
+	for i := 0; i < n; i++ {
+		idx := (oldestIdx + i) % n
+		b := r.buckets[idx]
+		if b.Timestamp.IsZero() {
+			continue
+		}
+		if b.Timestamp.Before(from) || !b.Timestamp.Before(to) {
+			continue
+		}
+
+		off := int(b.Timestamp.Sub(from) / r.step)
+		if off >= 0 && off < totalSteps {
+			series[off] = b.Value
+		}
+	}
+
+	return series
+}
+
 type PodStore struct {
 	metrics  [MetricCount]*RingWindow
 	lastSeen time.Time

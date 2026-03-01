@@ -9,6 +9,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/kudmo/CoolPA/analyzer"
 	"github.com/kudmo/CoolPA/collector"
 	"github.com/kudmo/CoolPA/storage"
 )
@@ -185,7 +186,8 @@ func main() {
 			},
 		},
 	}
-	handler := storage.NewStorageHandler(config.Interval*10, config.Interval)
+	store := storage.NewStorage(config.Interval*10, config.Interval)
+	handler := storage.NewStorageHandler(store)
 
 	promCollector, err := collector.NewPrometheusCollector(
 		config,
@@ -206,6 +208,12 @@ func main() {
 	}
 
 	log.Println("Metric collector started. Press Ctrl+C to stop.")
+
+	analyzer := analyzer.NewAnalyzer(analyzer.Config{Interval: 15 * time.Second}, store)
+	if err := analyzer.Start(ctx); err != nil {
+		log.Fatalf("Failed to start analyzer: %v", err)
+	}
+	log.Println("Analyzer started. Press Ctrl+C to stop.")
 
 	<-sigChan
 	log.Println("Shutdown signal received")
