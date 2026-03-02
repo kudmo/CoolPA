@@ -186,7 +186,7 @@ func main() {
 			},
 		},
 	}
-	store := storage.NewStorage(config.Interval*10, config.Interval)
+	store := storage.NewStorage(config.Interval*100, config.Interval)
 	handler := storage.NewStorageHandler(store)
 
 	promCollector, err := collector.NewPrometheusCollector(
@@ -209,7 +209,15 @@ func main() {
 
 	log.Println("Metric collector started. Press Ctrl+C to stop.")
 
-	analyzer := analyzer.NewAnalyzer(analyzer.Config{Interval: 15 * time.Second}, store)
+	analyzer := analyzer.NewAnalyzer(
+		analyzer.Config{
+			Interval:              15 * time.Second,
+			Confidence:            0.05,
+			WelchOldIntervalBegin: time.Duration(300 * time.Second),
+			WelchNowIntervalBegin: time.Duration(60 * time.Second),
+		},
+		store,
+	)
 	if err := analyzer.Start(ctx); err != nil {
 		log.Fatalf("Failed to start analyzer: %v", err)
 	}

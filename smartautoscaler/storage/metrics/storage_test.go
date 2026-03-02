@@ -608,3 +608,188 @@ func TestRingWindow_SeriesRangeUnalignedFromAndEmpty(t *testing.T) {
 		t.Fatalf("expected nil for from>=to, got %v", got)
 	}
 }
+
+func TestRingWindow_ValuesRangeAligned(t *testing.T) {
+	w := NewRingWindow(40*time.Second, 10*time.Second)
+
+	// add buckets at 100,110,120,130
+	w.Add(time.Unix(100, 0), 10)
+	w.Add(time.Unix(110, 0), 20)
+	w.Add(time.Unix(120, 0), 30)
+	w.Add(time.Unix(130, 0), 40)
+
+	got := w.ValuesRange(time.Unix(100, 0), time.Unix(140, 0))
+	want := []float64{10, 20, 30, 40}
+	if got == nil {
+		t.Fatalf("ValuesRange returned nil, want %v", want)
+	}
+	if len(got) != len(want) {
+		t.Fatalf("ValuesRange length = %d, want %d", len(got), len(want))
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("ValuesRange[%d] = %v, want %v", i, got[i], want[i])
+		}
+	}
+}
+
+func TestRingWindow_ValuesRangeWithMissingBuckets(t *testing.T) {
+	w := NewRingWindow(40*time.Second, 10*time.Second)
+
+	w.Add(time.Unix(100, 0), 10)
+	w.Add(time.Unix(120, 0), 30)
+
+	got := w.ValuesRange(time.Unix(100, 0), time.Unix(140, 0))
+	want := []float64{10, 30}
+	if got == nil {
+		t.Fatalf("ValuesRange returned nil, want %v", want)
+	}
+	if len(got) != len(want) {
+		t.Fatalf("ValuesRange length = %d, want %d", len(got), len(want))
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("ValuesRange[%d] = %v, want %v", i, got[i], want[i])
+		}
+	}
+}
+
+func TestRingWindow_ValuesRangeUnalignedAndEmpty(t *testing.T) {
+	w := NewRingWindow(40*time.Second, 10*time.Second)
+
+	w.Add(time.Unix(100, 0), 10)
+	w.Add(time.Unix(110, 0), 20)
+	w.Add(time.Unix(120, 0), 30)
+	w.Add(time.Unix(130, 0), 40)
+
+	got := w.ValuesRange(time.Unix(105, 0), time.Unix(145, 0))
+	want := []float64{20, 30, 40}
+	if got == nil {
+		t.Fatalf("ValuesRange returned nil, want %v", want)
+	}
+	if len(got) != len(want) {
+		t.Fatalf("ValuesRange length = %d, want %d", len(got), len(want))
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("ValuesRange[%d] = %v, want %v", i, got[i], want[i])
+		}
+	}
+
+	// empty window (start not initialized) should return nil
+	e := NewRingWindow(40*time.Second, 10*time.Second)
+	if got := e.ValuesRange(time.Unix(100, 0), time.Unix(140, 0)); got != nil {
+		t.Fatalf("expected nil for empty window, got %v", got)
+	}
+
+	// from >= to -> nil
+	if got := w.ValuesRange(time.Unix(150, 0), time.Unix(140, 0)); got != nil {
+		t.Fatalf("expected nil for from>=to, got %v", got)
+	}
+}
+
+func TestRingWindow_ValuesRange_NowBased(t *testing.T) {
+	// Use a larger window and 10s step to cover several minutes
+	step := 10 * time.Second
+	w := NewRingWindow(300*time.Second, step)
+
+	now := time.Now().Truncate(step)
+
+	// Prepare timestamps relative to now
+	ts := map[int]time.Time{
+		-290: now.Add(-290 * time.Second),
+		-250: now.Add(-250 * time.Second),
+		-200: now.Add(-200 * time.Second),
+		-100: now.Add(-100 * time.Second),
+		-60:  now.Add(-60 * time.Second),
+		-50:  now.Add(-50 * time.Second),
+		-10:  now.Add(-10 * time.Second),
+	}
+
+	// Insert values so we can reason about expected slices
+	values := map[int]float64{
+		-290: 1,
+		-250: 2,
+		-200: 3,
+		-100: 4,
+		-60:  5, // boundary value (should be included when from == now-60)
+		-50:  6,
+		-10:  7,
+	}
+
+	// Add samples in chronological order (map iteration is random)
+	offsets := []int{-290, -250, -200, -100, -60, -50, -10}
+	for _, off := range offsets {
+		w.Add(ts[off], values[off])
+	}
+
+	// Range A: [now-60, now) should include -60, -50, -10
+	gotA := w.ValuesRange(now.Add(-60*time.Second), now)
+	wantA := []float64{5, 6, 7}
+	if gotA == nil {
+		t.Fatalf("ValuesRange returned nil for range A, want %v", wantA)
+	}
+	if len(gotA) != len(wantA) {
+		t.Fatalf("ValuesRange length for A = %d, want %d", len(gotA), len(wantA))
+	}
+	for i := range wantA {
+		if gotA[i] != wantA[i] {
+			t.Fatalf("ValuesRange A[%d] = %v, want %v", i, gotA[i], wantA[i])
+		}
+	}
+
+	// Range B: [now-300, now-60) should include -290, -250, -200, -100
+	gotB := w.ValuesRange(now.Add(-300*time.Second), now.Add(-60*time.Second))
+	wantB := []float64{1, 2, 3, 4}
+	if gotB == nil {
+		t.Fatalf("ValuesRange returned nil for range B, want %v", wantB)
+	}
+	if len(gotB) != len(wantB) {
+		t.Fatalf("ValuesRange length for B = %d, want %d", len(gotB), len(wantB))
+	}
+	for i := range wantB {
+		if gotB[i] != wantB[i] {
+			t.Fatalf("ValuesRange B[%d] = %v, want %v", i, gotB[i], wantB[i])
+		}
+	}
+
+	// Intersection / combined range: [now-200, now) -> should include -200, -100, -60, -50, -10
+	gotC := w.ValuesRange(now.Add(-200*time.Second), now)
+	wantC := []float64{3, 4, 5, 6, 7}
+	if gotC == nil {
+		t.Fatalf("ValuesRange returned nil for range C, want %v", wantC)
+	}
+	if len(gotC) != len(wantC) {
+		t.Fatalf("ValuesRange length for C = %d, want %d", len(gotC), len(wantC))
+	}
+	for i := range wantC {
+		if gotC[i] != wantC[i] {
+			t.Fatalf("ValuesRange C[%d] = %v, want %v", i, gotC[i], wantC[i])
+		}
+	}
+
+	// Unaligned from: from = now-65 should include bucket at now-60
+	gotD := w.ValuesRange(now.Add(-65*time.Second), now.Add(-55*time.Second))
+	// window [now-65, now-55) covers bucket starting at now-60 only
+	wantD := []float64{5}
+	if gotD == nil {
+		t.Fatalf("ValuesRange returned nil for unaligned D, want %v", wantD)
+	}
+	if len(gotD) != len(wantD) {
+		t.Fatalf("ValuesRange length for D = %d, want %d", len(gotD), len(wantD))
+	}
+	if gotD[0] != wantD[0] {
+		t.Fatalf("ValuesRange D[0] = %v, want %v", gotD[0], wantD[0])
+	}
+
+	// from >= to -> nil
+	if got := w.ValuesRange(now, now.Add(-10*time.Second)); got != nil {
+		t.Fatalf("expected nil for from>=to, got %v", got)
+	}
+
+	// empty window should return nil
+	e := NewRingWindow(300*time.Second, step)
+	if got := e.ValuesRange(now.Add(-60*time.Second), now); got != nil {
+		t.Fatalf("expected nil for empty window, got %v", got)
+	}
+}

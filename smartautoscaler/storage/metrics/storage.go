@@ -234,9 +234,7 @@ func (r *RingWindow) ValuesRange(from, to time.Time) []float64 {
 	if n == 0 {
 		return nil
 	}
-	// Индекс самой старой корзины (с наименьшим временем начала)
 	oldestIdx := (r.head + 1) % n
-	// Время начала самой старой корзины
 	values := make([]float64, 0, n)
 	for i := 0; i < n; i++ {
 		idx := (oldestIdx + i) % n
@@ -269,7 +267,7 @@ func (r *RingWindow) SeriesRange(from, to time.Time) []float64 {
 	// number of discrete steps in requested interval
 	totalSteps := int(to.Sub(from) / r.step)
 	if totalSteps <= 0 {
-		return nil
+		return make([]float64, 0)
 	}
 
 	series := make([]float64, totalSteps)

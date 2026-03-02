@@ -8,6 +8,7 @@ import (
 	"time"
 
 	sloviolation "github.com/kudmo/CoolPA/analyzer/slo_violation"
+	"github.com/kudmo/CoolPA/analyzer/welchtest"
 	"github.com/kudmo/CoolPA/storage"
 	"github.com/kudmo/toporank/api"
 	"github.com/kudmo/toporank/types"
@@ -15,6 +16,11 @@ import (
 
 type Config struct {
 	Interval time.Duration
+
+	Confidence float64
+
+	WelchOldIntervalBegin time.Duration
+	WelchNowIntervalBegin time.Duration
 }
 
 type Analyzer struct {
@@ -64,6 +70,25 @@ func (a *Analyzer) Start(ctx context.Context) error {
 				anomalys := api.RunTopoRank(graph, types.DefaultConfig())
 				for _, service := range anomalys {
 					a.logger.Printf("Service: %s, Anomaly Score: %.4f", service.ID, service.Rank)
+				}
+
+				fmt.Printf("[DEBUG]: \n")
+				for _, service := range a.Store.Graph.GetServices() {
+					n, _ := a.Store.Graph.GetNode(service)
+					time_now := time.Now()
+					time_now_begin := time_now.Add(-a.config.WelchNowIntervalBegin)
+					time_old_begin := time_now.Add(-a.config.WelchOldIntervalBegin)
+
+					old := n.RequestCount.SeriesRange(time_old_begin, time_now_begin)
+					new := n.RequestCount.SeriesRange(time_now_begin, time_now)
+					welch_result, _ := welchtest.TwoSampleWelch(new, old)
+					fmt.Printf("Service %s old: %v\n", service, old)
+					fmt.Printf("Service %s new: %v\n", service, new)
+					fmt.Printf("Welch_res: t:%f, p:%f\n", welch_result.TStatistic, welch_result.PValueOneSided())
+
+					if welch_result.TStatistic > 0 && welch_result.PValueOneSided() <= a.config.Confidence {
+						fmt.Printf("Service %s has underutilization\n", service)
+					}
 				}
 			case <-a.stopChan:
 				a.logger.Printf("Stopping metric collector")
