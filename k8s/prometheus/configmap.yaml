@@ -9,46 +9,88 @@ data:
       scrape_interval: 5s
       evaluation_interval: 5s
 
-    rule_files:
-      - /etc/prometheus/rules.yml
-
     scrape_configs:
-      - job_name: test-go-app
+      # Kubelet
+      - job_name: 'kubelet'
+        scheme: https
+        tls_config:
+          insecure_skip_verify: true
+        bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
         kubernetes_sd_configs:
-          - role: endpoints
+          - role: node
         relabel_configs:
-          - source_labels: [__meta_kubernetes_service_name]
-            action: keep
-            regex: test-go-app
-
-      - job_name: smartautoscaler
-        kubernetes_sd_configs:
-          - role: endpoints
-        relabel_configs:
-          - source_labels: [__meta_kubernetes_service_name]
-            action: keep
-            regex: smartautoscaler
-
-      - job_name: kube-state-metrics
+          - action: labelmap
+            regex: __meta_kubernetes_node_label_(.+)
+          - target_label: __address__
+            replacement: kubernetes.default.svc.cluster.local:443
+          - source_labels: [__meta_kubernetes_node_name]
+            regex: (.+)
+            target_label: __metrics_path__
+            replacement: /api/v1/nodes/${1}/proxy/metrics/cadvisor
+      # Kubelet / node / pod metrics
+      - job_name: 'kube-state-metrics'
         static_configs:
-          - targets:
-              - kube-state-metrics.kube-system.svc:8080
+          - targets: ['kube-state-metrics.kube-system.svc.cluster.local:8080']
 
-  rules.yml: |
-    groups:
-      - name: pbscaler
-        interval: 5s
-        rules:
-          - record: app:rps
-            expr: sum(rate(http_requests_total[1m]))
+      - job_name: 'autoscaled-apps'
+        kubernetes_sd_configs:
+          - role: pod
+            namespaces:
+              names:
+                - autoscale-test
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_pod_label_autoscaling_enabled]
+            action: keep
+            regex: "true"
+          - source_labels: [__meta_kubernetes_pod_ip]
+            target_label: __address__
+            replacement: ${1}:8080
+          - action: labelmap
+            regex: __meta_kubernetes_pod_label_(.+)
+          - source_labels: [__meta_kubernetes_namespace]
+            target_label: namespace
+          - source_labels: [__meta_kubernetes_pod_name]
+            target_label: pod
 
-          - record: app:p95
-            expr: histogram_quantile(
-                    0.95,
-                    sum by (le)(
-                      rate(http_request_duration_seconds_bucket[1m])
-                    )
-                  )
+      # Prometheus
+      - job_name: 'prometheus'
+        static_configs:
+          - targets: ['prometheus.autoscale-test.svc.cluster.local:9090']
 
-          - record: app:pressure
-            expr: app:rps * app:p95
+      # Istio sidecar (Envoy proxy metrics)
+      # Istio sidecar (Envoy proxy metrics)
+      - job_name: 'istio-envoy'
+        kubernetes_sd_configs:
+          - role: pod
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_pod_container_name]
+            action: keep
+            regex: istio-proxy
+
+          - source_labels: [__meta_kubernetes_pod_ip]
+            target_label: __address__
+            replacement: "${1}:15090"
+
+          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_port]
+            action: replace
+            regex: (.+)
+            target_label: __tmp_port
+            replacement: $1
+
+          - source_labels: [__meta_kubernetes_pod_ip, __tmp_port]
+            action: replace
+            regex: (.+);(.+)
+            target_label: __address__
+            replacement: $1:$2
+            # ВАЖНО: это правило перезапишет предыдущее, если есть __tmp_port
+
+          - target_label: __metrics_path__
+            replacement: /stats/prometheus
+
+          - action: labelmap
+            regex: __meta_kubernetes_pod_label_(.+)
+
+          - source_labels: [__meta_kubernetes_namespace]
+            target_label: namespace
+          - source_labels: [__meta_kubernetes_pod_name]
+            target_label: pod

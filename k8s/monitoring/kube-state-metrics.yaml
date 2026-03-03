@@ -9,12 +9,12 @@ kind: ClusterRole
 metadata:
   name: kube-state-metrics
 rules:
-  - apiGroups: ["" ]
-    resources: ["pods","nodes","namespaces","services","endpoints"]
-    verbs: ["list","watch"]
+  - apiGroups: [""]
+    resources: ["pods", "nodes", "namespaces", "services", "endpoints"]
+    verbs: ["list", "watch"]
   - apiGroups: ["apps"]
-    resources: ["deployments","daemonsets","replicasets","statefulsets"]
-    verbs: ["list","watch"]
+    resources: ["deployments", "daemonsets", "replicasets", "statefulsets"]
+    verbs: ["list", "watch"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
@@ -37,6 +37,7 @@ metadata:
   labels:
     app: kube-state-metrics
 spec:
+  replicas: 1
   selector:
     matchLabels:
       app: kube-state-metrics
@@ -48,13 +49,14 @@ spec:
       serviceAccountName: kube-state-metrics
       containers:
         - name: kube-state-metrics
-          image: quay.io/coreos/kube-state-metrics:v2.8.0
+          image: k8s.gcr.io/kube-state-metrics/kube-state-metrics:v2.8.0
           ports:
             - containerPort: 8080
               name: metrics
           args:
             - --port=8080
             - --telemetry-port=8081
+            - --metric-labels-allowlist=pods=[*]
 ---
 apiVersion: v1
 kind: Service

@@ -1,25 +1,25 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: test-go-app
+  name: test-go-app-client
   namespace: autoscale-test
   labels:
-    app: test-go-app
+    app: test-go-app-client
     autoscaling-enabled: "true"
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: test-go-app
+      app: test-go-app-client
   template:
     metadata:
       labels:
-        app: test-go-app
+        app: test-go-app-client
         autoscaling-enabled: "true"
     spec:
       containers:
-        - name: test-go-app
-          image: test-go-app:latest
+        - name: test-go-app-client
+          image: test-go-app-client:latest
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8080
