@@ -56,8 +56,18 @@ help:
 	@echo "  logs-prom       - логи Prometheus"
 	@echo ""
 	@echo "Масштабирование:"
-	@echo "  scale-up        - масштабировать test-go-app до 3 реплик"
-	@echo "  scale-down      - вернуть 1 реплику"
+	@echo "  hpa-scale       - горизонтальное масштабирование (изменение количества реплик)"
+	@echo "      Параметры: SERVICE=имя_сервиса (default: test-go-app)"
+	@echo "                 REPLICAS=количество (default: 3)"
+	@echo "      Пример: make hpa-scale SERVICE=test-go-app-client REPLICAS=5"
+	@echo ""
+	@echo "  vpa-scale       - вертикальное масштабирование (изменение ресурсов CPU/Memory)"
+	@echo "      Параметры: SERVICE=имя_сервиса (default: test-go-app)"
+	@echo "                 REQUESTS_CPU=запрос CPU (default: 200m)"
+	@echo "                 REQUESTS_MEM=запрос памяти (default: 512Mi)"
+	@echo "                 LIMITS_CPU=лимит CPU (default: 500m)"
+	@echo "                 LIMITS_MEM=лимит памяти (default: 1Gi)"
+	@echo "      Пример: make vpa-scale SERVICE=test-go-app-client REQUESTS_CPU=300m LIMITS_MEM=2Gi"
 	@echo ""
 	@echo "Istio:"
 	@echo "  istio-install         - установить Istio"
@@ -198,15 +208,31 @@ logs-prom:
 # МАСШТАБИРОВАНИЕ
 # =========================
 
-.PHONY: scale-up
-scale-up:
-	$(KUBECTL) -n $(NS) scale deploy/test-go-app --replicas=3
-	$(KUBECTL) -n $(NS) rollout status deploy/test-go-app
+# Параметры с возможностью переопределения
+SERVICE ?= test-go-app
+REPLICAS ?= 3
+REQUESTS_CPU ?= 200m
+REQUESTS_MEM ?= 512Mi
+LIMITS_CPU ?= 500m
+LIMITS_MEM ?= 1Gi
 
-.PHONY: scale-down
-scale-down:
-	$(KUBECTL) -n $(NS) scale deploy/test-go-app --replicas=1
-	$(KUBECTL) -n $(NS) rollout status deploy/test-go-app
+# Универсальная команда для HPA
+.PHONY: hpa-scale
+hpa-scale:
+	$(KUBECTL) -n $(NS) scale deploy/$(SERVICE) --replicas=$(REPLICAS)
+	$(KUBECTL) -n $(NS) rollout status deploy/$(SERVICE)
+
+# Универсальная команда для VPA
+.PHONY: vpa-scale
+vpa-scale:
+	$(KUBECTL) -n $(NS) set resources deploy/$(SERVICE) \
+		--requests=cpu=$(REQUESTS_CPU),memory=$(REQUESTS_MEM) \
+		--limits=cpu=$(LIMITS_CPU),memory=$(LIMITS_MEM)
+	$(KUBECTL) -n $(NS) rollout status deploy/$(SERVICE)
+
+# Примеры использования:
+# make hpa-scale SERVICE=test-go-app-client REPLICAS=5
+# make vpa-scale SERVICE=test-go-app-client REQUESTS_CPU=300m LIMITS_MEM=2Gi
 
 # =========================
 # КОМПОЗИТНЫЕ ЦЕЛИ
