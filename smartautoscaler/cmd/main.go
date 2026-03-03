@@ -17,8 +17,8 @@ import (
 func main() {
 	config := collector.Config{
 		PrometheusURL: "http://prometheus.autoscale-test.svc.cluster.local:9090",
-		Interval:      15 * time.Second,
-		Timeout:       10 * time.Second,
+		Interval:      5 * time.Second,
+		Timeout:       4 * time.Second,
 		Queries: []collector.MetricQuery{
 			{
 				Name:  "kube_pod_info",
@@ -186,7 +186,7 @@ func main() {
 			},
 		},
 	}
-	store := storage.NewStorage(config.Interval*100, config.Interval)
+	store := storage.NewStorage(10*time.Minute, config.Interval)
 	handler := storage.NewStorageHandler(store)
 
 	promCollector, err := collector.NewPrometheusCollector(

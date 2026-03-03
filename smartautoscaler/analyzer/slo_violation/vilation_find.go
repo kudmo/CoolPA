@@ -52,42 +52,23 @@ type call struct {
 
 // findAbnormalCalls detects abnormal calls according to parameters and returns
 // the list of abnormal edges along with an anomaly degree per service.
-func findAbnormalCalls(now time.Time, p AbnormalParams, g *graph.CallGraph) ([]call, map[string]float64) {
+func findAbnormalCalls(now time.Time, p AbnormalParams, g *graph.CallGraph) []call {
 	fromTime := now.Add(-p.Window)
 	threshold := p.SLO * (1 + p.Alpha/2)
 
 	var abnormalCalls []call
-	serviceAnomaly := make(map[string]float64)
 
 	for _, from := range g.GetServices() {
 		node, _ := g.GetNode(from)
 		for to, edge := range node.OutboundEdges {
 			lat := edge.Latency95.AvgRange(fromTime, now)
-
 			if lat > threshold {
 				abnormalCalls = append(abnormalCalls, call{from, to})
-
-				// anomaly degree = normalized exceed ratio
-				excess := (lat - threshold) / threshold
-				if excess < 0 {
-					excess = 0
-				}
-				if excess > 1 {
-					excess = 1
-				}
-
-				// assign to both services (max if multiple edges)
-				if excess > serviceAnomaly[from] {
-					serviceAnomaly[from] = excess
-				}
-				if excess > serviceAnomaly[to] {
-					serviceAnomaly[to] = excess
-				}
 			}
 		}
 	}
 
-	return abnormalCalls, serviceAnomaly
+	return abnormalCalls
 }
 
 // buildCorrelationGraphFromCalls builds a correlation graph from provided abnormal
@@ -129,11 +110,46 @@ func buildCorrelationGraphFromCalls(now time.Time, p AbnormalParams, g *graph.Ca
 	return cg, nil
 }
 
+func computeAnomalyDegree(now time.Time, p AbnormalParams, g *graph.CallGraph, abnormalCalls []call) map[string]float64 {
+	fromTime := now.Add(-p.Window)
+	serviceAnomaly := make(map[string]float64)
+
+	affectedServices := make(map[string]bool)
+	for _, c := range abnormalCalls {
+		affectedServices[c.from] = true
+		affectedServices[c.to] = true
+	}
+
+	for svc := range affectedServices {
+		node, exists := g.GetNode(svc)
+		if !exists {
+			continue
+		}
+
+		exceedCount := 0
+
+		for _, edge := range node.InboundEdges {
+			latencySeries := edge.Latency95.SeriesRange(fromTime, now)
+			for _, lat := range latencySeries {
+				if lat > p.SLO {
+					exceedCount++
+				}
+			}
+
+		}
+
+		serviceAnomaly[svc] = float64(exceedCount)
+	}
+
+	return serviceAnomaly
+}
 func BuildAbnormalCorrelationGraph(
 	now time.Time,
 	p AbnormalParams,
 	g *graph.CallGraph,
 ) (*types.CorrelationGraph, error) {
-	abnormalCalls, serviceAnomaly := findAbnormalCalls(now, p, g)
+	abnormalCalls := findAbnormalCalls(now, p, g)
+	serviceAnomaly := computeAnomalyDegree(now, p, g, abnormalCalls)
+
 	return buildCorrelationGraphFromCalls(now, p, g, abnormalCalls, serviceAnomaly)
 }
