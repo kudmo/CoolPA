@@ -9,6 +9,7 @@ import (
 
 	sloviolation "github.com/kudmo/CoolPA/analyzer/slo_violation"
 	"github.com/kudmo/CoolPA/analyzer/welchtest"
+	"github.com/kudmo/CoolPA/decision"
 	"github.com/kudmo/CoolPA/storage"
 	"github.com/kudmo/toporank/api"
 	"github.com/kudmo/toporank/types"
@@ -142,6 +143,18 @@ func (a *Analyzer) Start(ctx context.Context) error {
 					a.logger.Printf("Anomalous services: %v, Scale: %d\n", result.Services, result.Scale)
 				} else {
 					a.logger.Printf("No anomalies detected\n")
+				}
+
+				reactor := decision.ReactionOptimizer{}
+				switch result.Scale {
+				case 1:
+					a.logger.Printf("Proposing scale up for services: %v\n", result.Services)
+					reactor.ScaleUp(result.Services, a.Store)
+				case -1:
+					a.logger.Printf("Proposing scale down for services: %v\n", result.Services)
+					reactor.ScaleDown(result.Services, a.Store)
+				default:
+					a.logger.Printf("No scaling action proposed\n")
 				}
 			case <-a.stopChan:
 				a.logger.Printf("Stopping metric collector\n")
