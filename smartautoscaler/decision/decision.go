@@ -8,11 +8,14 @@ import (
 	"github.com/kudmo/CoolPA/decision/ga/engine"
 	"github.com/kudmo/CoolPA/decision/ga/fitness"
 	"github.com/kudmo/CoolPA/decision/ga/genome"
+	slopredictor "github.com/kudmo/CoolPA/decision/slo_predictor"
 	"github.com/kudmo/CoolPA/storage"
 	"github.com/kudmo/CoolPA/storage/metrics"
 )
 
-type ReactionOptimizer struct{}
+type ReactionOptimizer struct {
+	Store *storage.Storage
+}
 
 // ScaleUp runs the GA to propose scaling decisions biased towards increases.
 func (ro *ReactionOptimizer) ScaleUp(services []string, store *storage.Storage) {
@@ -44,8 +47,8 @@ func (ro *ReactionOptimizer) ScaleUp(services []string, store *storage.Storage) 
 
 	ce := &constraints.ConstraintEngine{ServicePolicies: constraintsmap, GlobalPolicy: constraints.GlobalPolicy{ClusterCPULimit: 5000000.0, ClusterReplicaLimit: 100}}
 
-	fb := &fitness.DefaultFeatureBuilder{}
-	pred := &fitness.DummyPredictor{}
+	fb := &fitness.DefaultFeatureBuilder{Store: ro.Store}
+	pred := &slopredictor.RFPredictor{}
 	fit := &fitness.DefaultFitness{Builder: fb, Predictor: pred}
 
 	eng := &engine.Engine{Config: cfg, Fitness: fit, Constraints: ce}

@@ -145,7 +145,7 @@ func (a *Analyzer) Start(ctx context.Context) error {
 					a.logger.Printf("No anomalies detected\n")
 				}
 
-				reactor := decision.ReactionOptimizer{}
+				reactor := decision.ReactionOptimizer{Store: a.Store}
 				switch result.Scale {
 				case 1:
 					a.logger.Printf("Proposing scale up for services: %v\n", result.Services)

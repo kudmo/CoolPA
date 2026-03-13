@@ -4,6 +4,8 @@ import (
 	"math"
 
 	"github.com/kudmo/CoolPA/decision/ga/genome"
+	"github.com/kudmo/CoolPA/storage"
+	"github.com/kudmo/CoolPA/storage/metrics"
 )
 
 // FeatureBuilder converts genomes into per-service feature vectors suitable for predictors.
@@ -11,12 +13,20 @@ type FeatureBuilder interface {
 	Build(genome *genome.ReactionGenome) [][]float64
 }
 
-// DefaultFeatureBuilder implements a basic builder that uses:
-// - one-hot reaction type (HPA/VPA)
-// - active relative delta (replicas for HPA, cpu for VPA)
 type DefaultFeatureBuilder struct {
+	Store *storage.Storage
 }
 
+// container_cpu_quota
+// container_memory_limit
+// replicas_count
+// istio_requests_total
+// slo_threshold
+// rps_per_replica = istio_requests_total / replicas_count
+// cpu_per_rps = container_cpu_quota / istio_requests_total
+// memory_per_rps = container_memory_limit / istio_requests_total
+// total_cpu_limit = replicas_count * container_cpu_quota
+// total_memory_limit = replicas_count * container_memory_limit
 func (b *DefaultFeatureBuilder) Build(g *genome.ReactionGenome) [][]float64 {
 	if g == nil {
 		return nil
@@ -26,30 +36,41 @@ func (b *DefaultFeatureBuilder) Build(g *genome.ReactionGenome) [][]float64 {
 		if sg == nil {
 			continue
 		}
-		// reaction one-hot: [isHPA, isVPA]
-		isHPA := 0.0
-		isVPA := 0.0
-		if sg.ReactionType == genome.HPA {
-			isHPA = 1.0
-		} else {
-			isVPA = 1.0
+		svc := sg.ServiceName
+		node, _ := b.Store.Graph.GetNode(svc)
+
+		container_cpu_quota, _, _ := b.Store.ResourceMetrics.GetPodMetricHeadValue(svc, b.Store.ServicePods[svc][0], metrics.CPUQuota)
+		container_memory_limit, _, _ := b.Store.ResourceMetrics.GetPodMetricHeadValue(svc, b.Store.ServicePods[svc][0], metrics.MemoryLimit)
+		replicas_count := float64(len(b.Store.ServicePods[svc]))
+		istio_requests_total := node.RequestCount.Avg()
+		slo_threshold := float64(200)
+
+		switch sg.ReactionType {
+		case genome.HPA:
+			replicas_count = math.Max(0, math.Round(float64(replicas_count)*(1.0+sg.DeltaReplicas)))
+		case genome.VPA_CPU:
+			container_cpu_quota = container_cpu_quota * (1.0 + sg.DeltaCPU)
+			// container_memory_limit = container_memory_limit * (1.0 + sg.DeltaMem)
 		}
-		// active delta only
-		var active float64
-		if sg.ReactionType == genome.HPA {
-			active = sg.DeltaReplicas
-		} else {
-			active = sg.DeltaCPU
-		}
-		out = append(out, []float64{isHPA, isVPA, safeNorm(active)})
+
+		rps_per_replica := istio_requests_total / replicas_count
+		cpu_per_rps := container_cpu_quota / istio_requests_total
+		memory_per_rps := container_memory_limit / istio_requests_total
+		total_cpu_limit := replicas_count * container_cpu_quota
+		total_memory_limit := replicas_count * container_memory_limit
+
+		out = append(out, []float64{
+			container_cpu_quota,
+			container_memory_limit,
+			replicas_count,
+			istio_requests_total,
+			slo_threshold,
+			rps_per_replica,
+			cpu_per_rps,
+			memory_per_rps,
+			total_cpu_limit,
+			total_memory_limit,
+		})
 	}
 	return out
-}
-
-func safeNorm(v float64) float64 {
-	if math.IsNaN(v) || math.IsInf(v, 0) {
-		return 0
-	}
-	// small normalisation: squeeze into [-1,1] via tanh-like mapping
-	return math.Tanh(v)
 }

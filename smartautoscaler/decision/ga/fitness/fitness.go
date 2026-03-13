@@ -25,8 +25,7 @@ func (f *DefaultFitness) EvaluateBatch(pop []*genome.ReactionGenome) []float64 {
 			prod *= (1.0 - r)
 		}
 		p := 1.0 - prod
-		// Fitness to maximize: we invert risk -> prefer low risk by returning (1 - p)
-		scores[i] = 1.0 - p
+		scores[i] = p
 	}
 	return scores
 }
