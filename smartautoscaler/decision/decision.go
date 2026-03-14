@@ -49,7 +49,7 @@ func (ro *ReactionOptimizer) ScaleUp(services []string, store *storage.Storage) 
 
 	fb := &fitness.DefaultFeatureBuilder{Store: ro.Store}
 	pred := &slopredictor.RFPredictor{}
-	fit := &fitness.DefaultFitness{Builder: fb, Predictor: pred}
+	fit := &fitness.DefaultFitness{Builder: fb, Predictor: pred, Store: store}
 
 	eng := &engine.Engine{Config: cfg, Fitness: fit, Constraints: ce}
 

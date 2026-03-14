@@ -40,7 +40,7 @@ type AnalysisResult struct {
 func (a *Analyzer) analyzeWithSLOViolation() []string {
 	params := sloviolation.AbnormalParams{
 		Window: 1 * time.Minute,
-		SLO:    200,
+		SLO:    100,
 		Alpha:  0.2,
 	}
 	TOPORANK_THRESHOLD := 0.5

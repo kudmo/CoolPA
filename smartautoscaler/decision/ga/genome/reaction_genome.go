@@ -185,12 +185,12 @@ func (g *ReactionGenome) Decode(currentStates []ServiceState) CandidateState {
 		if sg, ok := idx[cs.Name]; ok {
 			switch sg.ReactionType {
 			case HPA:
-				newRepF := float64(cs.CurrentReplicas) * (1.0 + sg.DeltaReplicas)
+				newRepF := float64(cs.CurrentReplicas) + sg.DeltaReplicas
 				cand.Replicas = int(math.Max(0, math.Round(newRepF)))
 				cand.CPURel = cs.CurrentCPURel
 			case VPA_CPU:
+				cand.CPURel = math.Max(0, cs.CurrentCPURel+sg.DeltaCPU)
 				cand.Replicas = cs.CurrentReplicas
-				cand.CPURel = cs.CurrentCPURel * (1.0 + sg.DeltaCPU)
 			default:
 				cand.Replicas = cs.CurrentReplicas
 				cand.CPURel = cs.CurrentCPURel
