@@ -2,6 +2,7 @@ package metrics
 
 import (
 	"errors"
+	"math"
 	"time"
 )
 
@@ -226,6 +227,27 @@ func (r *RingWindow) MaxRange(from, to time.Time) float64 {
 	return max
 }
 
+func (r *RingWindow) Values() []float64 {
+	if len(r.buckets) == 0 {
+		return nil
+	}
+
+	values := make([]float64, 0, len(r.buckets))
+
+	n := len(r.buckets)
+	oldestIdx := (r.head + 1) % n
+
+	for i := 0; i < n; i++ {
+		idx := (oldestIdx + i) % n
+		b := r.buckets[idx]
+		if !b.Timestamp.IsZero() {
+			values = append(values, b.Value)
+		}
+	}
+
+	return values
+}
+
 func (r *RingWindow) ValuesRange(from, to time.Time) []float64 {
 	if r.start.IsZero() || !from.Before(to) {
 		return nil
@@ -250,6 +272,125 @@ func (r *RingWindow) ValuesRange(from, to time.Time) []float64 {
 		return nil
 	}
 	return values
+}
+
+func (r *RingWindow) StdDev() float64 {
+	values := r.Values()
+	if len(values) < 2 {
+		return 0
+	}
+
+	// Вычисляем среднее
+	sum := 0.0
+	for _, v := range values {
+		sum += v
+	}
+	mean := sum / float64(len(values))
+
+	// Вычисляем дисперсию
+	variance := 0.0
+	for _, v := range values {
+		diff := v - mean
+		variance += diff * diff
+	}
+	variance /= float64(len(values))
+
+	return math.Sqrt(variance)
+}
+
+func (r *RingWindow) StdDevRange(from, to time.Time) float64 {
+	values := r.ValuesRange(from, to)
+	if len(values) < 2 {
+		return 0
+	}
+
+	sum := 0.0
+	for _, v := range values {
+		sum += v
+	}
+	mean := sum / float64(len(values))
+
+	variance := 0.0
+	for _, v := range values {
+		diff := v - mean
+		variance += diff * diff
+	}
+	variance /= float64(len(values))
+
+	return math.Sqrt(variance)
+}
+
+func (r *RingWindow) Min() float64 {
+	values := r.Values()
+	if len(values) == 0 {
+		return 0
+	}
+
+	minVal := values[0]
+	for _, v := range values[1:] {
+		if v < minVal {
+			minVal = v
+		}
+	}
+	return minVal
+}
+
+func (r *RingWindow) Median() float64 {
+	values := r.Values()
+	if len(values) == 0 {
+		return 0
+	}
+
+	sorted := make([]float64, len(values))
+	copy(sorted, values)
+
+	for i := 1; i < len(sorted); i++ {
+		j := i
+		for j > 0 && sorted[j-1] > sorted[j] {
+			sorted[j-1], sorted[j] = sorted[j], sorted[j-1]
+			j--
+		}
+	}
+
+	mid := len(sorted) / 2
+	if len(sorted)%2 == 1 {
+		return sorted[mid]
+	}
+	return (sorted[mid-1] + sorted[mid]) / 2
+}
+
+func (r *RingWindow) Quantile(p float64) float64 {
+	values := r.Values()
+	if len(values) == 0 {
+		return 0
+	}
+
+	if p < 0 {
+		p = 0
+	}
+	if p > 1 {
+		p = 1
+	}
+
+	sorted := make([]float64, len(values))
+	copy(sorted, values)
+	for i := 1; i < len(sorted); i++ {
+		j := i
+		for j > 0 && sorted[j-1] > sorted[j] {
+			sorted[j-1], sorted[j] = sorted[j], sorted[j-1]
+			j--
+		}
+	}
+
+	pos := p * float64(len(sorted)-1)
+	idx := int(pos)
+	frac := pos - float64(idx)
+
+	if idx >= len(sorted)-1 {
+		return sorted[len(sorted)-1]
+	}
+
+	return sorted[idx]*(1-frac) + sorted[idx+1]*frac
 }
 
 // SeriesRange returns a time-aligned series of values for the interval [from, to)
@@ -442,6 +583,22 @@ func (s *MetricStore) GetPodMetricHeadValue(service, pod string, metric MetricID
 	}
 	rw := p.metrics[metric]
 	return rw.buckets[rw.head].Value, true, nil
+}
+
+func (s *MetricStore) GetPodMetricWindow(service, pod string, metric MetricID) (*RingWindow, bool, error) {
+	if metric >= MetricCount {
+		return nil, false, ErrInvalidMetric
+	}
+	svc, ok := s.services[service]
+	if !ok {
+		return nil, false, nil
+	}
+	p, ok := svc.pods[pod]
+	if !ok {
+		return nil, false, nil
+	}
+	rw := p.metrics[metric]
+	return rw, true, nil
 }
 
 // GetPodLastSeen returns last seen timestamp for a pod.
