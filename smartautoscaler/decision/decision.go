@@ -6,7 +6,6 @@ import (
 	"github.com/kudmo/CoolPA/decision/ga/config"
 	"github.com/kudmo/CoolPA/decision/ga/constraints"
 	"github.com/kudmo/CoolPA/decision/ga/engine"
-	"github.com/kudmo/CoolPA/decision/ga/fitness"
 	"github.com/kudmo/CoolPA/decision/ga/genome"
 	slopredictor "github.com/kudmo/CoolPA/decision/slo_predictor"
 	"github.com/kudmo/CoolPA/storage"
@@ -47,9 +46,8 @@ func (ro *ReactionOptimizer) ScaleUp(services []string, store *storage.Storage) 
 
 	ce := &constraints.ConstraintEngine{ServicePolicies: constraintsmap, GlobalPolicy: constraints.GlobalPolicy{ClusterCPULimit: 5000000.0, ClusterReplicaLimit: 100}}
 
-	fb := &fitness.DefaultFeatureBuilder{Store: ro.Store}
-	pred := &slopredictor.RFPredictor{}
-	fit := &fitness.DefaultFitness{Builder: fb, Predictor: pred, Store: store}
+	fit := slopredictor.NewResourceOptimizerFitness(store)
+	fit.Config = slopredictor.ResourceOptimizerFitnessConfig{CpuMax: 1200000, ReplicasMax: 10}
 
 	eng := &engine.Engine{Config: cfg, Fitness: fit, Constraints: ce}
 
@@ -124,9 +122,8 @@ func (ro *ReactionOptimizer) ScaleDown(services []string, store *storage.Storage
 	}
 	ce := &constraints.ConstraintEngine{ServicePolicies: constraintsmap, GlobalPolicy: constraints.GlobalPolicy{ClusterCPULimit: 5000000.0, ClusterReplicaLimit: 100}}
 
-	fb := &fitness.DefaultFeatureBuilder{}
-	pred := &fitness.DummyPredictor{}
-	fit := &fitness.DefaultFitness{Builder: fb, Predictor: pred}
+	fit := slopredictor.NewResourceOptimizerFitness(store)
+	fit.Config = slopredictor.ResourceOptimizerFitnessConfig{CpuMax: 1200000, ReplicasMax: 10}
 
 	eng := &engine.Engine{Config: cfg, Fitness: fit, Constraints: ce}
 

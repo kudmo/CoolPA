@@ -6,9 +6,14 @@ import (
 	ort "github.com/yalue/onnxruntime_go"
 )
 
-type RFPredictor struct{}
+// Predictor defines a batched predictor that returns per-service risk scores in [0,1].
+type Predictor interface {
+	PredictBatch(X [][]float64) []float64
+}
 
-func (d *RFPredictor) PredictBatch(X [][]float64) []float64 {
+type SLOPredictor struct{}
+
+func (d *SLOPredictor) PredictBatch(X [][]float64) []float64 {
 	out := make([]float64, len(X))
 
 	ort.SetSharedLibraryPath("/usr/local/lib/libonnxruntime.so")
