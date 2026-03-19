@@ -34,11 +34,12 @@ func (ro *ReactionOptimizer) ScaleUp(services []string, store *storage.Storage) 
 	// Build service policies
 	constraintsmap := map[string]constraints.ServicePolicy{}
 	for _, svc := range services {
-		cpu_quota, _, _ := store.ResourceMetrics.GetPodMetricHeadValue(svc, store.ServicePods[svc][0], metrics.CPUQuota)
+		pods := store.ResourceMetrics.GetServicePods(svc)
+		cpu_quota, _, _ := store.ResourceMetrics.GetPodMetricHeadValue(svc, pods[0], metrics.CPUQuota)
 		constraintsmap[svc] = constraints.ServicePolicy{
 			AllowedReactions: []genome.ReactionType{genome.HPA, genome.VPA_CPU},
-			MinReplicas:      len(store.ServicePods[svc]) + 1,
-			MaxReplicas:      len(store.ServicePods[svc]) + 10,
+			MinReplicas:      len(pods) + 1,
+			MaxReplicas:      len(pods) + 10,
 			MinCPU:           cpu_quota,
 			MaxCPU:           cpu_quota * 4,
 		}
@@ -84,8 +85,9 @@ func (ro *ReactionOptimizer) ScaleUp(services []string, store *storage.Storage) 
 	// Build current service states and decode candidate decisions
 	current := make([]genome.ServiceState, 0, len(services))
 	for _, svc := range services {
-		cpu_quota, _, _ := store.ResourceMetrics.GetPodMetricHeadValue(svc, store.ServicePods[svc][0], metrics.CPUQuota)
-		current = append(current, genome.ServiceState{Name: svc, CurrentReplicas: len(store.ServicePods[svc]), CurrentCPURel: cpu_quota})
+		pods := store.ResourceMetrics.GetServicePods(svc)
+		cpu_quota, _, _ := store.ResourceMetrics.GetPodMetricHeadValue(svc, pods[0], metrics.CPUQuota)
+		current = append(current, genome.ServiceState{Name: svc, CurrentReplicas: len(pods), CurrentCPURel: cpu_quota})
 	}
 	cand := best.Decode(current)
 	fmt.Println("Candidate state:")
@@ -111,11 +113,12 @@ func (ro *ReactionOptimizer) ScaleDown(services []string, store *storage.Storage
 
 	constraintsmap := map[string]constraints.ServicePolicy{}
 	for _, svc := range services {
-		cpu_quota, _, _ := store.ResourceMetrics.GetPodMetricHeadValue(svc, store.ServicePods[svc][0], metrics.CPUQuota)
+		pods := store.ResourceMetrics.GetServicePods(svc)
+		cpu_quota, _, _ := store.ResourceMetrics.GetPodMetricHeadValue(svc, pods[0], metrics.CPUQuota)
 		constraintsmap[svc] = constraints.ServicePolicy{
 			AllowedReactions: []genome.ReactionType{genome.HPA, genome.VPA_CPU},
 			MinReplicas:      1,
-			MaxReplicas:      len(store.ServicePods[svc]) + 10,
+			MaxReplicas:      len(pods) + 10,
 			MinCPU:           cpu_quota * 0.25,
 			MaxCPU:           cpu_quota * 4,
 		}
@@ -159,8 +162,9 @@ func (ro *ReactionOptimizer) ScaleDown(services []string, store *storage.Storage
 
 	current := make([]genome.ServiceState, 0, len(services))
 	for _, svc := range services {
-		cpu_quota, _, _ := store.ResourceMetrics.GetPodMetricHeadValue(svc, store.ServicePods[svc][0], metrics.CPUQuota)
-		current = append(current, genome.ServiceState{Name: svc, CurrentReplicas: len(store.ServicePods[svc]), CurrentCPURel: cpu_quota})
+		pods := store.ResourceMetrics.GetServicePods(svc)
+		cpu_quota, _, _ := store.ResourceMetrics.GetPodMetricHeadValue(svc, pods[0], metrics.CPUQuota)
+		current = append(current, genome.ServiceState{Name: svc, CurrentReplicas: len(pods), CurrentCPURel: cpu_quota})
 	}
 	cand := best.Decode(current)
 	fmt.Println("Candidate state (scale down):")

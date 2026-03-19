@@ -210,7 +210,7 @@ func (h *StorageHandler) handleIstio(result collector.MetricResult) {
 func (h *StorageHandler) handlePodsInfo(result collector.MetricResult) {
 	pod := result.Labels["pod"]
 	service := h.parser.ExtractServiceName(pod)
-	h.Store.ServicePods[service] = append(h.Store.ServicePods[service], pod)
+	h.Store.servicePods[service] = append(h.Store.servicePods[service], pod)
 }
 
 func (h *StorageHandler) Handle(result collector.MetricResult) {
@@ -227,14 +227,14 @@ func (h *StorageHandler) Handle(result collector.MetricResult) {
 
 func (h *StorageHandler) HandleBatch(results []collector.MetricResult) {
 	for _, s := range h.Store.Graph.GetServices() {
-		h.Store.ServicePods[s] = make([]string, 0)
+		h.Store.servicePods[s] = make([]string, 0)
 	}
 
 	for _, result := range results {
 		h.Handle(result)
 	}
 
-	h.Store.Sync(h.Store.ServicePods)
+	h.Store.Sync(h.Store.servicePods)
 
 	fmt.Printf("[DEBUG]: \n")
 	for _, svc := range h.Store.ResourceMetrics.GetServices() {

@@ -3,6 +3,7 @@ package metrics
 import (
 	"errors"
 	"math"
+	"sync"
 	"time"
 )
 
@@ -21,8 +22,7 @@ Design goals:
 
 Concurrency model:
 
-  The store assumes single-writer semantics.
-  External synchronization must be applied if accessed concurrently.
+  The store supports concurrent access with RWMutex for thread safety.
 */
 
 type MetricID uint8
@@ -448,6 +448,7 @@ type MetricStore struct {
 
 	window time.Duration
 	step   time.Duration
+	mu     sync.RWMutex
 }
 
 // NewMetricStore creates a new store.
@@ -496,6 +497,8 @@ func (s *MetricStore) AddSample(
 	ts time.Time,
 	value float64,
 ) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 
 	if metric >= MetricCount {
 		return ErrInvalidMetric
@@ -510,23 +513,11 @@ func (s *MetricStore) AddSample(
 	return nil
 }
 
-// RemovePod removes pod and subtracts its contribution.
-func (s *MetricStore) RemovePod(service, pod string) {
-	svc, ok := s.services[service]
-	if !ok {
-		return
-	}
-
-	_, ok = svc.pods[pod]
-	if !ok {
-		return
-	}
-
-	delete(svc.pods, pod)
-}
-
 // SyncPods removes pods not in active list.
 func (s *MetricStore) SyncPods(service string, active []string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	svc, ok := s.services[service]
 	if !ok {
 		return
@@ -539,13 +530,16 @@ func (s *MetricStore) SyncPods(service string, active []string) {
 
 	for pod := range svc.pods {
 		if _, ok := activeSet[pod]; !ok {
-			s.RemovePod(service, pod)
+			delete(svc.pods, pod)
 		}
 	}
 }
 
 // GetServices returns the list of known services.
 func (s *MetricStore) GetServices() []string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
 	out := make([]string, 0, len(s.services))
 	for name := range s.services {
 		out = append(out, name)
@@ -555,6 +549,9 @@ func (s *MetricStore) GetServices() []string {
 
 // GetServicePods returns list of pods for a service, or nil if service unknown.
 func (s *MetricStore) GetServicePods(service string) []string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
 	svc, ok := s.services[service]
 	if !ok {
 		return nil
@@ -570,6 +567,9 @@ func (s *MetricStore) GetServicePods(service string) []string {
 // Returns (value, true, nil) when found, (0, false, nil) when service/pod not found,
 // or (0,false,ErrInvalidMetric) when metric is invalid.
 func (s *MetricStore) GetPodMetricHeadValue(service, pod string, metric MetricID) (float64, bool, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
 	if metric >= MetricCount {
 		return 0, false, ErrInvalidMetric
 	}
@@ -586,6 +586,9 @@ func (s *MetricStore) GetPodMetricHeadValue(service, pod string, metric MetricID
 }
 
 func (s *MetricStore) GetPodMetricWindow(service, pod string, metric MetricID) (*RingWindow, bool, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
 	if metric >= MetricCount {
 		return nil, false, ErrInvalidMetric
 	}
@@ -603,6 +606,9 @@ func (s *MetricStore) GetPodMetricWindow(service, pod string, metric MetricID) (
 
 // GetPodLastSeen returns last seen timestamp for a pod.
 func (s *MetricStore) GetPodLastSeen(service, pod string) (time.Time, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
 	svc, ok := s.services[service]
 	if !ok {
 		return time.Time{}, false

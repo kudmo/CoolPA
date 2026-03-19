@@ -15,7 +15,9 @@ import (
 )
 
 func main() {
-	config := collector.Config{
+	// Configs
+
+	collectorConfig := collector.Config{
 		PrometheusURL: "http://prometheus.autoscale-test.svc.cluster.local:9090",
 		Interval:      5 * time.Second,
 		Timeout:       4 * time.Second,
@@ -186,20 +188,34 @@ func main() {
 			},
 		},
 	}
-	store := storage.NewStorage(10*time.Minute, config.Interval)
+	analyzerConfig := analyzer.Config{
+		Interval:              15 * time.Second,
+		Confidence:            0.05,
+		WelchOldIntervalBegin: time.Duration(300 * time.Second),
+		WelchNowIntervalBegin: time.Duration(60 * time.Second),
+	}
+
+	// Components creating
+
+	store := storage.NewStorage(10*time.Minute, collectorConfig.Interval)
 	handler := storage.NewStorageHandler(store)
 
 	promCollector, err := collector.NewPrometheusCollector(
-		config,
+		collectorConfig,
 		collector.WithHandler(handler),
 	)
 	if err != nil {
 		log.Fatalf("Failed to create collector: %v", err)
 	}
+	analyzer := analyzer.NewAnalyzer(
+		analyzerConfig,
+		store,
+	)
+
+	// Context creating and starting components
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 
@@ -209,22 +225,20 @@ func main() {
 
 	log.Println("Metric collector started. Press Ctrl+C to stop.")
 
-	analyzer := analyzer.NewAnalyzer(
-		analyzer.Config{
-			Interval:              15 * time.Second,
-			Confidence:            0.05,
-			WelchOldIntervalBegin: time.Duration(300 * time.Second),
-			WelchNowIntervalBegin: time.Duration(60 * time.Second),
-		},
-		store,
-	)
 	if err := analyzer.Start(ctx); err != nil {
 		log.Fatalf("Failed to start analyzer: %v", err)
 	}
 	log.Println("Analyzer started. Press Ctrl+C to stop.")
 
+	// Components destroying
+
 	<-sigChan
 	log.Println("Shutdown signal received")
+
+	if err := analyzer.Stop(); err != nil {
+		log.Printf("Error stopping analyzer: %v", err)
+	}
+	log.Println("Analyzer stopped")
 
 	if err := promCollector.Stop(); err != nil {
 		log.Printf("Error stopping collector: %v", err)

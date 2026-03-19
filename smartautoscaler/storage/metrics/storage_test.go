@@ -134,39 +134,6 @@ func TestMetricStoreAddAndRetrievePod(t *testing.T) {
 	}
 }
 
-func TestMetricStoreRemovePod(t *testing.T) {
-	window := 30 * time.Second
-	step := 10 * time.Second
-	store := NewMetricStore(window, step)
-
-	serviceName := "svc1"
-	podName1 := "pod1"
-	podName2 := "pod2"
-	metric := CPUUsage
-	ts := time.Now()
-
-	store.AddSample(serviceName, podName1, metric, ts, 10)
-	store.AddSample(serviceName, podName2, metric, ts, 20)
-
-	svc := store.services[serviceName]
-
-	// Под1 должен существовать
-	if _, ok := svc.pods[podName1]; !ok {
-		t.Fatal("pod1 not created")
-	}
-
-	store.RemovePod(serviceName, podName1)
-
-	if _, ok := svc.pods[podName1]; ok {
-		t.Fatal("pod1 was not removed")
-	}
-
-	// Под2 всё ещё существует
-	if _, ok := svc.pods[podName2]; !ok {
-		t.Fatal("pod2 should still exist")
-	}
-}
-
 func TestMetricStoreSyncPods(t *testing.T) {
 	window := 30 * time.Second
 	step := 10 * time.Second
