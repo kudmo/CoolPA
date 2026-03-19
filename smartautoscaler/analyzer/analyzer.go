@@ -2,9 +2,8 @@ package analyzer
 
 import (
 	"context"
-	"fmt"
-	"log"
-	"os"
+	"errors"
+	"log/slog"
 	"time"
 
 	sloviolation "github.com/kudmo/CoolPA/analyzer/slo_violation"
@@ -27,7 +26,6 @@ type AnalyzerConfig struct {
 type Analyzer struct {
 	Store     *storage.Storage
 	stopChan  chan struct{}
-	logger    *log.Logger
 	config    AnalyzerConfig
 	isRunning bool
 }
@@ -48,19 +46,16 @@ func (a *Analyzer) analyzeWithSLOViolation() []string {
 
 	graph, err := sloviolation.BuildAbnormalCorrelationGraph(time.Now(), params, a.Store.Graph)
 	if err != nil {
-		a.logger.Printf("Failed to build abnormal correlation graph: %v", err)
+		slog.Error("Failed to build abnormal correlation graph", "error", err)
 	} else {
 		if graph == nil {
-			a.logger.Printf("Empty correlation graph\n")
 			return result
 		}
-		a.logger.Printf("Built abnormal correlation graph with %d nodes", len(graph.Nodes))
 	}
-	a.logger.Printf("[DEBUG]: \n")
 	anomalys := api.RunTopoRank(graph, types.DefaultConfig())
 
 	for _, service := range anomalys {
-		a.logger.Printf("Service: %s, Anomaly Score: %.4f\n", service.ID, service.Rank)
+		slog.Debug("Calculated anomaly", "service", service.ID, "Anomaly Score", service.Rank)
 		if service.Rank > TOPORANK_THRESHOLD {
 			result = append(result, service.ID)
 		}
@@ -70,7 +65,6 @@ func (a *Analyzer) analyzeWithSLOViolation() []string {
 
 func (a *Analyzer) analyzeUnderutilization() []string {
 	result := make([]string, 0)
-	a.logger.Printf("[DEBUG]: \n")
 	for _, service := range a.Store.Graph.GetServices() {
 		n, _ := a.Store.Graph.GetNode(service)
 		time_now := time.Now()
@@ -80,10 +74,9 @@ func (a *Analyzer) analyzeUnderutilization() []string {
 		old := n.RequestCount.SeriesRange(time_old_begin, time_now_begin)
 		new := n.RequestCount.SeriesRange(time_now_begin, time_now)
 		welch_result, _ := welchtest.TwoSampleWelch(new, old)
-		a.logger.Printf("Welch_res: t:%f, p:%f\n", welch_result.TStatistic, welch_result.PValueOneSided())
 
 		if welch_result.TStatistic > 0 && welch_result.PValueOneSided() <= a.config.Confidence {
-			a.logger.Printf("Service %s has underutilization\n", service)
+			slog.Debug("Calculated underutilization", "service", service)
 			result = append(result, service)
 		}
 	}
@@ -116,7 +109,6 @@ func (a *Analyzer) Analyze() AnalysisResult {
 func NewAnalyzer(config AnalyzerConfig, store *storage.Storage) *Analyzer {
 	return &Analyzer{
 		stopChan: make(chan struct{}),
-		logger:   log.New(os.Stdout, "", log.LstdFlags),
 		Store:    store,
 		config:   config,
 	}
@@ -124,11 +116,10 @@ func NewAnalyzer(config AnalyzerConfig, store *storage.Storage) *Analyzer {
 
 func (a *Analyzer) Start(ctx context.Context) error {
 	if a.isRunning {
-		return fmt.Errorf("collector is already running")
+		return errors.New("collector is already running")
 	}
 
 	a.isRunning = true
-	a.logger.Printf("Starting analyzer with interval %v", a.config.Interval)
 
 	go func() {
 		ticker := time.NewTicker(a.config.Interval)
@@ -137,31 +128,23 @@ func (a *Analyzer) Start(ctx context.Context) error {
 		for {
 			select {
 			case <-ticker.C:
-				a.logger.Printf("Running analysis\n")
 				result := a.Analyze()
-				if len(result.Services) > 0 {
-					a.logger.Printf("Anomalous services: %v, Scale: %d\n", result.Services, result.Scale)
-				} else {
-					a.logger.Printf("No anomalies detected\n")
-				}
 
 				reactor := decision.ReactionOptimizer{Store: a.Store}
 				switch result.Scale {
 				case 1:
-					a.logger.Printf("Proposing scale up for services: %v\n", result.Services)
+					slog.Info("Proposing scale up for services", "services", result.Services)
 					reactor.ScaleUp(result.Services, a.Store)
 				case -1:
-					a.logger.Printf("Proposing scale down for services: %v\n", result.Services)
+					slog.Info("Proposing scale down for services", "services", result.Services)
 					reactor.ScaleDown(result.Services, a.Store)
 				default:
-					a.logger.Printf("No scaling action proposed\n")
+					slog.Info("No scaling action proposed")
 				}
 			case <-a.stopChan:
-				a.logger.Printf("Stopping metric collector\n")
 				return
 
 			case <-ctx.Done():
-				a.logger.Printf("Context cancelled, stopping collector\n")
 				return
 			}
 		}

@@ -1,7 +1,7 @@
 package slopredictor
 
 import (
-	"log"
+	"log/slog"
 
 	ort "github.com/yalue/onnxruntime_go"
 )
@@ -20,7 +20,7 @@ func (d *SLOPredictor) PredictBatch(X [][]float64) []float64 {
 
 	err := ort.InitializeEnvironment()
 	if err != nil {
-		log.Fatal(err)
+		slog.Error("Failed inicialize predictor", "error", err)
 	}
 	defer ort.DestroyEnvironment()
 
@@ -32,7 +32,7 @@ func (d *SLOPredictor) PredictBatch(X [][]float64) []float64 {
 
 		inputTensor, err := ort.NewTensor[float64](inputShape, inputData)
 		if err != nil {
-			log.Fatal(err)
+			slog.Error("Failed inicialize inputTensor", "error", err)
 		}
 		defer inputTensor.Destroy()
 
@@ -40,7 +40,7 @@ func (d *SLOPredictor) PredictBatch(X [][]float64) []float64 {
 
 		outputTensor, err := ort.NewEmptyTensor[float32](outputShape)
 		if err != nil {
-			log.Fatal(err)
+			slog.Error("Failed inicialize outputTensor", "error", err)
 		}
 		defer outputTensor.Destroy()
 
@@ -54,13 +54,13 @@ func (d *SLOPredictor) PredictBatch(X [][]float64) []float64 {
 		)
 
 		if err != nil {
-			log.Fatal(err)
+			slog.Error("Failed inicialize predictor session", "error", err)
 		}
 		defer session.Destroy()
 
 		err = session.Run()
 		if err != nil {
-			log.Fatal(err)
+			slog.Error("Failed run predictor", "error", err)
 		}
 
 		outputData := outputTensor.GetData()

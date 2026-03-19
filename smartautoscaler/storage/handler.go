@@ -1,7 +1,7 @@
 package storage
 
 import (
-	"fmt"
+	"log/slog"
 	"regexp"
 	"strings"
 
@@ -10,6 +10,7 @@ import (
 	"github.com/kudmo/CoolPA/storage/metrics"
 )
 
+// PodNameParser остался без изменений
 type PodNameParser struct {
 	patterns []*regexp.Regexp
 }
@@ -145,16 +146,34 @@ func metricIDToName(metricID metrics.MetricID) string {
 func (h *StorageHandler) handleResource(result collector.MetricResult) {
 	pod, ok := result.Labels["pod"]
 	if !ok {
-		fmt.Printf("Missing pod label for resource metric: %s\n", result.QueryName)
+		slog.Warn("Missing pod label for resource metric",
+			"query_name", result.QueryName,
+			"timestamp", result.Timestamp,
+			"labels", result.Labels,
+		)
 		return
 	}
 
 	service := h.parser.ExtractServiceName(pod)
 	metricID, ok := extractResourceMetricID(result.QueryName)
 	if !ok {
+		slog.Debug("Unknown resource metric, skipping",
+			"query_name", result.QueryName,
+			"pod", pod,
+			"service", service,
+		)
 		return
 	}
+
 	h.Store.AddResourceSample(service, pod, metricID, result.Timestamp, result.Value)
+
+	slog.Debug("Resource metric processed",
+		"service", service,
+		"pod", pod,
+		"metric", metricIDToName(metricID),
+		"value", result.Value,
+		"timestamp", result.Timestamp,
+	)
 }
 
 func extractIstioMetricID(metricName string) (graph.MetricID, bool) {
@@ -177,7 +196,10 @@ func extractIstioMetricID(metricName string) (graph.MetricID, bool) {
 func (h *StorageHandler) handleIstio(result collector.MetricResult) {
 	dst, ok := result.Labels["destination_app"]
 	if !ok {
-		fmt.Printf("Missing destination_app label for istio metric: %s\n", result.QueryName)
+		slog.Warn("Missing destination_app label for istio metric",
+			"query_name", result.QueryName,
+			"labels", result.Labels,
+		)
 		return
 	}
 
@@ -185,32 +207,85 @@ func (h *StorageHandler) handleIstio(result collector.MetricResult) {
 	case "istio_request_duration_p95":
 		src, ok := result.Labels["source_app"]
 		if !ok {
-			fmt.Printf("Missing source_app label for istio_request_duration_p95\n")
+			slog.Warn("Missing source_app label for istio_request_duration_p95",
+				"destination", dst,
+				"labels", result.Labels,
+			)
 			return
 		}
 		h.Store.AddIstioEdgeMetric(src, dst, result.Timestamp, graph.EdgeLatency95, result.Value)
+		slog.Debug("Istio edge metric processed",
+			"source", src,
+			"destination", dst,
+			"metric", "latency_p95",
+			"value", result.Value,
+		)
+
 	case "istio_request_duration_p50":
 		src, ok := result.Labels["source_app"]
 		if !ok {
-			fmt.Printf("Missing source_app label for istio_request_duration_p50\n")
+			slog.Warn("Missing source_app label for istio_request_duration_p50",
+				"destination", dst,
+				"labels", result.Labels,
+			)
 			return
 		}
 		h.Store.AddIstioEdgeMetric(src, dst, result.Timestamp, graph.EdgeLatency50, result.Value)
+		slog.Debug("Istio edge metric processed",
+			"source", src,
+			"destination", dst,
+			"metric", "latency_p50",
+			"value", result.Value,
+		)
+
 	case "istio_requests_total":
 		h.Store.AddIstioServiceMetric(dst, result.Timestamp, graph.ServiceRequestCount, result.Value)
+		slog.Debug("Istio service metric processed",
+			"service", dst,
+			"metric", "request_count",
+			"value", result.Value,
+		)
+
 	case "istio_tcp_sent_bytes_total":
 		h.Store.AddIstioServiceMetric(dst, result.Timestamp, graph.ServiceBytesSent, result.Value)
+		slog.Debug("Istio service metric processed",
+			"service", dst,
+			"metric", "bytes_sent",
+			"value", result.Value,
+		)
+
 	case "istio_tcp_received_bytes_total":
 		h.Store.AddIstioServiceMetric(dst, result.Timestamp, graph.ServiceBytesReceived, result.Value)
+		slog.Debug("Istio service metric processed",
+			"service", dst,
+			"metric", "bytes_received",
+			"value", result.Value,
+		)
+
 	default:
-		fmt.Printf("Unknown istio metric: %s\n", result.QueryName)
+		slog.Warn("Unknown istio metric",
+			"query_name", result.QueryName,
+			"destination", dst,
+		)
 	}
 }
 
 func (h *StorageHandler) handlePodsInfo(result collector.MetricResult) {
-	pod := result.Labels["pod"]
+	pod, ok := result.Labels["pod"]
+	if !ok {
+		slog.Warn("Missing pod label for kube_pod_info",
+			"labels", result.Labels,
+		)
+		return
+	}
+
 	service := h.parser.ExtractServiceName(pod)
 	h.Store.servicePods[service] = append(h.Store.servicePods[service], pod)
+
+	slog.Debug("Pod info processed",
+		"service", service,
+		"pod", pod,
+	)
 }
 
 func (h *StorageHandler) Handle(result collector.MetricResult) {
@@ -221,7 +296,10 @@ func (h *StorageHandler) Handle(result collector.MetricResult) {
 	} else if result.QueryName == "kube_pod_info" {
 		h.handlePodsInfo(result)
 	} else {
-		fmt.Printf("Unknown metric type for: %s\n", result.QueryName)
+		slog.Debug("Unknown metric type, skipping",
+			"query_name", result.QueryName,
+			"labels", result.Labels,
+		)
 	}
 }
 
@@ -236,35 +314,60 @@ func (h *StorageHandler) HandleBatch(results []collector.MetricResult) {
 
 	h.Store.Sync(h.Store.servicePods)
 
-	fmt.Printf("[DEBUG]: \n")
+	slog.Debug("=== Storage State Debug ===")
+
 	for _, svc := range h.Store.ResourceMetrics.GetServices() {
 		pods := h.Store.ResourceMetrics.GetServicePods(svc)
-		fmt.Printf("Service: %s\n", svc)
+		slog.Debug("Service resource metrics",
+			"service", svc,
+			"pods_count", len(pods),
+		)
+
 		for _, pod := range pods {
-			fmt.Printf("\tPod %s:\n", pod)
+			podLog := slog.With("service", svc, "pod", pod)
+
 			for metricID := metrics.MetricID(0); metricID < metrics.MetricCount; metricID++ {
 				value, found, err := h.Store.ResourceMetrics.GetPodMetricHeadValue(svc, pod, metricID)
 				if err != nil {
-					fmt.Printf("\t  Metric: %v, Error: %v\n", metricID, err)
+					podLog.Error("Failed to get pod metric",
+						"metric_name", metricIDToName(metricID),
+						"error", err,
+					)
 				} else if found {
-					fmt.Printf("\t  Metric: %v (%s), Value: %f\n", metricID, metricIDToName(metricID), value)
-				} else {
-					fmt.Printf("\t  Metric: %v (%s), No data\n", metricID, metricIDToName(metricID))
+					podLog.Debug("Pod metric",
+						"metric_name", metricIDToName(metricID),
+						"value", value,
+					)
 				}
 			}
 		}
 	}
 
+	// Graph metrics debug
 	for _, svc := range h.Store.Graph.GetServices() {
-		node, _ := h.Store.Graph.GetNode(svc)
-		fmt.Printf("Service: %s\n", svc)
-		fmt.Printf("\tRequestCount: %f\n", node.RequestCount.Avg())
-		fmt.Printf("\tBytesSent: %f\n", node.BytesSent.Sum())
-		fmt.Printf("\tBytesReceived: %f\n", node.BytesReceived.Sum())
+		node, ok := h.Store.Graph.GetNode(svc)
+		if !ok {
+			slog.Error("Failed to get service node",
+				"service", svc,
+			)
+			continue
+		}
+
+		svcLog := slog.With("service", svc)
+		svcLog.Debug("Service graph metrics",
+			"request_count_avg", node.RequestCount.Avg(),
+			"bytes_sent_sum", node.BytesSent.Sum(),
+			"bytes_received_sum", node.BytesReceived.Sum(),
+		)
+
 		for dst, edge := range node.OutboundEdges {
-			fmt.Printf("\tEdge to %s:\n", dst)
-			fmt.Printf("\t  Latency95: %f\n", edge.Latency95.Avg())
-			fmt.Printf("\t  Latency50: %f\n", edge.Latency50.Avg())
+			svcLog.Debug("Service edge metrics",
+				"destination", dst,
+				"latency_p95_avg", edge.Latency95.Avg(),
+				"latency_p50_avg", edge.Latency50.Avg(),
+			)
 		}
 	}
+
+	slog.Debug("=== End Storage State Debug ===")
 }

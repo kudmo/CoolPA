@@ -13,6 +13,7 @@ type ScalerConfig struct {
 	PrometheusInterval time.Duration `yaml:"prometheus_interval"`
 	AnalyzerInterval   time.Duration `yaml:"analyzer_interval"`
 	ScalingCooldown    time.Duration `yaml:"scaling_cooldown"`
+	Logger             LoggerConfig  `yaml:"logger"`
 }
 
 // LoadFromYAML reads configuration from a YAML file.

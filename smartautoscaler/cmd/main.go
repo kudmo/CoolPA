@@ -4,7 +4,7 @@ package main
 import (
 	"context"
 	"flag"
-	"log"
+	"log/slog"
 	"os"
 	"os/signal"
 	"syscall"
@@ -16,6 +16,46 @@ import (
 	"github.com/kudmo/CoolPA/storage"
 )
 
+func setupLogging(loggerConfig config.LoggerConfig) {
+	var logLevel slog.Level
+	switch loggerConfig.Level {
+	case "debug":
+		logLevel = slog.LevelDebug
+	case "info":
+		logLevel = slog.LevelInfo
+	case "warn":
+		logLevel = slog.LevelWarn
+	case "error":
+		logLevel = slog.LevelError
+	default:
+		logLevel = slog.LevelInfo
+	}
+
+	handlerOpts := &slog.HandlerOptions{
+		Level:     logLevel,
+		AddSource: true,
+		ReplaceAttr: func(groups []string, a slog.Attr) slog.Attr {
+			if a.Key == slog.TimeKey {
+				a.Value = slog.StringValue(time.Now().Format(time.RFC3339))
+			}
+			return a
+		},
+	}
+
+	var handler slog.Handler
+	switch loggerConfig.Format {
+	case "json":
+		handler = slog.NewJSONHandler(os.Stdout, handlerOpts)
+	case "text":
+		handler = slog.NewTextHandler(os.Stdout, handlerOpts)
+	default:
+		handler = slog.NewTextHandler(os.Stdout, handlerOpts)
+	}
+
+	logger := slog.New(handler)
+	slog.SetDefault(logger)
+}
+
 func main() {
 	var configPath string
 	flag.StringVar(&configPath, "config", "/etc/config/config.yaml", "Path to configuration file")
@@ -25,8 +65,10 @@ func main() {
 
 	cfg := &config.ScalerConfig{}
 	if err := cfg.LoadFromYAML(configPath); err != nil {
-		log.Fatalf("Failed to load config: %v", err)
+		panic(err)
 	}
+
+	setupLogging(cfg.Logger)
 
 	// Configs
 
@@ -218,7 +260,7 @@ func main() {
 		collector.WithHandler(handler),
 	)
 	if err != nil {
-		log.Fatalf("Failed to create collector: %v", err)
+		slog.Error("Failed to create collector", "error", err)
 	}
 	analyzer := analyzer.NewAnalyzer(
 		analyzerConfig,
@@ -233,29 +275,29 @@ func main() {
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 
 	if err := promCollector.Start(ctx); err != nil {
-		log.Fatalf("Failed to start collector: %v", err)
+		slog.Error("Failed to start collector", "error", err)
 	}
 
-	log.Println("Metric collector started. Press Ctrl+C to stop.")
+	slog.Info("Metric collector started. Press Ctrl+C to stop.")
 
 	if err := analyzer.Start(ctx); err != nil {
-		log.Fatalf("Failed to start analyzer: %v", err)
+		slog.Error("Failed to start analyzer", "error", err)
 	}
-	log.Println("Analyzer started. Press Ctrl+C to stop.")
+	slog.Info("Analyzer started. Press Ctrl+C to stop.")
 
 	// Components destroying
 
 	<-sigChan
-	log.Println("Shutdown signal received")
+	slog.Info("Shutdown signal received")
 
 	if err := analyzer.Stop(); err != nil {
-		log.Printf("Error stopping analyzer: %v", err)
+		slog.Error("Error stopping analyzer", "error", err)
 	}
-	log.Println("Analyzer stopped")
+	slog.Info("Analyzer stopped")
 
 	if err := promCollector.Stop(); err != nil {
-		log.Printf("Error stopping collector: %v", err)
+		slog.Error("Error stopping collector", "error", err)
 	}
 
-	log.Println("Collector stopped")
+	slog.Info("Collector stopped")
 }

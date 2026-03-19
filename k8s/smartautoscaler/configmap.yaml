@@ -9,3 +9,6 @@ data:
     prometheus_interval: 5s
     analyzer_interval: 15s
     scaling_cooldown: 60s
+    logger:
+      level: "info"
+      format: "text"

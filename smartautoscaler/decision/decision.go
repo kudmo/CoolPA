@@ -1,7 +1,7 @@
 package decision
 
 import (
-	"fmt"
+	"log/slog"
 
 	gaconfig "github.com/kudmo/CoolPA/decision/ga/config"
 	"github.com/kudmo/CoolPA/decision/ga/constraints"
@@ -73,13 +73,12 @@ func (ro *ReactionOptimizer) ScaleUp(services []string, store *storage.Storage) 
 
 	best, err := eng.Run(seedGenome)
 	if err != nil {
-		fmt.Println("engine run error:", err)
+		slog.Error("GA engine run error", "error", err)
 		return
 	}
 
-	fmt.Println("Best genome:")
 	for _, g := range best.Genes {
-		fmt.Printf("- %s: reaction=%v, deltaRep=%.3f, cpu=%.3f\n", g.ServiceName, g.ReactionType, g.DeltaReplicas, g.DeltaCPU)
+		slog.Debug("Best genome", "Service", g.ServiceName, "reaction", g.ReactionType, "delta replicas", g.DeltaReplicas, "delta cpu", g.DeltaCPU)
 	}
 
 	// Build current service states and decode candidate decisions
@@ -90,9 +89,8 @@ func (ro *ReactionOptimizer) ScaleUp(services []string, store *storage.Storage) 
 		current = append(current, genome.ServiceState{Name: svc, CurrentReplicas: len(pods), CurrentCPURel: cpu_quota})
 	}
 	cand := best.Decode(current)
-	fmt.Println("Candidate state:")
 	for _, s := range cand.Services {
-		fmt.Printf("- %s -> replicas=%d, cpu=%.3f, reaction=%v\n", s.ServiceName, s.Replicas, s.CPURel, s.Reaction)
+		slog.Debug("Candidate state", "Service", s.ServiceName, "replicas", s.Replicas, "cpu", s.Reaction)
 	}
 }
 
@@ -151,13 +149,12 @@ func (ro *ReactionOptimizer) ScaleDown(services []string, store *storage.Storage
 
 	best, err := eng.Run(seedGenome)
 	if err != nil {
-		fmt.Println("engine run error:", err)
+		slog.Error("GA engine run error", "error", err)
 		return
 	}
 
-	fmt.Println("Best genome (scale down):")
 	for _, g := range best.Genes {
-		fmt.Printf("- %s: reaction=%v, deltaRep=%.3f, cpu=%.3f\n", g.ServiceName, g.ReactionType, g.DeltaReplicas, g.DeltaCPU)
+		slog.Debug("Best genome", "Service", g.ServiceName, "reaction", g.ReactionType, "delta replicas", g.DeltaReplicas, "delta cpu", g.DeltaCPU)
 	}
 
 	current := make([]genome.ServiceState, 0, len(services))
@@ -167,8 +164,8 @@ func (ro *ReactionOptimizer) ScaleDown(services []string, store *storage.Storage
 		current = append(current, genome.ServiceState{Name: svc, CurrentReplicas: len(pods), CurrentCPURel: cpu_quota})
 	}
 	cand := best.Decode(current)
-	fmt.Println("Candidate state (scale down):")
+
 	for _, s := range cand.Services {
-		fmt.Printf("- %s -> replicas=%d, cpu=%.3f, reaction=%v\n", s.ServiceName, s.Replicas, s.CPURel, s.Reaction)
+		slog.Debug("Candidate state", "Service", s.ServiceName, "replicas", s.Replicas, "cpu", s.Reaction)
 	}
 }

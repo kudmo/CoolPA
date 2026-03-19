@@ -2,9 +2,8 @@ package collector
 
 import (
 	"context"
-	"fmt"
-	"log"
-	"os"
+	"errors"
+	"log/slog"
 	"time"
 
 	"github.com/prometheus/client_golang/api"
@@ -34,15 +33,9 @@ type MetricResult struct {
 	Error     error
 }
 
-type MetricHandler interface {
-	Handle(result MetricResult)
-	HandleBatch(results []MetricResult)
-}
-
 type PrometheusCollector struct {
 	client    v1.API
 	config    PrometheusCollectorConfig
-	logger    *log.Logger
 	handler   MetricHandler
 	stopChan  chan struct{}
 	isRunning bool
@@ -51,7 +44,6 @@ type PrometheusCollector struct {
 func NewPrometheusCollector(config PrometheusCollectorConfig, opts ...PrometheusOption) (*PrometheusCollector, error) {
 	pc := &PrometheusCollector{
 		config:   config,
-		logger:   log.New(os.Stdout, "", log.LstdFlags),
 		stopChan: make(chan struct{}),
 	}
 
@@ -63,7 +55,7 @@ func NewPrometheusCollector(config PrometheusCollectorConfig, opts ...Prometheus
 		Address: config.PrometheusURL,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to create Prometheus client: %w", err)
+		return nil, err
 	}
 
 	pc.client = v1.NewAPI(client)
@@ -89,7 +81,7 @@ func (pc *PrometheusCollector) Collect(ctx context.Context) ([]MetricResult, err
 
 		results, err := pc.collectQuery(ctx, query)
 		if err != nil {
-			pc.logger.Printf("Failed to collect metric %s: %v", query.Name, err)
+			slog.Error("Failed to collect metric", query.Name, "error", err)
 			continue
 		}
 
@@ -105,11 +97,11 @@ func (pc *PrometheusCollector) collectQuery(ctx context.Context, query MetricQue
 
 	promResult, warnings, err := pc.client.Query(ctx, query.Query, time.Now())
 	if err != nil {
-		return nil, fmt.Errorf("query failed: %w", err)
+		return nil, err
 	}
 
 	if len(warnings) > 0 {
-		pc.logger.Printf("Warnings for query %s: %v", query.Name, warnings)
+		slog.Info("Warnings for query", query.Name, warnings)
 	}
 
 	return extractResults(query, promResult)
@@ -174,7 +166,7 @@ func extractResults(query MetricQuery, val model.Value) ([]MetricResult, error) 
 		}
 
 	default:
-		return nil, fmt.Errorf("unsupported value type: %s", val.Type())
+		return nil, errors.New("unsupported value type")
 	}
 
 	return results, nil
@@ -182,33 +174,28 @@ func extractResults(query MetricQuery, val model.Value) ([]MetricResult, error) 
 
 func (pc *PrometheusCollector) Start(ctx context.Context) error {
 	if pc.isRunning {
-		return fmt.Errorf("collector is already running")
+		return errors.New("collector is already running")
 	}
 
 	pc.isRunning = true
-	pc.logger.Printf("Starting metric collector with interval %v", pc.config.Interval)
 
 	go func() {
 		ticker := time.NewTicker(pc.config.Interval)
 		defer ticker.Stop()
 
 		if _, err := pc.Collect(ctx); err != nil {
-			pc.logger.Printf("Initial collection failed: %v", err)
+			slog.Error("Initial collection failed", "error", err)
 		}
 
 		for {
 			select {
 			case <-ticker.C:
 				if _, err := pc.Collect(ctx); err != nil {
-					pc.logger.Printf("Periodic collection failed: %v", err)
+					slog.Error("Periodic collection failed", "error", err)
 				}
-
 			case <-pc.stopChan:
-				pc.logger.Printf("Stopping metric collector")
 				return
-
 			case <-ctx.Done():
-				pc.logger.Printf("Context cancelled, stopping collector")
 				return
 			}
 		}
