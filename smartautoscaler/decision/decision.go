@@ -17,9 +17,10 @@ type DecisionMakerConfig struct {
 }
 
 type DecisionMaker struct {
-	stopChan  chan struct{}
-	config    DecisionMakerConfig
-	isRunning bool
+	stopChan         chan struct{}
+	config           DecisionMakerConfig
+	isRunning        bool
+	lastReactionTime time.Time
 
 	Store           *storage.Storage
 	ServiceAnalyzer *analyzer.Analyzer
@@ -49,6 +50,7 @@ func (d *DecisionMaker) Start(ctx context.Context) error {
 	}
 
 	d.isRunning = true
+	d.lastReactionTime = time.Now()
 
 	go func() {
 		ticker := time.NewTicker(d.config.Interval)
@@ -57,15 +59,23 @@ func (d *DecisionMaker) Start(ctx context.Context) error {
 		for {
 			select {
 			case <-ticker.C:
+				timeSinceLastReaction := time.Since(d.lastReactionTime)
+				if timeSinceLastReaction < d.config.Cooldown {
+					slog.Info("In cooldown period",
+						"remaining", d.config.Cooldown-timeSinceLastReaction)
+					continue
+				}
 				result := d.ServiceAnalyzer.Analyze()
 
 				switch result.Scale {
 				case 1:
 					slog.Info("Proposing scale up for services", "services", result.Services)
 					d.Optimizer.ScaleUp(result.Services, d.Store)
+					d.lastReactionTime = time.Now()
 				case -1:
 					slog.Info("Proposing scale down for services", "services", result.Services)
 					d.Optimizer.ScaleDown(result.Services, d.Store)
+					d.lastReactionTime = time.Now()
 				default:
 					slog.Info("No scaling action proposed")
 				}
