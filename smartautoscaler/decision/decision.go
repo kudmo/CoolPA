@@ -3,7 +3,7 @@ package decision
 import (
 	"fmt"
 
-	"github.com/kudmo/CoolPA/decision/ga/config"
+	gaconfig "github.com/kudmo/CoolPA/decision/ga/config"
 	"github.com/kudmo/CoolPA/decision/ga/constraints"
 	"github.com/kudmo/CoolPA/decision/ga/engine"
 	"github.com/kudmo/CoolPA/decision/ga/genome"
@@ -20,7 +20,7 @@ type ReactionOptimizer struct {
 func (ro *ReactionOptimizer) ScaleUp(services []string, store *storage.Storage) {
 	seed := int64(42)
 
-	cfg := config.Config{
+	cfg := gaconfig.Config{
 		PopulationSize:   20,
 		Generations:      15,
 		EliteRatio:       0.1,
@@ -100,7 +100,7 @@ func (ro *ReactionOptimizer) ScaleUp(services []string, store *storage.Storage) 
 func (ro *ReactionOptimizer) ScaleDown(services []string, store *storage.Storage) {
 	seed := int64(42)
 
-	cfg := config.Config{
+	cfg := gaconfig.Config{
 		PopulationSize:   20,
 		Generations:      15,
 		EliteRatio:       0.1,

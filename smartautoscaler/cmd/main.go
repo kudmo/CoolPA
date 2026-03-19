@@ -3,6 +3,7 @@ package main
 
 import (
 	"context"
+	"flag"
 	"log"
 	"os"
 	"os/signal"
@@ -11,15 +12,27 @@ import (
 
 	"github.com/kudmo/CoolPA/analyzer"
 	"github.com/kudmo/CoolPA/collector"
+	"github.com/kudmo/CoolPA/config"
 	"github.com/kudmo/CoolPA/storage"
 )
 
 func main() {
+	var configPath string
+	flag.StringVar(&configPath, "config", "/etc/config/config.yaml", "Path to configuration file")
+	flag.StringVar(&configPath, "c", "/etc/config/config.yaml", "Path to configuration file (shorthand)")
+
+	flag.Parse()
+
+	cfg := &config.ScalerConfig{}
+	if err := cfg.LoadFromYAML(configPath); err != nil {
+		log.Fatalf("Failed to load config: %v", err)
+	}
+
 	// Configs
 
-	collectorConfig := collector.Config{
-		PrometheusURL: "http://prometheus.autoscale-test.svc.cluster.local:9090",
-		Interval:      5 * time.Second,
+	collectorConfig := collector.PrometheusCollectorConfig{
+		PrometheusURL: cfg.PrometheusURL,
+		Interval:      cfg.PrometheusInterval,
 		Timeout:       4 * time.Second,
 		Queries: []collector.MetricQuery{
 			{
@@ -188,8 +201,8 @@ func main() {
 			},
 		},
 	}
-	analyzerConfig := analyzer.Config{
-		Interval:              15 * time.Second,
+	analyzerConfig := analyzer.AnalyzerConfig{
+		Interval:              cfg.AnalyzerInterval,
 		Confidence:            0.05,
 		WelchOldIntervalBegin: time.Duration(300 * time.Second),
 		WelchNowIntervalBegin: time.Duration(60 * time.Second),

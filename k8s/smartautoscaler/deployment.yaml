@@ -20,3 +20,12 @@ spec:
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8088
+          args: ["-config", "/etc/config/config.yaml"]
+          volumeMounts:
+          - name: config
+            mountPath: /etc/config
+            readOnly: true
+      volumes:
+      - name: config
+        configMap:
+          name: scaler-config

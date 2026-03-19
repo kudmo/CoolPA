@@ -12,7 +12,7 @@ import (
 	"github.com/prometheus/common/model"
 )
 
-type Config struct {
+type PrometheusCollectorConfig struct {
 	PrometheusURL string
 	Interval      time.Duration
 	Queries       []MetricQuery
@@ -41,14 +41,14 @@ type MetricHandler interface {
 
 type PrometheusCollector struct {
 	client    v1.API
-	config    Config
+	config    PrometheusCollectorConfig
 	logger    *log.Logger
 	handler   MetricHandler
 	stopChan  chan struct{}
 	isRunning bool
 }
 
-func NewPrometheusCollector(config Config, opts ...PrometheusOption) (*PrometheusCollector, error) {
+func NewPrometheusCollector(config PrometheusCollectorConfig, opts ...PrometheusOption) (*PrometheusCollector, error) {
 	pc := &PrometheusCollector{
 		config:   config,
 		logger:   log.New(os.Stdout, "", log.LstdFlags),

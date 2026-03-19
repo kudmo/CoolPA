@@ -15,7 +15,7 @@ import (
 	"github.com/kudmo/toporank/types"
 )
 
-type Config struct {
+type AnalyzerConfig struct {
 	Interval time.Duration
 
 	Confidence float64
@@ -28,7 +28,7 @@ type Analyzer struct {
 	Store     *storage.Storage
 	stopChan  chan struct{}
 	logger    *log.Logger
-	config    Config
+	config    AnalyzerConfig
 	isRunning bool
 }
 
@@ -113,7 +113,7 @@ func (a *Analyzer) Analyze() AnalysisResult {
 	}
 }
 
-func NewAnalyzer(config Config, store *storage.Storage) *Analyzer {
+func NewAnalyzer(config AnalyzerConfig, store *storage.Storage) *Analyzer {
 	return &Analyzer{
 		stopChan: make(chan struct{}),
 		logger:   log.New(os.Stdout, "", log.LstdFlags),

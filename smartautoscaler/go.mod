@@ -15,4 +15,5 @@ require (
 	github.com/prometheus/client_model v0.6.1 // indirect
 	github.com/yalue/onnxruntime_go v1.27.0 // indirect
 	google.golang.org/protobuf v1.36.1 // indirect
+	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
