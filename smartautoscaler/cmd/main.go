@@ -10,9 +10,10 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/kudmo/CoolPA/analyzer"
 	"github.com/kudmo/CoolPA/collector"
 	"github.com/kudmo/CoolPA/config"
+	"github.com/kudmo/CoolPA/decision"
+	reactionapplier "github.com/kudmo/CoolPA/reaction_applier"
 	"github.com/kudmo/CoolPA/storage"
 )
 
@@ -243,11 +244,9 @@ func main() {
 			},
 		},
 	}
-	analyzerConfig := analyzer.AnalyzerConfig{
-		Interval:              cfg.AnalyzerInterval,
-		Confidence:            0.05,
-		WelchOldIntervalBegin: time.Duration(300 * time.Second),
-		WelchNowIntervalBegin: time.Duration(60 * time.Second),
+	analyzerConfig := decision.DecisionMakerConfig{
+		Interval: cfg.AnalyzerInterval,
+		Cooldown: cfg.ScalingCooldown,
 	}
 
 	// Components creating
@@ -262,9 +261,16 @@ func main() {
 	if err != nil {
 		slog.Error("Failed to create collector", "error", err)
 	}
-	analyzer := analyzer.NewAnalyzer(
+
+	applier, err := reactionapplier.BuildApplier()
+	if err != nil {
+		slog.Error("Failed to create applier", "error", err)
+	}
+
+	analyzer := decision.NewDecisionMaker(
 		analyzerConfig,
 		store,
+		applier,
 	)
 
 	// Context creating and starting components

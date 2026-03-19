@@ -1,22 +1,17 @@
 package analyzer
 
 import (
-	"context"
-	"errors"
 	"log/slog"
 	"time"
 
 	sloviolation "github.com/kudmo/CoolPA/analyzer/slo_violation"
 	"github.com/kudmo/CoolPA/analyzer/welchtest"
-	"github.com/kudmo/CoolPA/decision"
 	"github.com/kudmo/CoolPA/storage"
 	"github.com/kudmo/toporank/api"
 	"github.com/kudmo/toporank/types"
 )
 
 type AnalyzerConfig struct {
-	Interval time.Duration
-
 	Confidence float64
 
 	WelchOldIntervalBegin time.Duration
@@ -24,10 +19,15 @@ type AnalyzerConfig struct {
 }
 
 type Analyzer struct {
-	Store     *storage.Storage
-	stopChan  chan struct{}
-	config    AnalyzerConfig
-	isRunning bool
+	store  *storage.Storage
+	config AnalyzerConfig
+}
+
+func NewAnalyzer(config AnalyzerConfig, store *storage.Storage) *Analyzer {
+	return &Analyzer{
+		store:  store,
+		config: config,
+	}
 }
 
 type AnalysisResult struct {
@@ -44,7 +44,7 @@ func (a *Analyzer) analyzeWithSLOViolation() []string {
 	TOPORANK_THRESHOLD := 0.5
 	result := make([]string, 0)
 
-	graph, err := sloviolation.BuildAbnormalCorrelationGraph(time.Now(), params, a.Store.Graph)
+	graph, err := sloviolation.BuildAbnormalCorrelationGraph(time.Now(), params, a.store.Graph)
 	if err != nil {
 		slog.Error("Failed to build abnormal correlation graph", "error", err)
 	} else {
@@ -65,8 +65,8 @@ func (a *Analyzer) analyzeWithSLOViolation() []string {
 
 func (a *Analyzer) analyzeUnderutilization() []string {
 	result := make([]string, 0)
-	for _, service := range a.Store.Graph.GetServices() {
-		n, _ := a.Store.Graph.GetNode(service)
+	for _, service := range a.store.Graph.GetServices() {
+		n, _ := a.store.Graph.GetNode(service)
 		time_now := time.Now()
 		time_now_begin := time_now.Add(-a.config.WelchNowIntervalBegin)
 		time_old_begin := time_now.Add(-a.config.WelchOldIntervalBegin)
@@ -104,61 +104,4 @@ func (a *Analyzer) Analyze() AnalysisResult {
 		Services: []string{},
 		Scale:    0,
 	}
-}
-
-func NewAnalyzer(config AnalyzerConfig, store *storage.Storage) *Analyzer {
-	return &Analyzer{
-		stopChan: make(chan struct{}),
-		Store:    store,
-		config:   config,
-	}
-}
-
-func (a *Analyzer) Start(ctx context.Context) error {
-	if a.isRunning {
-		return errors.New("collector is already running")
-	}
-
-	a.isRunning = true
-
-	go func() {
-		ticker := time.NewTicker(a.config.Interval)
-		defer ticker.Stop()
-
-		for {
-			select {
-			case <-ticker.C:
-				result := a.Analyze()
-
-				reactor := decision.ReactionOptimizer{Store: a.Store}
-				switch result.Scale {
-				case 1:
-					slog.Info("Proposing scale up for services", "services", result.Services)
-					reactor.ScaleUp(result.Services, a.Store)
-				case -1:
-					slog.Info("Proposing scale down for services", "services", result.Services)
-					reactor.ScaleDown(result.Services, a.Store)
-				default:
-					slog.Info("No scaling action proposed")
-				}
-			case <-a.stopChan:
-				return
-
-			case <-ctx.Done():
-				return
-			}
-		}
-	}()
-
-	return nil
-}
-
-func (a *Analyzer) Stop() error {
-	if !a.isRunning {
-		return nil
-	}
-
-	close(a.stopChan)
-	a.isRunning = false
-	return nil
 }
