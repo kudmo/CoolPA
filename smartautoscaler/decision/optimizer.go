@@ -204,7 +204,8 @@ func (ro *ReactionOptimizer) applyCandidate(
 	ctx context.Context,
 	cand *genome.CandidateState,
 ) {
-	namespace := "autoscale-test"
+	// TODO: MAKE CONFIGURABLE
+	namespace := "microservices-demo"
 	if ro.applier == nil {
 		slog.Error("Failed apply reaction: applyer is nil")
 		return

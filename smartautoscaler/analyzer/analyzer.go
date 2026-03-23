@@ -75,11 +75,11 @@ func (a *Analyzer) analyzeUnderutilization() []string {
 		new := n.RequestCount.SeriesRange(time_now_begin, time_now)
 		welch_result, _ := welchtest.TwoSampleWelch(new, old)
 
-		if welch_result.TStatistic > 0 && welch_result.PValueOneSided() <= a.config.Confidence {
-			slog.Debug("Calculated underutilization", "service", service)
+		if welch_result.TStatistic < 0 && welch_result.PValueOneSided() <= a.config.Confidence {
 			result = append(result, service)
 		}
 	}
+	slog.Info("Calculated underutilization", "services", result)
 	return result
 }
 
