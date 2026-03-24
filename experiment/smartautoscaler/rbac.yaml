@@ -1,0 +1,38 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  namespace: autoscale-test
+  name: smartautoscaler
+rules:
+  - apiGroups: ["apps"]
+    resources: ["deployments/scale"]
+    verbs: ["get", "update"]
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    verbs: ["get", "patch", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["list", "get", "watch"]
+  - apiGroups: [""]
+    resources: ["services"]
+    verbs: ["list", "get", "watch"]
+  - apiGroups: [""]
+    resources: ["endpoints"]
+    verbs: ["list", "get", "watch"]
+  - apiGroups: [""]
+    resources: ["namespaces"]
+    verbs: ["list", "get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: smartautoscaler
+  namespace: autoscale-test
+subjects:
+  - kind: ServiceAccount
+    name: smartautoscaler
+    namespace: autoscale-test
+roleRef:
+  kind: ClusterRole
+  name: smartautoscaler
+  apiGroup: rbac.authorization.k8s.io

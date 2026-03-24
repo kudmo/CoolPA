@@ -1,0 +1,221 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-config
+  namespace: monitoring
+data:
+  prometheus.yml: |
+    global:
+      scrape_interval: 5s
+      evaluation_interval: 5s
+
+    scrape_configs:
+    # ---------------------------------------------------
+    # Prometheus itself
+    # ---------------------------------------------------
+    - job_name: prometheus
+      static_configs:
+        - targets:
+          - prometheus.autoscale-test.svc.cluster.local:9090
+
+    # ---------------------------------------------------
+    # Kubernetes API server
+    # ---------------------------------------------------
+    - job_name: kubernetes-apiservers
+      kubernetes_sd_configs:
+      - role: endpoints
+
+      scheme: https
+      tls_config:
+        insecure_skip_verify: true
+
+      bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+
+      relabel_configs:
+
+      - source_labels:
+        - __meta_kubernetes_namespace
+        - __meta_kubernetes_service_name
+        - __meta_kubernetes_endpoint_port_name
+
+        action: keep
+        regex: default;kubernetes;https
+
+    # ---------------------------------------------------
+    # Kubelet (cadvisor metrics)
+    # ---------------------------------------------------
+    - job_name: kubelet
+      scheme: https
+      tls_config:
+        insecure_skip_verify: true
+
+      bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+
+      kubernetes_sd_configs:
+      - role: node
+
+      relabel_configs:
+
+      - action: labelmap
+        regex: __meta_kubernetes_node_label_(.+)
+
+      - target_label: __address__
+        replacement: kubernetes.default.svc.cluster.local:443
+
+      - source_labels:
+        - __meta_kubernetes_node_name
+
+        regex: (.+)
+        target_label: __metrics_path__
+        replacement: /api/v1/nodes/${1}/proxy/metrics/cadvisor
+
+    # ---------------------------------------------------
+    # kube-state-metrics
+    # ---------------------------------------------------
+    - job_name: kube-state-metrics
+      kubernetes_sd_configs:
+      - role: endpoints
+        namespaces:
+          names:
+            - kube-system
+
+      relabel_configs:
+      - source_labels:
+        - __meta_kubernetes_service_name
+        action: keep
+        regex: kube-state-metrics
+
+    # ---------------------------------------------------
+    # Kubernetes pods
+    # ---------------------------------------------------
+    - job_name: kubernetes-pods
+      kubernetes_sd_configs:
+      - role: pod
+
+      relabel_configs:
+      - source_labels:
+        - __meta_kubernetes_pod_annotation_prometheus_io_scrape
+
+        action: keep
+        regex: true
+
+      - source_labels:
+        - __meta_kubernetes_pod_annotation_prometheus_io_path
+
+        action: replace
+        target_label: __metrics_path__
+        regex: (.+)
+
+      - source_labels:
+        - __address__
+        - __meta_kubernetes_pod_annotation_prometheus_io_port
+
+        action: replace
+        regex: ([^:]+)(?::\d+)?;(\d+)
+        replacement: $1:$2
+        target_label: __address__
+
+      - action: labelmap
+        regex: __meta_kubernetes_pod_label_(.+)
+
+      - source_labels:
+        - __meta_kubernetes_namespace
+        target_label: namespace
+
+      - source_labels:
+        - __meta_kubernetes_pod_name
+        target_label: pod
+
+
+    # ---------------------------------------------------
+    # Autoscaled apps
+    # ---------------------------------------------------
+    - job_name: autoscaled-apps
+      kubernetes_sd_configs:
+      - role: pod
+        namespaces:
+          names:
+            - microservices-demo
+
+      relabel_configs:
+      - source_labels:
+        - __meta_kubernetes_pod_label_autoscaling_enabled
+
+        action: keep
+        regex: true
+
+      - source_labels:
+        - __meta_kubernetes_pod_ip
+
+        target_label: __address__
+        replacement: ${1}:8080
+
+      - action: labelmap
+        regex: __meta_kubernetes_pod_label_(.+)
+
+      - source_labels:
+        - __meta_kubernetes_namespace
+        target_label: namespace
+
+      - source_labels:
+        - __meta_kubernetes_pod_name
+        target_label: pod
+
+
+    # ---------------------------------------------------
+    # Istio Envoy sidecars
+    # ---------------------------------------------------
+
+    - job_name: istio-envoy
+
+      kubernetes_sd_configs:
+      - role: pod
+
+      relabel_configs:
+
+      - source_labels:
+        - __meta_kubernetes_pod_container_name
+
+        action: keep
+        regex: istio-proxy
+
+      - source_labels:
+        - __meta_kubernetes_pod_ip
+
+        target_label: __address__
+        replacement: ${1}:15090
+
+      - target_label: __metrics_path__
+        replacement: /stats/prometheus
+
+      - action: labelmap
+        regex: __meta_kubernetes_pod_label_(.+)
+
+      - source_labels:
+        - __meta_kubernetes_namespace
+        target_label: namespace
+
+      - source_labels:
+        - __meta_kubernetes_pod_name
+        target_label: pod
+
+
+    # ---------------------------------------------------
+    # Istio control plane
+    # ---------------------------------------------------
+
+    - job_name: istiod
+
+      kubernetes_sd_configs:
+      - role: endpoints
+        namespaces:
+          names:
+          - istio-system
+
+      relabel_configs:
+
+      - source_labels:
+        - __meta_kubernetes_service_name
+
+        action: keep
+        regex: istiod
