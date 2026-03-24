@@ -5,7 +5,9 @@ import (
 	"math"
 	"time"
 
+	"github.com/kudmo/CoolPA/storage"
 	"github.com/kudmo/CoolPA/storage/graph"
+	"github.com/kudmo/CoolPA/storage/metrics"
 	"github.com/kudmo/toporank/types"
 )
 
@@ -55,7 +57,7 @@ type call struct {
 // the list of abnormal edges along with an anomaly degree per service.
 func findAbnormalCalls(now time.Time, p AbnormalParams, g *graph.CallGraph) []call {
 	fromTime := now.Add(-p.Window)
-	threshold := p.SLO * (1 + p.Alpha/2)
+	threshold := p.SLO * (1 - p.Alpha)
 
 	var abnormalCalls []call
 
@@ -74,7 +76,7 @@ func findAbnormalCalls(now time.Time, p AbnormalParams, g *graph.CallGraph) []ca
 
 // buildCorrelationGraphFromCalls builds a correlation graph from provided abnormal
 // calls and service anomaly degrees.
-func buildCorrelationGraphFromCalls(now time.Time, p AbnormalParams, g *graph.CallGraph, abnormalCalls []call, serviceAnomaly map[string]float64) (*types.CorrelationGraph, error) {
+func buildCorrelationGraphFromCalls(now time.Time, p AbnormalParams, s *storage.Storage, abnormalCalls []call, serviceAnomaly map[string]float64) (*types.CorrelationGraph, error) {
 	if len(abnormalCalls) == 0 {
 		return nil, nil
 	}
@@ -89,15 +91,20 @@ func buildCorrelationGraphFromCalls(now time.Time, p AbnormalParams, g *graph.Ca
 	}
 
 	for _, c := range abnormalCalls {
-		srcNode, _ := g.GetNode(c.from)
-		dstNode, _ := g.GetNode(c.to)
+		srcNode, _ := s.Graph.GetNode(c.from)
 
 		edge := srcNode.OutboundEdges[c.to]
 
 		latSeries := edge.Latency95.SeriesRange(fromTime, now)
-		reqSeries := dstNode.RequestCount.SeriesRange(fromTime, now)
 
-		weight := pearson(latSeries, reqSeries)
+		weight := 0.0
+		for m_id := 0; m_id < int(metrics.MetricCount); m_id++ {
+			m, _, err := s.ResourceMetrics.GetServiceMetricAvgSeries(c.to, metrics.MetricID(m_id), fromTime, now)
+			if err != nil {
+				continue
+			}
+			weight = math.Max(weight, pearson(latSeries, m))
+		}
 
 		if weight < 0 {
 			weight = -weight
@@ -147,12 +154,12 @@ func computeAnomalyDegree(now time.Time, p AbnormalParams, g *graph.CallGraph, a
 func BuildAbnormalCorrelationGraph(
 	now time.Time,
 	p AbnormalParams,
-	g *graph.CallGraph,
+	s *storage.Storage,
 ) (*types.CorrelationGraph, error) {
-	abnormalCalls := findAbnormalCalls(now, p, g)
+	abnormalCalls := findAbnormalCalls(now, p, s.Graph)
 	slog.Info("Finded abnormal calls", "count", len(abnormalCalls))
-	serviceAnomaly := computeAnomalyDegree(now, p, g, abnormalCalls)
+	serviceAnomaly := computeAnomalyDegree(now, p, s.Graph, abnormalCalls)
 	slog.Info("Calculatet anomaly degrees", "services", serviceAnomaly)
 
-	return buildCorrelationGraphFromCalls(now, p, g, abnormalCalls, serviceAnomaly)
+	return buildCorrelationGraphFromCalls(now, p, s, abnormalCalls, serviceAnomaly)
 }

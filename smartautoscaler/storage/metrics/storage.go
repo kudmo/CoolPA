@@ -619,3 +619,104 @@ func (s *MetricStore) GetPodLastSeen(service, pod string) (time.Time, bool) {
 	}
 	return p.lastSeen, true
 }
+
+// GetServiceMetricAvgSeries returns a time series of average metric values across all pods
+// in a service. Each point in the series is the average of all pods' values at that
+// timestamp bucket.
+// Returns (series, true, nil) when service exists, (nil, false, nil) when service not found,
+// or (nil, false, ErrInvalidMetric) when metric is invalid.
+func (s *MetricStore) GetServiceMetricAvgSeries(service string, metric MetricID, from, to time.Time) ([]float64, bool, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	if metric >= MetricCount {
+		return nil, false, ErrInvalidMetric
+	}
+
+	if !from.Before(to) {
+		return nil, false, nil
+	}
+
+	svc, ok := s.services[service]
+	if !ok {
+		return nil, false, nil
+	}
+
+	if len(svc.pods) == 0 {
+		return make([]float64, 0), true, nil
+	}
+
+	// Calculate the number of time points
+	totalSteps := int(to.Sub(from) / s.step)
+	if totalSteps <= 0 {
+		return make([]float64, 0), true, nil
+	}
+
+	// Initialize result series
+	series := make([]float64, totalSteps)
+	podCount := make([]int, totalSteps)
+
+	// Accumulate values from all pods
+	for _, pod := range svc.pods {
+		if pod.metrics[metric] != nil {
+			podSeries := pod.metrics[metric].SeriesRange(from, to)
+			if len(podSeries) == totalSteps {
+				for i, val := range podSeries {
+					if val > 0 || !math.IsNaN(val) {
+						series[i] += val
+						podCount[i]++
+					}
+				}
+			}
+		}
+	}
+
+	// Calculate averages
+	for i := range series {
+		if podCount[i] > 0 {
+			series[i] = series[i] / float64(podCount[i])
+		}
+	}
+
+	return series, true, nil
+}
+
+// GetServiceMetricAvgHead returns the average of head bucket values across all pods
+// in a service. This represents the most recent sample point.
+// Returns (value, true, nil) when service exists, (0, false, nil) when service not found,
+// or (0, false, ErrInvalidMetric) when metric is invalid.
+func (s *MetricStore) GetServiceMetricAvgHead(service string, metric MetricID) (float64, bool, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	if metric >= MetricCount {
+		return 0, false, ErrInvalidMetric
+	}
+
+	svc, ok := s.services[service]
+	if !ok {
+		return 0, false, nil
+	}
+
+	if len(svc.pods) == 0 {
+		return 0, true, nil
+	}
+
+	var sum float64
+	var count int
+	for _, pod := range svc.pods {
+		if pod.metrics[metric] != nil {
+			headValue := pod.metrics[metric].buckets[pod.metrics[metric].head].Value
+			if headValue > 0 || !math.IsNaN(headValue) {
+				sum += headValue
+				count++
+			}
+		}
+	}
+
+	if count == 0 {
+		return 0, true, nil
+	}
+
+	return sum / float64(count), true, nil
+}

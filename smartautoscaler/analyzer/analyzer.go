@@ -44,7 +44,7 @@ func (a *Analyzer) analyzeWithSLOViolation() []string {
 	TOPORANK_THRESHOLD := 0.5
 	result := make([]string, 0)
 
-	graph, err := sloviolation.BuildAbnormalCorrelationGraph(time.Now(), params, a.store.Graph)
+	graph, err := sloviolation.BuildAbnormalCorrelationGraph(time.Now(), params, a.store)
 	if err != nil {
 		slog.Error("Failed to build abnormal correlation graph", "error", err)
 	} else {
