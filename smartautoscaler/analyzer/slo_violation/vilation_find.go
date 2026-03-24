@@ -1,6 +1,7 @@
 package sloviolation
 
 import (
+	"log/slog"
 	"math"
 	"time"
 
@@ -149,7 +150,9 @@ func BuildAbnormalCorrelationGraph(
 	g *graph.CallGraph,
 ) (*types.CorrelationGraph, error) {
 	abnormalCalls := findAbnormalCalls(now, p, g)
+	slog.Info("Finded abnormal calls", "count", len(abnormalCalls))
 	serviceAnomaly := computeAnomalyDegree(now, p, g, abnormalCalls)
+	slog.Info("Calculatet anomaly degrees", "services", serviceAnomaly)
 
 	return buildCorrelationGraphFromCalls(now, p, g, abnormalCalls, serviceAnomaly)
 }

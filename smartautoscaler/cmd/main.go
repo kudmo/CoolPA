@@ -10,9 +10,10 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/kudmo/CoolPA/analyzer"
 	"github.com/kudmo/CoolPA/collector"
 	"github.com/kudmo/CoolPA/config"
+	"github.com/kudmo/CoolPA/decision"
+	reactionapplier "github.com/kudmo/CoolPA/reaction_applier"
 	"github.com/kudmo/CoolPA/storage"
 )
 
@@ -83,171 +84,84 @@ func main() {
 				Help:  "Kubernetes pod metadata",
 			},
 			{
-				Name: "container_cpu_usage",
-				Query: `sum by (pod) (
-					rate(container_cpu_usage_seconds_total{container!="",container!="istio-proxy",container!="POD"}[1m])
-					* on (namespace, pod) group_left()
-					(kube_pod_labels{label_autoscaling_enabled="true"})
-				)`,
-				Help: "CPU usage per container (cores)",
+				Name:  "container_cpu_usage",
+				Query: `sum by (pod) (rate(container_cpu_usage_seconds_total{container!="",container!="istio-proxy",container!="POD",namespace="microservices-demo"}[1m]))`,
+				Help:  "CPU usage per container (cores)",
 			},
 			{
-				Name: "container_memory_usage",
-				Query: `sum by (pod) (
-					container_memory_usage_bytes{container!="",container!="istio-proxy",container!="POD"}
-					* on (namespace, pod) group_left()
-					(kube_pod_labels{label_autoscaling_enabled="true"})
-				)`,
-				Help: "Memory usage per container (bytes)",
+				Name:  "container_memory_usage",
+				Query: `sum by (pod) (container_memory_usage_bytes{container!="",container!="istio-proxy",container!="POD",namespace="microservices-demo"})`,
+				Help:  "Memory usage per container (bytes)",
 			},
 			{
-				Name: "container_cpu_quota",
-				Query: `sum by (pod) (
-					container_spec_cpu_quota{container!="",container!="istio-proxy",container!="POD"}
-					* on (namespace, pod) group_left()
-					(kube_pod_labels{label_autoscaling_enabled="true"})
-				)`,
-				Help: "CPU quota per container",
+				Name:  "container_cpu_quota",
+				Query: `sum by (pod) (container_spec_cpu_quota{container!="",container!="istio-proxy",container!="POD",namespace="microservices-demo"})`,
+				Help:  "CPU quota per container",
 			},
 			{
-				Name: "container_memory_limit",
-				Query: `sum by (pod) (
-					container_spec_memory_limit_bytes{container!="",container!="istio-proxy",container!="POD"}
-					* on (namespace, pod) group_left()
-					(kube_pod_labels{label_autoscaling_enabled="true"})
-				)`,
-				Help: "Memory limit per container (bytes)",
+				Name:  "container_memory_limit",
+				Query: `sum by (pod) (container_spec_memory_limit_bytes{container!="",container!="istio-proxy",container!="POD",namespace="microservices-demo"})`,
+				Help:  "Memory limit per container (bytes)",
 			},
 			{
-				Name: "container_fs_usage",
-				Query: `sum by (pod) (
-					container_fs_usage_bytes{container!="",container!="istio-proxy",container!="POD"}
-					* on (namespace, pod) group_left()
-					(kube_pod_labels{label_autoscaling_enabled="true"})
-				)`,
-				Help: "Filesystem usage per container (bytes)",
+				Name:  "container_fs_usage",
+				Query: `sum by (pod) (container_fs_usage_bytes{container!="",container!="istio-proxy",container!="POD",namespace="microservices-demo"})`,
+				Help:  "Filesystem usage per container (bytes)",
 			},
 			{
-				Name: "container_fs_write",
-				Query: `sum by (pod) (
-					rate(container_fs_writes_bytes_total{container!="",container!="istio-proxy",container!="POD"}[1m])
-					* on (namespace, pod) group_left()
-					(kube_pod_labels{label_autoscaling_enabled="true"})
-				)`,
-				Help: "Filesystem write bytes per container",
+				Name:  "container_fs_write",
+				Query: `sum by (pod) (rate(container_fs_writes_bytes_total{container!="",container!="istio-proxy",container!="POD",namespace="microservices-demo"}[1m]))`,
+				Help:  "Filesystem write bytes per container",
 			},
 			{
-				Name: "container_fs_read",
-				Query: `sum by (pod) (
-					rate(container_fs_reads_bytes_total{container!="",container!="istio-proxy",container!="POD"}[1m])
-					* on (namespace, pod) group_left()
-					(kube_pod_labels{label_autoscaling_enabled="true"})
-				)`,
-				Help: "Filesystem read bytes per container",
+				Name:  "container_fs_read",
+				Query: `sum by (pod) (rate(container_fs_reads_bytes_total{container!="",container!="istio-proxy",container!="POD",namespace="microservices-demo"}[1m]))`,
+				Help:  "Filesystem read bytes per container",
 			},
 			{
-				Name: "container_network_receive",
-				Query: `sum by (pod) (
-					rate(container_network_receive_bytes_total{}[1m])
-					* on (namespace, pod) group_left()
-					(kube_pod_labels{label_autoscaling_enabled="true"})
-				)`,
-				Help: "Network receive bytes per pod",
+				Name:  "container_network_receive",
+				Query: `sum by (pod) (rate(container_network_receive_bytes_total{namespace="microservices-demo"}[1m]))`,
+				Help:  "Network receive bytes per pod",
 			},
 			{
-				Name: "container_network_transmit",
-				Query: `sum by (pod) (
-					rate(container_network_transmit_bytes_total{}[1m])
-					* on (namespace, pod) group_left()
-					(kube_pod_labels{label_autoscaling_enabled="true"})
-				)`,
-				Help: "Network transmit bytes per pod",
+				Name:  "container_network_transmit",
+				Query: `sum by (pod) (rate(container_network_transmit_bytes_total{namespace="microservices-demo"}[1m]))`,
+				Help:  "Network transmit bytes per pod",
 			},
 			{
 				Name: "istio_request_duration_p95",
 				Query: `histogram_quantile(0.95, 
-					sum by (le, destination_app, source_app) (rate(istio_request_duration_milliseconds_bucket{destination_workload!=""}[1m])) 
-				) 
-				* on (source_app) group_left()
-				max by (source_app) (
-					label_replace(
-					kube_pod_labels{label_autoscaling_enabled="true"},
-					"source_app", "$1", "label_app", "(.*)"
-					)
-				)
-				* on (destination_app) group_left()
-				max by (destination_app) (
-					label_replace(
-					kube_pod_labels{label_autoscaling_enabled="true"},
-					"destination_app", "$1", "label_app", "(.*)"
-					)
+					sum by (le, destination_app, source_app) (rate(istio_request_duration_milliseconds_bucket{destination_workload!="",destination_workload_namespace="microservices-demo"}[1m])) 
 				)`,
 				Help: "Istio P95 request latency per app (both source and destination must have autoscaling-enabled)",
 			},
 			{
 				Name: "istio_request_duration_p50",
 				Query: `histogram_quantile(0.50, 
-					sum by (le, destination_app, source_app) (rate(istio_request_duration_milliseconds_bucket{destination_workload!=""}[1m])) 
-				) 
-				* on (source_app) group_left()
-				max by (source_app) (
-					label_replace(
-					kube_pod_labels{label_autoscaling_enabled="true"},
-					"source_app", "$1", "label_app", "(.*)"
-					)
-				)
-				* on (destination_app) group_left()
-				max by (destination_app) (
-					label_replace(
-					kube_pod_labels{label_autoscaling_enabled="true"},
-					"destination_app", "$1", "label_app", "(.*)"
-					)
+					sum by (le, destination_app, source_app) (rate(istio_request_duration_milliseconds_bucket{destination_workload!="",destination_workload_namespace="microservices-demo"}[1m])) 
 				)`,
 				Help: "Istio P95 request latency per app (both source and destination must have autoscaling-enabled)",
 			},
 			{
-				Name: "istio_requests_total",
-				Query: `sum by (destination_app) (rate(istio_requests_total{destination_workload!="", reporter="destination"}[1m])) 
-				* on (destination_app) group_left()
-				max by (destination_app) (
-					label_replace(
-					kube_pod_labels{label_autoscaling_enabled="true"},
-					"destination_app", "$1", "label_app", "(.*)"
-					)
-				)`,
-				Help: "Istio HTTP requests per app (RPS) - both source and destination must have autoscaling-enabled",
+				Name:  "istio_requests_total",
+				Query: `sum by (destination_app) (rate(istio_requests_total{destination_workload!="", reporter="destination",destination_workload_namespace="microservices-demo"}[1m]))`,
+				Help:  "Istio HTTP requests per app (RPS) - both source and destination must have autoscaling-enabled",
 			},
 			{
-				Name: "istio_tcp_received_bytes_total",
-				Query: `sum by (destination_app) (rate(istio_tcp_received_bytes_total{destination_workload!=""}[1m])) 
-				* on (destination_app) group_left()
-				max by (destination_app) (
-					label_replace(
-					kube_pod_labels{label_autoscaling_enabled="true"},
-					"destination_app", "$1", "label_app", "(.*)"
-					)
-				)`,
-				Help: "Istio TCP received bytes per app - both source and destination must have autoscaling-enabled",
+				Name:  "istio_tcp_received_bytes_total",
+				Query: `sum by (destination_app) (rate(istio_tcp_received_bytes_total{destination_workload!="",destination_workload_namespace="microservices-demo"}[1m]))`,
+				Help:  "Istio TCP received bytes per app - both source and destination must have autoscaling-enabled",
 			},
 			{
-				Name: "istio_tcp_sent_bytes_total",
-				Query: `sum by (destination_app) (rate(istio_tcp_sent_bytes_total{destination_workload!=""}[1m])) 
-				* on (destination_app) group_left()
-				max by (destination_app) (
-					label_replace(
-					kube_pod_labels{label_autoscaling_enabled="true"},
-					"destination_app", "$1", "label_app", "(.*)"
-					)
-				)`,
-				Help: "Istio TCP sent bytes per app - both source and destination must have autoscaling-enabled",
+				Name:  "istio_tcp_sent_bytes_total",
+				Query: `sum by (destination_app) (rate(istio_tcp_sent_bytes_total{destination_workload!="",destination_workload_namespace="microservices-demo"}[1m]))`,
+				Help:  "Istio TCP sent bytes per app - both source and destination must have autoscaling-enabled",
 			},
 		},
 	}
-	analyzerConfig := analyzer.AnalyzerConfig{
-		Interval:              cfg.AnalyzerInterval,
-		Confidence:            0.05,
-		WelchOldIntervalBegin: time.Duration(300 * time.Second),
-		WelchNowIntervalBegin: time.Duration(60 * time.Second),
+	analyzerConfig := decision.DecisionMakerConfig{
+		Interval: cfg.AnalyzerInterval,
+		Cooldown: cfg.ScalingCooldown,
 	}
 
 	// Components creating
@@ -262,9 +176,16 @@ func main() {
 	if err != nil {
 		slog.Error("Failed to create collector", "error", err)
 	}
-	analyzer := analyzer.NewAnalyzer(
+
+	applier, err := reactionapplier.BuildApplier()
+	if err != nil {
+		slog.Error("Failed to create applier", "error", err)
+	}
+
+	analyzer := decision.NewDecisionMaker(
 		analyzerConfig,
 		store,
+		applier,
 	)
 
 	// Context creating and starting components

@@ -5,7 +5,7 @@ metadata:
   namespace: autoscale-test
 data:
   config.yaml: |
-    prometheus_url: "http://prometheus.autoscale-test.svc.cluster.local:9090"
+    prometheus_url: "http://prometheus.monitoring.svc.cluster.local:9090"
     prometheus_interval: 5s
     analyzer_interval: 15s
     scaling_cooldown: 300s
