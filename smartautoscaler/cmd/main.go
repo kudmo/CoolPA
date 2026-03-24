@@ -80,7 +80,7 @@ func main() {
 		Queries: []collector.MetricQuery{
 			{
 				Name:  "kube_pod_info",
-				Query: `kube_pod_info * on (namespace, pod) group_left() (kube_pod_labels{label_autoscaling_enabled="true"})`,
+				Query: `kube_pod_info`,
 				Help:  "Kubernetes pod metadata",
 			},
 			{
