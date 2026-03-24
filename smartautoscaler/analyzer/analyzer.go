@@ -53,9 +53,9 @@ func (a *Analyzer) analyzeWithSLOViolation() []string {
 		}
 	}
 	anomalys := api.RunTopoRank(graph, types.DefaultConfig())
+	slog.Info("Calculated anomaly", "values", anomalys)
 
 	for _, service := range anomalys {
-		slog.Debug("Calculated anomaly", "service", service.ID, "Anomaly Score", service.Rank)
 		if service.Rank > TOPORANK_THRESHOLD {
 			result = append(result, service.ID)
 		}
