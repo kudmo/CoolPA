@@ -10,17 +10,18 @@ type ReactionType int
 
 const (
 	HPA ReactionType = iota
-	VPA_CPU
+	VPA              // Vertical scaling affecting both CPU and memory
 )
 
 // ServiceGene represents a per-service atomic gene. Only one delta is active
-// depending on ReactionType: DeltaReplicas for HPA, DeltaCPU for VPA_CPU.
+// depending on ReactionType: DeltaReplicas for HPA, DeltaCPU and DeltaMemory for VPA.
 type ServiceGene struct {
 	ServiceName  string
 	ReactionType ReactionType
 
 	DeltaReplicas float64
 	DeltaCPU      float64
+	DeltaMemory   float64
 }
 
 // ReactionGenome encodes scaling decisions for several services.
@@ -63,7 +64,7 @@ func (g *ReactionGenome) Mutate(rng *rand.Rand, mutationRate, typeMutationRate f
 			// choose a new reaction from allowed set (or both if empty)
 			var candidates []ReactionType
 			if len(allowed) == 0 {
-				candidates = []ReactionType{HPA, VPA_CPU}
+				candidates = []ReactionType{HPA, VPA}
 			} else {
 				candidates = append(candidates, allowed...)
 			}
@@ -71,29 +72,33 @@ func (g *ReactionGenome) Mutate(rng *rand.Rand, mutationRate, typeMutationRate f
 				newType := candidates[rng.Intn(len(candidates))]
 				if newType != gene.ReactionType {
 					gene.ReactionType = newType
-					// after type change reset both deltas
+					// after type change reset all deltas
 					gene.DeltaReplicas = 0
 					gene.DeltaCPU = 0
+					gene.DeltaMemory = 0
 				}
 			}
 		}
 
-		// Mutate only the active parameter
+		// Mutate only the active parameters
 		if rng.Float64() < mutationRate {
 			switch gene.ReactionType {
 			case HPA:
 				gene.DeltaReplicas += rng.NormFloat64() * 0.1
 				gene.DeltaCPU = 0
-			case VPA_CPU:
+				gene.DeltaMemory = 0
+			case VPA:
 				gene.DeltaCPU += rng.NormFloat64() * 0.05
+				gene.DeltaMemory += rng.NormFloat64() * 0.05
 				gene.DeltaReplicas = 0
 			}
 		} else {
-			// ensure inactive param is zeroed
+			// ensure inactive params are zeroed
 			switch gene.ReactionType {
 			case HPA:
 				gene.DeltaCPU = 0
-			case VPA_CPU:
+				gene.DeltaMemory = 0
+			case VPA:
 				gene.DeltaReplicas = 0
 			}
 		}
@@ -104,6 +109,9 @@ func (g *ReactionGenome) Mutate(rng *rand.Rand, mutationRate, typeMutationRate f
 		}
 		if math.IsNaN(gene.DeltaCPU) || math.IsInf(gene.DeltaCPU, 0) {
 			gene.DeltaCPU = 0
+		}
+		if math.IsNaN(gene.DeltaMemory) || math.IsInf(gene.DeltaMemory, 0) {
+			gene.DeltaMemory = 0
 		}
 	}
 
@@ -152,9 +160,10 @@ func copyGene(s *ServiceGene) *ServiceGene {
 
 // ServiceState represents the current service runtime state (a minimal view needed for decode).
 type ServiceState struct {
-	Name            string
-	CurrentReplicas int
-	CurrentCPURel   float64
+	Name             string
+	CurrentReplicas  int
+	CurrentCPURel    float64
+	CurrentMemoryRel float64
 }
 
 // CandidateServiceState is a decoded proposed state for a single service.
@@ -162,6 +171,7 @@ type CandidateServiceState struct {
 	ServiceName string
 	Replicas    int
 	CPURel      float64
+	MemoryRel   float64
 	Reaction    ReactionType
 }
 
@@ -188,18 +198,22 @@ func (g *ReactionGenome) Decode(currentStates []ServiceState) CandidateState {
 				newRepF := float64(cs.CurrentReplicas) + sg.DeltaReplicas
 				cand.Replicas = int(math.Max(0, math.Round(newRepF)))
 				cand.CPURel = cs.CurrentCPURel
-			case VPA_CPU:
+				cand.MemoryRel = cs.CurrentMemoryRel
+			case VPA:
 				cand.CPURel = math.Max(0, cs.CurrentCPURel+sg.DeltaCPU)
+				cand.MemoryRel = math.Max(0, cs.CurrentMemoryRel+sg.DeltaMemory)
 				cand.Replicas = cs.CurrentReplicas
 			default:
 				cand.Replicas = cs.CurrentReplicas
 				cand.CPURel = cs.CurrentCPURel
+				cand.MemoryRel = cs.CurrentMemoryRel
 			}
 			cand.Reaction = sg.ReactionType
 		} else {
 			// No decision -> keep current
 			cand.Replicas = cs.CurrentReplicas
 			cand.CPURel = cs.CurrentCPURel
+			cand.MemoryRel = cs.CurrentMemoryRel
 			cand.Reaction = HPA
 		}
 		out.Services = append(out.Services, cand)

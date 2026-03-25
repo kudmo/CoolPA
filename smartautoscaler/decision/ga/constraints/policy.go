@@ -9,11 +9,14 @@ type ServicePolicy struct {
 	MaxReplicas      int
 	MinCPU           float64
 	MaxCPU           float64
+	MinMemory        float64
+	MaxMemory        float64
 }
 
 // GlobalPolicy defines cluster-wide constraints.
 type GlobalPolicy struct {
 	ClusterCPULimit     float64
+	ClusterMemoryLimit  float64
 	ClusterReplicaLimit int
 }
 

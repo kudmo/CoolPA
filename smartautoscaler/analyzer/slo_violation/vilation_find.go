@@ -8,39 +8,9 @@ import (
 	"github.com/kudmo/CoolPA/storage"
 	"github.com/kudmo/CoolPA/storage/graph"
 	"github.com/kudmo/CoolPA/storage/metrics"
+	"github.com/kudmo/CoolPA/utils"
 	"github.com/kudmo/toporank/types"
 )
-
-func pearson(x, y []float64) float64 {
-	n := len(x)
-	if n == 0 || len(y) != n {
-		return 0
-	}
-
-	var sumX, sumY float64
-	for i := 0; i < n; i++ {
-		sumX += x[i]
-		sumY += y[i]
-	}
-
-	meanX := sumX / float64(n)
-	meanY := sumY / float64(n)
-
-	var num, denX, denY float64
-	for i := 0; i < n; i++ {
-		dx := x[i] - meanX
-		dy := y[i] - meanY
-		num += dx * dy
-		denX += dx * dx
-		denY += dy * dy
-	}
-
-	if denX == 0 || denY == 0 {
-		return 0
-	}
-
-	return num / math.Sqrt(denX*denY)
-}
 
 type AbnormalParams struct {
 	Window time.Duration
@@ -67,7 +37,7 @@ func findAbnormalCalls(now time.Time, p AbnormalParams, g *graph.CallGraph) []ca
 		for to, edge := range node.OutboundEdges {
 			current := edge.Latency95.AvgRange(fromTime, now)
 			previous := edge.Latency95.AvgRange(prevFromTime, prevToTime)
-
+			slog.Info("Latency", "from", from, "to", to, "value", current)
 			if current > p.SLO*(1-p.Alpha) {
 				anomalous = append(anomalous, call{from, to})
 			} else if previous > 0 {
@@ -110,7 +80,8 @@ func buildCorrelationGraphFromCalls(now time.Time, p AbnormalParams, s *storage.
 			if err != nil {
 				continue
 			}
-			weight = math.Max(weight, pearson(latSeries, m))
+			weight = math.Max(weight, utils.Pearson(latSeries, m))
+			slog.Info("COMPUTED COORELATION", "service", c.to, "metic_id", m_id, "corr", utils.Pearson(latSeries, m))
 		}
 
 		if weight < 0 {
@@ -168,6 +139,10 @@ func BuildAbnormalCorrelationGraph(
 	slog.Info("Finded abnormal calls", "count", len(abnormalCalls))
 	serviceAnomaly := computeAnomalyDegree(now, p, s.Graph, abnormalCalls)
 	slog.Info("Calculatet anomaly degrees", "services", serviceAnomaly)
-
-	return buildCorrelationGraphFromCalls(now, p, s, abnormalCalls, serviceAnomaly)
+	for _, a := range serviceAnomaly {
+		if a != 0 {
+			return buildCorrelationGraphFromCalls(now, p, s, abnormalCalls, serviceAnomaly)
+		}
+	}
+	return nil, nil
 }

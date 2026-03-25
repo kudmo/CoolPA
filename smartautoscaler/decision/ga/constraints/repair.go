@@ -23,10 +23,10 @@ func (ce *ConstraintEngine) Repair(g *genome.ReactionGenome) {
 				sg.ReactionType = sp.AllowedReactions[0]
 			}
 
-			// Clamp replica delta so that (1*(1+delta)) falls into [MinReplicas, MaxReplicas]
+			// Clamp replica delta so that current + delta falls into [MinReplicas, MaxReplicas]
 			if sp.MaxReplicas > 0 && sp.MinReplicas >= 0 {
-				deltaMin := float64(sp.MinReplicas)/1.0 - 1.0
-				deltaMax := float64(sp.MaxReplicas)/1.0 - 1.0
+				deltaMin := float64(sp.MinReplicas) - 1.0
+				deltaMax := float64(sp.MaxReplicas) - 1.0
 				if sg.DeltaReplicas < deltaMin {
 					sg.DeltaReplicas = deltaMin
 				}
@@ -35,10 +35,10 @@ func (ce *ConstraintEngine) Repair(g *genome.ReactionGenome) {
 				}
 			}
 
-			// Clamp CPU deltas relative to 1.0 baseline
+			// Clamp CPU deltas relative to baseline
 			if sp.MinCPU >= 0 && sp.MaxCPU > 0 {
-				cpuMin := sp.MinCPU/1.0 - 1.0
-				cpuMax := sp.MaxCPU/1.0 - 1.0
+				cpuMin := sp.MinCPU - 1.0
+				cpuMax := sp.MaxCPU - 1.0
 				if sg.DeltaCPU < cpuMin {
 					sg.DeltaCPU = cpuMin
 				}
@@ -46,12 +46,26 @@ func (ce *ConstraintEngine) Repair(g *genome.ReactionGenome) {
 					sg.DeltaCPU = cpuMax
 				}
 			}
+
+			// Clamp Memory deltas relative to baseline
+			if sp.MinMemory >= 0 && sp.MaxMemory > 0 {
+				memMin := sp.MinMemory - 1.0
+				memMax := sp.MaxMemory - 1.0
+				if sg.DeltaMemory < memMin {
+					sg.DeltaMemory = memMin
+				}
+				if sg.DeltaMemory > memMax {
+					sg.DeltaMemory = memMax
+				}
+			}
 		}
 
 		// enforce inactive parameter zeroing
-		if sg.ReactionType == genome.HPA {
+		switch sg.ReactionType {
+		case genome.HPA:
 			sg.DeltaCPU = 0
-		} else {
+			sg.DeltaMemory = 0
+		case genome.VPA:
 			sg.DeltaReplicas = 0
 		}
 
@@ -61,6 +75,9 @@ func (ce *ConstraintEngine) Repair(g *genome.ReactionGenome) {
 		}
 		if math.IsNaN(sg.DeltaCPU) || math.IsInf(sg.DeltaCPU, 0) {
 			sg.DeltaCPU = 0
+		}
+		if math.IsNaN(sg.DeltaMemory) || math.IsInf(sg.DeltaMemory, 0) {
+			sg.DeltaMemory = 0
 		}
 	}
 }
@@ -88,9 +105,25 @@ func (ce *ConstraintEngine) Validate(g *genome.ReactionGenome) bool {
 					return false
 				}
 			}
-			// check numerical bounds (conservative using baseline=1)
+
+			// check numerical bounds
+			// Replicas bound check
 			if sp.MaxReplicas > 0 {
-				if int(math.Round(1.0*(1.0+sg.DeltaReplicas))) > sp.MaxReplicas {
+				if int(math.Round(1.0+sg.DeltaReplicas)) > sp.MaxReplicas {
+					return false
+				}
+			}
+
+			// CPU bound check
+			if sp.MaxCPU > 0 {
+				if 1.0+sg.DeltaCPU > sp.MaxCPU {
+					return false
+				}
+			}
+
+			// Memory bound check
+			if sp.MaxMemory > 0 {
+				if 1.0+sg.DeltaMemory > sp.MaxMemory {
 					return false
 				}
 			}

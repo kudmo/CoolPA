@@ -70,11 +70,11 @@ func (d *DecisionMaker) Start(ctx context.Context) error {
 				switch result.Scale {
 				case 1:
 					slog.Info("Proposing scale up for services", "services", result.Services)
-					d.Optimizer.ScaleUp(result.Services, d.Store)
+					d.Optimizer.ScaleUp(result.Services)
 					d.lastReactionTime = time.Now()
 				case -1:
 					slog.Info("Proposing scale down for services", "services", result.Services)
-					d.Optimizer.ScaleDown(result.Services, d.Store)
+					d.Optimizer.ScaleDown(result.Services)
 					d.lastReactionTime = time.Now()
 				default:
 					slog.Info("No scaling action proposed")

@@ -2,6 +2,7 @@ package analyzer
 
 import (
 	"log/slog"
+	"sort"
 	"time"
 
 	sloviolation "github.com/kudmo/CoolPA/analyzer/slo_violation"
@@ -38,10 +39,9 @@ type AnalysisResult struct {
 func (a *Analyzer) analyzeWithSLOViolation() []string {
 	params := sloviolation.AbnormalParams{
 		Window: 1 * time.Minute,
-		SLO:    100,
+		SLO:    150,
 		Alpha:  0.2,
 	}
-	TOPORANK_THRESHOLD := 0.5
 	result := make([]string, 0)
 
 	graph, err := sloviolation.BuildAbnormalCorrelationGraph(time.Now(), params, a.store)
@@ -53,17 +53,25 @@ func (a *Analyzer) analyzeWithSLOViolation() []string {
 		}
 	}
 	anomalys := api.RunTopoRank(graph, types.DefaultConfig())
-	slog.Info("Calculated anomaly", "values", anomalys)
+	sort.Slice(anomalys, func(i, j int) bool {
+		return anomalys[i].Rank > anomalys[j].Rank
+	})
+
+	// КОСТЫЛЬ, ЧТОБЫ НЕ БЫЛО LOADGEN
+	for i := 0; i < len(anomalys) && len(result) < 2; i++ {
+		if anomalys[i].ID != "loadgenerator" {
+			result = append(result, anomalys[i].ID)
+		}
+	}
 
 	for _, service := range anomalys {
-		if service.Rank > TOPORANK_THRESHOLD {
-			result = append(result, service.ID)
-		}
+		slog.Info("Calculated anomaly", "service", service.ID, "value", service.Rank)
 	}
 	return result
 }
 
 func (a *Analyzer) analyzeUnderutilization() []string {
+	BETA := 0.8
 	result := make([]string, 0)
 	for _, service := range a.store.Graph.GetServices() {
 		n, _ := a.store.Graph.GetNode(service)
@@ -72,6 +80,9 @@ func (a *Analyzer) analyzeUnderutilization() []string {
 		time_old_begin := time_now.Add(-a.config.WelchOldIntervalBegin)
 
 		old := n.RequestCount.SeriesRange(time_old_begin, time_now_begin)
+		for i, v := range old {
+			old[i] = v * BETA
+		}
 		new := n.RequestCount.SeriesRange(time_now_begin, time_now)
 		welch_result, _ := welchtest.TwoSampleWelch(new, old)
 
