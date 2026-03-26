@@ -1,0 +1,28 @@
+version: '3.8'
+
+services:
+  locust:
+    build: .
+    image: locust-loadgen:latest
+    container_name: locust-loadgen
+    network_mode: host
+    environment:
+      - FRONTEND_ADDR=${FRONTEND_ADDR:-http://localhost:8080}
+      - USERS=${USERS:-10}
+      - RATE=${RATE:-10}
+      - CONFIG_FILE=/config/config.env
+      - REFRESH_INTERVAL=${REFRESH_INTERVAL:-5}
+      - HEADLESS=${HEADLESS:-false}
+      - RUN_TIME=${RUN_TIME:-60s}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+    volumes:
+      - ./config:/config:rw
+      - ./reports:/tmp:rw
+    ports:
+      - "8089:8089"  # Locust Web UI
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"

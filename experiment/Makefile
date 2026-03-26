@@ -15,7 +15,7 @@ SCALER_NS ?= autoscale-test
 KUBECTL := kubectl --context=$(KCTX)
 
 BENCH_DIR := ./benchmarks/microservices-demo
-BENCH_MANIFESTS_DIR := $(BENCH_DIR)/release/kubernetes-manifests.yaml
+BENCH_MANIFESTS_DIR := $(BENCH_DIR)/release
 
 ISTIO_PROFILE ?= demo
 ISTIO_NS ?= istio-system
@@ -99,15 +99,284 @@ scaler-logs:
 	$(KUBECTL) -n $(SCALER_NS) logs -l app=smartautoscaler --tail=200
 
 # =====================================================
-# Loadgen
+# Loadgen Integration (Locust-based)
 # =====================================================
 
-USERS ?= 1
-RATE ?= 10
+# Определяем тип loadgen (можно переопределить)
+LOADGEN_TYPE ?= locust  # locust или legacy
 
-.PHONY: loadgen-setup
-loadgen-setup:
-	$(KUBECTL) -n $(NS) set env deployment/loadgenerator USERS=$(USERS) RATE=$(RATE)
+# Директории
+LOADGEN_DIR := $(BENCH_DIR)/loadgen
+LOADGEN_CONFIG_DIR ?= $(LOADGEN_DIR)/config
+LOADGEN_MAKE := $(MAKE) -C $(LOADGEN_DIR)
+
+# Параметры нагрузки
+USERS ?= 10
+RATE ?= 100
+FRONTEND_ADDR ?= http://localhost:8080  # Для locust нужен полный URL
+REFRESH_INTERVAL ?= 5
+HEADLESS ?= false
+RUN_TIME ?= 60s
+
+# Проверка существования loadgen директории
+.PHONY: check-loadgen
+check-loadgen:
+	@if [ ! -d "$(LOADGEN_DIR)" ]; then \
+		echo "❌ Loadgen directory not found: $(LOADGEN_DIR)"; \
+		echo "Please ensure LOADGEN_DIR points to the correct location"; \
+		echo "Current BENCH_DIR: $(BENCH_DIR)"; \
+		exit 1; \
+	fi
+	@if [ ! -f "$(LOADGEN_DIR)/Makefile" ]; then \
+		echo "❌ Loadgen Makefile not found in $(LOADGEN_DIR)"; \
+		echo "Please set up loadgen first:"; \
+		echo "  cd $(LOADGEN_DIR) && make setup"; \
+		exit 1; \
+	fi
+
+# Сборка образа
+.PHONY: loadgen-build
+loadgen-build: check-loadgen
+	@echo "🔨 Building loadgen image ($(LOADGEN_TYPE))..."
+	@$(LOADGEN_MAKE) build
+
+# Запуск loadgen
+.PHONY: loadgen-up
+loadgen-up: check-loadgen
+	@echo "🚀 Starting loadgenerator ($(LOADGEN_TYPE)) with USERS=$(USERS), RATE=$(RATE)"
+	@mkdir -p $(LOADGEN_CONFIG_DIR)
+	@if [ "$(LOADGEN_TYPE)" = "locust" ]; then \
+		$(LOADGEN_MAKE) up \
+			USERS=$(USERS) \
+			RATE=$(RATE) \
+			FRONTEND_ADDR=$(FRONTEND_ADDR) \
+			REFRESH_INTERVAL=$(REFRESH_INTERVAL) \
+			HEADLESS=$(HEADLESS); \
+	else \
+		$(LOADGEN_MAKE) up \
+			USERS=$(USERS) \
+			RATE=$(RATE) \
+			FRONTEND_ADDR=$(FRONTEND_ADDR) \
+			REFRESH_INTERVAL=$(REFRESH_INTERVAL); \
+	fi
+	@echo "✅ Loadgenerator started"
+	@if [ "$(LOADGEN_TYPE)" = "locust" ] && [ "$(HEADLESS)" != "true" ]; then \
+		echo "🌐 Locust Web UI: http://localhost:8089"; \
+	fi
+
+# Запуск в headless режиме (только для locust)
+.PHONY: loadgen-up-headless
+loadgen-up-headless: check-loadgen
+	@echo "🚀 Starting loadgenerator in headless mode with USERS=$(USERS), RATE=$(RATE), RUN_TIME=$(RUN_TIME)"
+	@mkdir -p $(LOADGEN_CONFIG_DIR)
+	@$(LOADGEN_MAKE) up-headless \
+		USERS=$(USERS) \
+		RATE=$(RATE) \
+		FRONTEND_ADDR=$(FRONTEND_ADDR) \
+		RUN_TIME=$(RUN_TIME) \
+		REFRESH_INTERVAL=$(REFRESH_INTERVAL)
+
+# Остановка loadgen
+.PHONY: loadgen-down
+loadgen-down: check-loadgen
+	@echo "🛑 Stopping loadgenerator..."
+	@$(LOADGEN_MAKE) down || true
+	@rm -rf $(LOADGEN_CONFIG_DIR) 2>/dev/null || true
+
+# Плавное изменение RATE
+.PHONY: loadgen-set-rate
+loadgen-set-rate: check-loadgen
+	@if [ -z "$(RATE)" ]; then \
+		echo "❌ Error: RATE is required. Usage: make loadgen-set-rate RATE=200"; \
+		exit 1; \
+	fi
+	@echo "📊 Smoothly changing RATE to $(RATE)..."
+	@$(LOADGEN_MAKE) set-rate RATE=$(RATE)
+
+# Плавное изменение USERS
+.PHONY: loadgen-set-users
+loadgen-set-users: check-loadgen
+	@if [ -z "$(USERS)" ]; then \
+		echo "❌ Error: USERS is required. Usage: make loadgen-set-users USERS=20"; \
+		exit 1; \
+	fi
+	@echo "👥 Smoothly changing USERS to $(USERS)..."
+	@$(LOADGEN_MAKE) set-users USERS=$(USERS)
+
+# Обновление обоих параметров
+.PHONY: loadgen-set-config
+loadgen-set-config: check-loadgen
+	@echo "⚙️  Updating configuration: USERS=$(USERS), RATE=$(RATE)"
+	@$(LOADGEN_MAKE) set-config USERS=$(USERS) RATE=$(RATE)
+
+# Просмотр логов
+.PHONY: loadgen-logs
+loadgen-logs: check-loadgen
+	@$(LOADGEN_MAKE) logs
+
+# Статус
+.PHONY: loadgen-status
+loadgen-status: check-loadgen
+	@echo "📊 Loadgenerator status:"
+	@$(LOADGEN_MAKE) status || echo "Loadgenerator is not running"
+
+# Показать конфигурацию
+.PHONY: loadgen-show-config
+loadgen-show-config: check-loadgen
+	@$(LOADGEN_MAKE) show-config
+
+# Открыть Web UI (только для locust)
+.PHONY: loadgen-webui
+loadgen-webui: check-loadgen
+	@if [ "$(LOADGEN_TYPE)" = "locust" ]; then \
+		$(LOADGEN_MAKE) webui; \
+	else \
+		echo "Web UI only available for Locust-based loadgen"; \
+	fi
+
+# Быстрый тест
+.PHONY: loadgen-test
+loadgen-test: check-loadgen
+	@echo "🧪 Running quick test with USERS=$(USERS), RATE=$(RATE)"
+	@$(LOADGEN_MAKE) test USERS=$(USERS) RATE=$(RATE)
+
+# Бенчмарк с разными RPS
+.PHONY: loadgen-benchmark
+loadgen-benchmark: check-loadgen
+	@echo "🏃 Running benchmark..."
+	@$(LOADGEN_MAKE) benchmark
+
+# Стресс-тест с разными пользователями
+.PHONY: loadgen-stress-test
+loadgen-stress-test: check-loadgen
+	@echo "💪 Running stress test..."
+	@$(LOADGEN_MAKE) stress-test
+
+# Мониторинг конфигурации
+.PHONY: loadgen-watch
+loadgen-watch: check-loadgen
+	@$(LOADGEN_MAKE) watch
+
+# Очистка
+.PHONY: loadgen-clean
+loadgen-clean: check-loadgen
+	@echo "🧹 Cleaning loadgen..."
+	@$(LOADGEN_MAKE) clean || true
+	@rm -rf $(LOADGEN_CONFIG_DIR)
+	@echo "✅ Loadgen cleaned"
+
+# Полный сброс
+.PHONY: loadgen-reset
+loadgen-reset: loadgen-down loadgen-clean
+	@echo "🔄 Loadgen fully reset"
+
+# Рестарт
+.PHONY: loadgen-restart
+loadgen-restart: loadgen-down loadgen-up
+	@echo "🔄 Loadgen restarted"
+
+# Помощь по loadgen
+.PHONY: loadgen-help
+loadgen-help:
+	@echo "=========================================="
+	@echo "📚 Loadgen Integration Commands"
+	@echo "=========================================="
+	@echo ""
+	@echo "Configuration:"
+	@echo "  LOADGEN_TYPE=$(LOADGEN_TYPE)              - Type: locust or legacy"
+	@echo "  USERS=$(USERS)                             - Number of simulated users"
+	@echo "  RATE=$(RATE)                               - Requests per second"
+	@echo "  FRONTEND_ADDR=$(FRONTEND_ADDR)             - Frontend service address"
+	@echo "  REFRESH_INTERVAL=$(REFRESH_INTERVAL)       - Config refresh interval (seconds)"
+	@echo "  HEADLESS=$(HEADLESS)                       - Run without Web UI (locust only)"
+	@echo "  RUN_TIME=$(RUN_TIME)                       - Test duration in headless mode"
+	@echo ""
+	@echo "Setup & Build:"
+	@echo "  make loadgen-build          - Build loadgen Docker image"
+	@echo "  make check-loadgen          - Verify loadgen directory exists"
+	@echo ""
+	@echo "Control:"
+	@echo "  make loadgen-up              - Start load generator"
+	@echo "  make loadgen-up-headless     - Start in headless mode (locust only)"
+	@echo "  make loadgen-down            - Stop load generator"
+	@echo "  make loadgen-restart         - Restart load generator"
+	@echo ""
+	@echo "Dynamic Control:"
+	@echo "  make loadgen-set-rate RATE=200     - Smoothly change RPS"
+	@echo "  make loadgen-set-users USERS=20    - Smoothly change users"
+	@echo "  make loadgen-set-config            - Update both parameters"
+	@echo ""
+	@echo "Monitoring:"
+	@echo "  make loadgen-logs            - View logs"
+	@echo "  make loadgen-status          - Check status"
+	@echo "  make loadgen-show-config     - Show current configuration"
+	@echo "  make loadgen-watch           - Watch config changes"
+	@echo "  make loadgen-webui           - Open Locust Web UI (locust only)"
+	@echo ""
+	@echo "Testing:"
+	@echo "  make loadgen-test            - Quick 30-second test"
+	@echo "  make loadgen-benchmark       - Benchmark different RPS values"
+	@echo "  make loadgen-stress-test     - Stress test different user counts"
+	@echo ""
+	@echo "Cleanup:"
+	@echo "  make loadgen-clean           - Clean loadgen files"
+	@echo "  make loadgen-reset           - Full reset (stop + clean)"
+	@echo ""
+	@echo "Examples:"
+	@echo "  make loadgen-up USERS=20 RATE=150"
+	@echo "  make loadgen-set-rate RATE=500"
+	@echo "  make loadgen-test USERS=10 RATE=50"
+	@echo "  make loadgen-up-headless RUN_TIME=300s"
+	@echo "=========================================="
+
+# Комбинированные цели для разных сценариев тестирования
+.PHONY: test-ramp-up
+test-ramp-up: loadgen-up
+	@echo "📈 Running ramp-up test..."
+	@sleep 10
+	@$(MAKE) loadgen-set-rate RATE=50
+	@sleep 30
+	@$(MAKE) loadgen-set-rate RATE=100
+	@sleep 30
+	@$(MAKE) loadgen-set-rate RATE=200
+	@sleep 30
+	@$(MAKE) loadgen-set-rate RATE=300
+	@sleep 30
+	@echo "✅ Ramp-up test completed"
+
+.PHONY: test-ramp-down
+test-ramp-down: loadgen-up
+	@echo "📉 Running ramp-down test..."
+	@sleep 10
+	@$(MAKE) loadgen-set-rate RATE=200
+	@sleep 30
+	@$(MAKE) loadgen-set-rate RATE=100
+	@sleep 30
+	@$(MAKE) loadgen-set-rate RATE=50
+	@sleep 30
+	@$(MAKE) loadgen-set-rate RATE=10
+	@sleep 30
+	@echo "✅ Ramp-down test completed"
+
+.PHONY: test-spike
+test-spike: loadgen-up
+	@echo "⚡ Running spike test..."
+	@sleep 10
+	@$(MAKE) loadgen-set-rate RATE=100
+	@sleep 30
+	@$(MAKE) loadgen-set-rate RATE=500
+	@sleep 10
+	@$(MAKE) loadgen-set-rate RATE=100
+	@sleep 30
+	@echo "✅ Spike test completed"
+
+export USERS
+export RATE
+export FRONTEND_ADDR
+export REFRESH_INTERVAL
+export HEADLESS
+export RUN_TIME
+export LOADGEN_TYPE
 
 # =====================================================
 # CLUSTER
@@ -137,6 +406,12 @@ istio-label-ns:
 	$(KUBECTL) label namespace $(NS) istio.io/rev=default --overwrite
 	$(KUBECTL) rollout restart deployment -n $(NS)
 
+.PHONY: istio-apply-manifests
+istio-apply-manifests:
+	$(KUBECTL) apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.1.0/standard-install.yaml
+	$(KUBECTL) apply -f $(BENCH_MANIFESTS_DIR)/istio-classic-gateway.yaml -n $(NS)
+	$(KUBECTL) wait --for=condition=ready pod -l app=frontend -n $(NS) --timeout=60s
+
 # =====================================================
 # MONITORING
 # =====================================================
@@ -155,7 +430,7 @@ deploy-monitoring:
 .PHONY: deploy-demo
 deploy-demo:
 	$(KUBECTL) create namespace $(NS) || true
-	$(KUBECTL) apply -n $(NS) -f $(BENCH_MANIFESTS_DIR)
+	$(KUBECTL) apply -n $(NS) -f $(BENCH_MANIFESTS_DIR)/kubernetes-manifests.yaml
 
 # =====================================================
 # PORT FORWARD
@@ -167,7 +442,7 @@ prometheus:
 
 .PHONY: frontend
 frontend:
-	$(KUBECTL) -n $(NS) port-forward svc/frontend 8080:80
+	$(KUBECTL) port-forward -n $(ISTIO_NS) svc/istio-ingressgateway 8080:80
 
 # =====================================================
 # DEBUG
@@ -225,7 +500,7 @@ experiment:
 deploy-all: deploy-monitoring deploy-demo
 
 .PHONY: up
-up: cluster-up istio-install deploy-all istio-label-ns
+up: cluster-up istio-install deploy-all istio-label-ns istio-apply-manifests
 	@echo ""
 	@echo "System ready"
 	@echo ""
