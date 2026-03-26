@@ -304,7 +304,7 @@ func (h *StorageHandler) Handle(result collector.MetricResult) {
 }
 
 func (h *StorageHandler) HandleBatch(results []collector.MetricResult) {
-	for _, s := range h.Store.Graph.GetServices() {
+	for _, s := range h.Store.ResourceMetrics.GetServices() {
 		h.Store.servicePods[s] = make([]string, 0)
 	}
 

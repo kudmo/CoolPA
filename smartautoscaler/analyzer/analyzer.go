@@ -59,7 +59,7 @@ func (a *Analyzer) analyzeWithSLOViolation() []string {
 
 	// КОСТЫЛЬ, ЧТОБЫ НЕ БЫЛО LOADGEN
 	for i := 0; i < len(anomalys) && len(result) < 2; i++ {
-		if anomalys[i].ID != "loadgenerator" {
+		if anomalys[i].ID != "istio-ingressgateway" {
 			result = append(result, anomalys[i].ID)
 		}
 	}
@@ -73,7 +73,7 @@ func (a *Analyzer) analyzeWithSLOViolation() []string {
 func (a *Analyzer) analyzeUnderutilization() []string {
 	BETA := 0.8
 	result := make([]string, 0)
-	for _, service := range a.store.Graph.GetServices() {
+	for _, service := range a.store.ResourceMetrics.GetServices() {
 		n, _ := a.store.Graph.GetNode(service)
 		time_now := time.Now()
 		time_now_begin := time_now.Add(-a.config.WelchNowIntervalBegin)

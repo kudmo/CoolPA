@@ -37,7 +37,6 @@ func findAbnormalCalls(now time.Time, p AbnormalParams, g *graph.CallGraph) []ca
 		for to, edge := range node.OutboundEdges {
 			current := edge.Latency95.AvgRange(fromTime, now)
 			previous := edge.Latency95.AvgRange(prevFromTime, prevToTime)
-			slog.Info("Latency", "from", from, "to", to, "value", current)
 			if current > p.SLO*(1-p.Alpha) {
 				anomalous = append(anomalous, call{from, to})
 			} else if previous > 0 {
@@ -81,7 +80,6 @@ func buildCorrelationGraphFromCalls(now time.Time, p AbnormalParams, s *storage.
 				continue
 			}
 			weight = math.Max(weight, utils.Pearson(latSeries, m))
-			slog.Info("COMPUTED COORELATION", "service", c.to, "metic_id", m_id, "corr", utils.Pearson(latSeries, m))
 		}
 
 		if weight < 0 {

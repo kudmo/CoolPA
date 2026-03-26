@@ -29,10 +29,10 @@ func NewResourceOptimizerFitness(store *storage.Storage) *ResourceOptimizerFitne
 }
 
 func (f *ResourceOptimizerFitness) calculateR2(gen *genome.ReactionGenome) float64 {
-	n := len(f.Store.Graph.GetServices())
+	n := len(f.Store.ResourceMetrics.GetServices())
 
 	current := make([]genome.ServiceState, 0, len(gen.Genes))
-	for _, svc := range f.Store.Graph.GetServices() {
+	for _, svc := range f.Store.ResourceMetrics.GetServices() {
 		pods := f.Store.ResourceMetrics.GetServicePods(svc)
 		cpu_quota, _, _ := f.Store.ResourceMetrics.GetPodMetricHeadValue(svc, pods[0], metrics.CPUQuota)
 		current = append(current, genome.ServiceState{Name: svc, CurrentReplicas: len(pods), CurrentCPURel: cpu_quota})
