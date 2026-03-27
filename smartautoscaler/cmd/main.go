@@ -80,7 +80,7 @@ func main() {
 		Queries: []collector.MetricQuery{
 			{
 				Name:  "kube_pod_info",
-				Query: `kube_pod_info`,
+				Query: `kube_pod_info{namespace="microservices-demo"}`,
 				Help:  "Kubernetes pod metadata",
 			},
 			{
@@ -131,30 +131,30 @@ func main() {
 			{
 				Name: "istio_request_duration_p95",
 				Query: `histogram_quantile(0.95, 
-					sum by (le, destination_app, source_app) (rate(istio_request_duration_milliseconds_bucket{destination_workload!="",destination_workload_namespace="microservices-demo"}[1m])) 
+					sum by (le, destination_workload, source_workload) (rate(istio_request_duration_milliseconds_bucket{destination_workload!="",destination_workload_namespace="microservices-demo"}[1m])) 
 				)`,
 				Help: "Istio P95 request latency per app (both source and destination must have autoscaling-enabled)",
 			},
 			{
 				Name: "istio_request_duration_p50",
 				Query: `histogram_quantile(0.50, 
-					sum by (le, destination_app, source_app) (rate(istio_request_duration_milliseconds_bucket{destination_workload!="",destination_workload_namespace="microservices-demo"}[1m])) 
+					sum by (le, destination_workload, source_workload) (rate(istio_request_duration_milliseconds_bucket{destination_workload!="",destination_workload_namespace="microservices-demo"}[1m])) 
 				)`,
 				Help: "Istio P95 request latency per app (both source and destination must have autoscaling-enabled)",
 			},
 			{
 				Name:  "istio_requests_total",
-				Query: `sum by (destination_app) (rate(istio_requests_total{destination_workload!="", reporter="destination",destination_workload_namespace="microservices-demo"}[1m]))`,
+				Query: `sum by (destination_workload) (rate(istio_requests_total{destination_workload!="", reporter="destination",destination_workload_namespace="microservices-demo"}[1m]))`,
 				Help:  "Istio HTTP requests per app (RPS) - both source and destination must have autoscaling-enabled",
 			},
 			{
 				Name:  "istio_tcp_received_bytes_total",
-				Query: `sum by (destination_app) (rate(istio_tcp_received_bytes_total{destination_workload!="",destination_workload_namespace="microservices-demo"}[1m]))`,
+				Query: `sum by (destination_workload) (rate(istio_tcp_received_bytes_total{destination_workload!="",destination_workload_namespace="microservices-demo"}[1m]))`,
 				Help:  "Istio TCP received bytes per app - both source and destination must have autoscaling-enabled",
 			},
 			{
 				Name:  "istio_tcp_sent_bytes_total",
-				Query: `sum by (destination_app) (rate(istio_tcp_sent_bytes_total{destination_workload!="",destination_workload_namespace="microservices-demo"}[1m]))`,
+				Query: `sum by (destination_workload) (rate(istio_tcp_sent_bytes_total{destination_workload!="",destination_workload_namespace="microservices-demo"}[1m]))`,
 				Help:  "Istio TCP sent bytes per app - both source and destination must have autoscaling-enabled",
 			},
 		},

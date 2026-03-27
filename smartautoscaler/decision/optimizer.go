@@ -70,8 +70,9 @@ func (ro *ReactionOptimizer) runOptimization(
 	}
 
 	fit := slopredictor.NewResourceOptimizerFitness(ro.store)
+	// TODO: Вынести в получение из k8s конфигов
 	fit.Config = slopredictor.ResourceOptimizerFitnessConfig{
-		CpuMax:      1200000,
+		CpuMax:      200000,
 		ReplicasMax: 10,
 	}
 

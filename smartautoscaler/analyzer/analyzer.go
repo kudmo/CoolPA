@@ -75,6 +75,10 @@ func (a *Analyzer) analyzeUnderutilization() []string {
 	result := make([]string, 0)
 	for _, service := range a.store.ResourceMetrics.GetServices() {
 		n, _ := a.store.Graph.GetNode(service)
+		if n == nil {
+			slog.Error("Unexisting service", "service name", service)
+			continue
+		}
 		time_now := time.Now()
 		time_now_begin := time_now.Add(-a.config.WelchNowIntervalBegin)
 		time_old_begin := time_now.Add(-a.config.WelchOldIntervalBegin)
