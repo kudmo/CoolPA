@@ -414,17 +414,29 @@ cluster-down:
 istio-install:
 	$(ISTIOCTL) install \
 	--set profile=$(ISTIO_PROFILE) \
+	--set values.pilot.resources.requests.cpu=100m \
+	--set values.pilot.resources.requests.memory=128Mi \
+	--set values.pilot.resources.limits.cpu=500m \
+	--set values.pilot.resources.limits.memory=512Mi \
+	--set values.global.proxy.resources.requests.cpu=100m \
+	--set values.global.proxy.resources.requests.memory=128Mi \
+	--set values.global.proxy.resources.limits.cpu=500m \
+	--set values.global.proxy.resources.limits.memory=256Mi \
 	-y
 
 .PHONY: istio-label-ns
 istio-label-ns:
 	$(KUBECTL) label namespace $(NS) istio.io/rev=default --overwrite
+	$(KUBECTL) annotate namespace $(NS) sidecar.istio.io/proxyCPU=100m --overwrite
+	$(KUBECTL) annotate namespace $(NS) sidecar.istio.io/proxyCPULimit=500m --overwrite
+	$(KUBECTL) annotate namespace $(NS) sidecar.istio.io/proxyMemory=128Mi --overwrite
+	$(KUBECTL) annotate namespace $(NS) sidecar.istio.io/proxyMemoryLimit=256Mi --overwrite
 	$(KUBECTL) rollout restart deployment -n $(NS)
 
 .PHONY: istio-apply-manifests
 istio-apply-manifests:
 	$(KUBECTL) apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.1.0/standard-install.yaml
-	$(KUBECTL) apply -f $(BENCH_MANIFESTS_DIR)/istio-classic-gateway.yaml -n $(NS)
+	$(KUBECTL) apply -f $(BENCH_MANIFESTS_DIR)/istio-classic-gateway.yaml
 	$(KUBECTL) wait --for=condition=ready pod -l app=frontend -n $(NS) --timeout=60s
 
 # =====================================================
@@ -507,7 +519,8 @@ deploy-monitoring:
 
 .PHONY: deploy-demo
 deploy-demo:
-	$(KUBECTL) create namespace $(NS) || true
+# 	$(KUBECTL) create namespace $(NS) || true
+	$(KUBECTL) apply -f $(BENCH_MANIFESTS_DIR)/namespace.yaml
 	$(KUBECTL) apply -n $(NS) -f $(BENCH_MANIFESTS_DIR)/kubernetes-manifests.yaml
 
 # =====================================================
