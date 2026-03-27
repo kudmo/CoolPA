@@ -1,6 +1,6 @@
 # =====================================================
 # Microservices Demo Benchmark Pipeline
-# KinD + Istio + Prometheus
+# KinD + Istio + Prometheus + Chaos Mesh
 # =====================================================
 
 SHELL := /bin/bash
@@ -11,6 +11,7 @@ KCTX ?= kind-$(CLUSTER_NAME)
 NS ?= microservices-demo
 MON_NS ?= monitoring
 SCALER_NS ?= autoscale-test
+CHAOS_NS ?= chaos-mesh
 
 KUBECTL := kubectl --context=$(KCTX)
 
@@ -28,6 +29,11 @@ METRICS_URL ?= https://github.com/kubernetes-sigs/metrics-server/releases/latest
 
 AUTOSCALER_IMAGE ?= smartautoscaler:latest
 
+# Chaos Mesh
+CHAOS_MESH_VERSION ?= latest
+CHAOS_MESH_HELM_REPO := https://charts.chaos-mesh.org
+CHAOS_MESH_CHART := chaos-mesh/chaos-mesh
+
 # =====================================================
 # HELP
 # =====================================================
@@ -43,10 +49,19 @@ help:
 	@echo "  deploy-monitoring deploy prometheus + kube-state-metrics"
 	@echo "  deploy-demo       deploy microservices-demo"
 	@echo "  deploy-all        monitoring + demo + scaler"
+	@echo "  deploy-chaos      deploy Chaos Mesh"
 	@echo ""
 	@echo "Istio:"
 	@echo "  istio-install"
 	@echo "  istio-label-ns"
+	@echo ""
+	@echo "Chaos Mesh:"
+	@echo "  chaos-install     install Chaos Mesh via Helm"
+	@echo "  chaos-uninstall   uninstall Chaos Mesh"
+	@echo "  chaos-dashboard   port-forward Chaos Dashboard"
+	@echo "  chaos-status      show Chaos Mesh components status"
+	@echo "  chaos-experiments list all chaos experiments"
+	@echo "  chaos-clean       delete all chaos experiments"
 	@echo ""
 	@echo "Debug:"
 	@echo "  pods"
@@ -413,6 +428,69 @@ istio-apply-manifests:
 	$(KUBECTL) wait --for=condition=ready pod -l app=frontend -n $(NS) --timeout=60s
 
 # =====================================================
+# CHAOS MESH
+# =====================================================
+
+.PHONY: chaos-install
+chaos-install:
+	@echo "Installing Chaos Mesh..."
+	helm repo add chaos-mesh $(CHAOS_MESH_HELM_REPO) || true
+	helm repo update
+	$(KUBECTL) create namespace $(CHAOS_NS) || true
+	helm install chaos-mesh $(CHAOS_MESH_CHART) \
+		--namespace $(CHAOS_NS) \
+		--set dashboard.create=true \
+		--set chaosDaemon.runtime=containerd \
+		--set chaosDaemon.socketPath=/run/containerd/containerd.sock \
+		--set dashboard.securityMode=false
+	@echo "Waiting for Chaos Mesh pods to be ready..."
+	$(KUBECTL) -n $(CHAOS_NS) wait --for=condition=ready pod --all --timeout=120s
+	@echo "Chaos Mesh installed successfully!"
+
+.PHONY: chaos-uninstall
+chaos-uninstall:
+	@echo "Uninstalling Chaos Mesh..."
+	helm uninstall chaos-mesh -n $(CHAOS_NS) || true
+	$(KUBECTL) delete ns $(CHAOS_NS) || true
+	@echo "Chaos Mesh uninstalled."
+
+.PHONY: chaos-dashboard
+chaos-dashboard:
+	@echo "Port-forwarding Chaos Dashboard to http://localhost:2333"
+	$(KUBECTL) -n $(CHAOS_NS) port-forward svc/chaos-dashboard 2333:2333
+
+.PHONY: chaos-status
+chaos-status:
+	@echo "Chaos Mesh components:"
+	$(KUBECTL) -n $(CHAOS_NS) get pods
+	@echo ""
+	@echo "Chaos experiments:"
+	$(KUBECTL) get podchaos,networkchaos,stresschaos,iochaos -A 2>/dev/null || echo "No experiments found"
+
+.PHONY: chaos-experiments
+chaos-experiments:
+	@echo "=== PodChaos ==="
+	$(KUBECTL) get podchaos -A 2>/dev/null || echo "No PodChaos"
+	@echo ""
+	@echo "=== NetworkChaos ==="
+	$(KUBECTL) get networkchaos -A 2>/dev/null || echo "No NetworkChaos"
+	@echo ""
+	@echo "=== StressChaos ==="
+	$(KUBECTL) get stresschaos -A 2>/dev/null || echo "No StressChaos"
+	@echo ""
+	@echo "=== IoChaos ==="
+	$(KUBECTL) get iochaos -A 2>/dev/null || echo "No IoChaos"
+
+.PHONY: chaos-clean
+chaos-clean:
+	@echo "Deleting all chaos experiments..."
+	$(KUBECTL) delete podchaos --all -A 2>/dev/null || true
+	$(KUBECTL) delete networkchaos --all -A 2>/dev/null || true
+	$(KUBECTL) delete stresschaos --all -A 2>/dev/null || true
+	$(KUBECTL) delete iochaos --all -A 2>/dev/null || true
+	@echo "All experiments deleted."
+
+# =====================================================
 # MONITORING
 # =====================================================
 
@@ -509,6 +587,10 @@ up: cluster-up istio-install deploy-all istio-label-ns istio-apply-manifests
 	@echo ""
 	@echo "Frontend:"
 	@echo "make frontend"
+	@echo ""
+	@echo "Chaos Mesh:"
+	@echo "make chaos-install"
+	@echo "make chaos-dashboard"
 
 .PHONY: destroy
 destroy: cluster-down
