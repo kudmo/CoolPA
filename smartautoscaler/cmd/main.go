@@ -90,17 +90,17 @@ func main() {
 			},
 			{
 				Name:  "container_memory_usage",
-				Query: `sum by (pod) (container_memory_usage_bytes{container!="",container!="istio-proxy",container!="POD",namespace="microservices-demo"})`,
+				Query: `sum by (pod) (container_memory_usage_bytes{container!="",container!="istio-proxy",container!="POD",namespace="microservices-demo"}) / (1024*1024)`,
 				Help:  "Memory usage per container (bytes)",
 			},
 			{
 				Name:  "container_cpu_quota",
-				Query: `sum by (pod) (container_spec_cpu_quota{container!="",container!="istio-proxy",container!="POD",namespace="microservices-demo"})`,
+				Query: `sum by (pod) (container_spec_cpu_quota{container!="",container!="istio-proxy",container!="POD",namespace="microservices-demo"}) / 100`,
 				Help:  "CPU quota per container",
 			},
 			{
 				Name:  "container_memory_limit",
-				Query: `sum by (pod) (container_spec_memory_limit_bytes{container!="",container!="istio-proxy",container!="POD",namespace="microservices-demo"})`,
+				Query: `sum by (pod) (container_spec_memory_limit_bytes{container!="",container!="istio-proxy",container!="POD",namespace="microservices-demo"})  / (1024*1024)`,
 				Help:  "Memory limit per container (bytes)",
 			},
 			{
@@ -199,12 +199,12 @@ func main() {
 		slog.Error("Failed to start collector", "error", err)
 	}
 
-	slog.Info("Metric collector started. Press Ctrl+C to stop.")
+	slog.Info("Metric collector started.")
 
 	if err := analyzer.Start(ctx); err != nil {
 		slog.Error("Failed to start analyzer", "error", err)
 	}
-	slog.Info("Analyzer started. Press Ctrl+C to stop.")
+	slog.Info("Analyzer started.")
 
 	// Components destroying
 

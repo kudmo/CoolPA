@@ -720,3 +720,48 @@ func (s *MetricStore) GetServiceMetricAvgHead(service string, metric MetricID) (
 
 	return sum / float64(count), true, nil
 }
+
+// GetServiceMetricAvgAllTime returns the average metric value across all pods and all time buckets
+// for a given service. This represents the overall average across the entire history.
+// Returns (value, true, nil) when service exists and has data, (0, false, nil) when service not found,
+// or (0, false, ErrInvalidMetric) when metric is invalid.
+func (s *MetricStore) GetServiceMetricAvg(service string, metric MetricID) (float64, bool, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	if metric >= MetricCount {
+		return 0, false, ErrInvalidMetric
+	}
+
+	svc, ok := s.services[service]
+	if !ok {
+		return 0, false, nil
+	}
+
+	if len(svc.pods) == 0 {
+		return 0, true, nil
+	}
+
+	var totalSum float64
+	var totalCount int
+
+	for _, pod := range svc.pods {
+		if pod.metrics[metric] != nil {
+			// Get all values from all buckets
+			buckets := pod.metrics[metric].buckets
+			for _, bucket := range buckets {
+				val := bucket.Value
+				if val > 0 || !math.IsNaN(val) {
+					totalSum += val
+					totalCount++
+				}
+			}
+		}
+	}
+
+	if totalCount == 0 {
+		return 0, true, nil
+	}
+
+	return totalSum / float64(totalCount), true, nil
+}

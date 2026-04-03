@@ -8,6 +8,7 @@ import (
 
 type ResourceOptimizerFitnessConfig struct {
 	CpuMax      float64
+	MemMax      float64
 	ReplicasMax float64
 }
 
@@ -40,16 +41,19 @@ func (f *ResourceOptimizerFitness) calculateR2(gen *genome.ReactionGenome) float
 	res := gen.Decode(current)
 
 	cpu_sum := 0.0
+	mem_sum := 0.0
 	replics_sum := 0.0
 
 	for _, svc := range res.Services {
 		cpu_sum += float64(svc.Replicas) * svc.CPURel
+		mem_sum += float64(svc.Replicas) * svc.MemoryRel
 		replics_sum += float64(svc.Replicas)
 	}
 	cpu_percent := cpu_sum / (float64(n) * f.Config.CpuMax)
+	mem_percent := mem_sum / (float64(n) * f.Config.MemMax)
 	replics_percent := replics_sum / (float64(n) * f.Config.ReplicasMax)
 
-	return 1 - max(cpu_percent, replics_percent)
+	return 1 - max(cpu_percent, replics_percent, mem_percent)
 }
 
 func (f *ResourceOptimizerFitness) EvaluateBatch(pop []*genome.ReactionGenome) []float64 {
@@ -59,12 +63,12 @@ func (f *ResourceOptimizerFitness) EvaluateBatch(pop []*genome.ReactionGenome) [
 	for i, g := range pop {
 		X := f.Builder.Build(g)
 		risks := f.Predictor.PredictBatch(X)
-		// aggregate P(SLO violation) = 1 - Π(1 - Ri)
+		// aggregate P(SLO) = Π(1 - Ri)
 		prod := 1.0
 		for _, r := range risks {
 			prod *= (1.0 - r)
 		}
-		R1 := 1.0 - prod
+		R1 := prod
 		R2 := f.calculateR2(g)
 		scores[i] = LAMBDA*R1 + (1-LAMBDA)*R2
 	}
