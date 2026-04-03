@@ -22,6 +22,10 @@ type ServiceGene struct {
 	DeltaReplicas float64
 	DeltaCPU      float64
 	DeltaMemory   float64
+
+	CurrentReplicas float64
+	CurrentCPU      float64
+	CurrentMemory   float64
 }
 
 // ReactionGenome encodes scaling decisions for several services.
@@ -84,12 +88,12 @@ func (g *ReactionGenome) Mutate(rng *rand.Rand, mutationRate, typeMutationRate f
 		if rng.Float64() < mutationRate {
 			switch gene.ReactionType {
 			case HPA:
-				gene.DeltaReplicas += rng.NormFloat64() * 0.1
+				gene.DeltaReplicas += rng.NormFloat64() * 2.0
 				gene.DeltaCPU = 0
 				gene.DeltaMemory = 0
 			case VPA:
-				gene.DeltaCPU += rng.NormFloat64() * 0.05
-				gene.DeltaMemory += rng.NormFloat64() * 0.05
+				gene.DeltaCPU += rng.NormFloat64() * 300.0
+				gene.DeltaMemory += rng.NormFloat64() * 256.0
 				gene.DeltaReplicas = 0
 			}
 		} else {
@@ -162,16 +166,16 @@ func copyGene(s *ServiceGene) *ServiceGene {
 type ServiceState struct {
 	Name             string
 	CurrentReplicas  int
-	CurrentCPURel    float64
-	CurrentMemoryRel float64
+	CurrentCPURel    float64 // in mCore
+	CurrentMemoryRel float64 // in MB
 }
 
 // CandidateServiceState is a decoded proposed state for a single service.
 type CandidateServiceState struct {
 	ServiceName string
 	Replicas    int
-	CPURel      float64
-	MemoryRel   float64
+	CPURel      float64 // in mCore
+	MemoryRel   float64 // in MB
 	Reaction    ReactionType
 }
 
@@ -180,43 +184,36 @@ type CandidateState struct {
 	Services []CandidateServiceState
 }
 
-// Decode applies the genome deltas to the provided current state to produce a candidate state.
-func (g *ReactionGenome) Decode(currentStates []ServiceState) CandidateState {
-	idx := make(map[string]*ServiceGene)
+// Decode applies the genome deltas using current values stored in each gene.
+func (g *ReactionGenome) Decode() CandidateState {
+	out := CandidateState{Services: make([]CandidateServiceState, 0, len(g.Genes))}
+
 	for _, sg := range g.Genes {
-		if sg != nil {
-			idx[sg.ServiceName] = sg
+		if sg == nil {
+			continue
 		}
-	}
-	out := CandidateState{Services: make([]CandidateServiceState, 0, len(currentStates))}
-	for _, cs := range currentStates {
+
 		var cand CandidateServiceState
-		cand.ServiceName = cs.Name
-		if sg, ok := idx[cs.Name]; ok {
-			switch sg.ReactionType {
-			case HPA:
-				newRepF := float64(cs.CurrentReplicas) + sg.DeltaReplicas
-				cand.Replicas = int(math.Max(0, math.Round(newRepF)))
-				cand.CPURel = cs.CurrentCPURel
-				cand.MemoryRel = cs.CurrentMemoryRel
-			case VPA:
-				cand.CPURel = math.Max(0, cs.CurrentCPURel+sg.DeltaCPU)
-				cand.MemoryRel = math.Max(0, cs.CurrentMemoryRel+sg.DeltaMemory)
-				cand.Replicas = cs.CurrentReplicas
-			default:
-				cand.Replicas = cs.CurrentReplicas
-				cand.CPURel = cs.CurrentCPURel
-				cand.MemoryRel = cs.CurrentMemoryRel
-			}
-			cand.Reaction = sg.ReactionType
-		} else {
-			// No decision -> keep current
-			cand.Replicas = cs.CurrentReplicas
-			cand.CPURel = cs.CurrentCPURel
-			cand.MemoryRel = cs.CurrentMemoryRel
-			cand.Reaction = HPA
+		cand.ServiceName = sg.ServiceName
+
+		switch sg.ReactionType {
+		case HPA:
+			newRepF := sg.CurrentReplicas + sg.DeltaReplicas
+			cand.Replicas = int(math.Max(0, math.Round(newRepF)))
+			cand.CPURel = sg.CurrentCPU
+			cand.MemoryRel = sg.CurrentMemory
+		case VPA:
+			cand.CPURel = math.Max(0, sg.CurrentCPU+sg.DeltaCPU)
+			cand.MemoryRel = math.Max(0, sg.CurrentMemory+sg.DeltaMemory)
+			cand.Replicas = int(math.Max(0, math.Round(sg.CurrentReplicas)))
+		default:
+			cand.Replicas = int(math.Max(0, math.Round(sg.CurrentReplicas)))
+			cand.CPURel = sg.CurrentCPU
+			cand.MemoryRel = sg.CurrentMemory
 		}
+		cand.Reaction = sg.ReactionType
 		out.Services = append(out.Services, cand)
 	}
+
 	return out
 }

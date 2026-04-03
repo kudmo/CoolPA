@@ -3,7 +3,6 @@ package slopredictor
 import (
 	"github.com/kudmo/CoolPA/decision/ga/genome"
 	"github.com/kudmo/CoolPA/storage"
-	"github.com/kudmo/CoolPA/storage/metrics"
 )
 
 type ResourceOptimizerFitnessConfig struct {
@@ -30,15 +29,7 @@ func NewResourceOptimizerFitness(store *storage.Storage) *ResourceOptimizerFitne
 }
 
 func (f *ResourceOptimizerFitness) calculateR2(gen *genome.ReactionGenome) float64 {
-	n := len(f.Store.ResourceMetrics.GetServices())
-
-	current := make([]genome.ServiceState, 0, len(gen.Genes))
-	for _, svc := range f.Store.ResourceMetrics.GetServices() {
-		pods := f.Store.ResourceMetrics.GetServicePods(svc)
-		cpu_quota, _, _ := f.Store.ResourceMetrics.GetPodMetricHeadValue(svc, pods[0], metrics.CPUQuota)
-		current = append(current, genome.ServiceState{Name: svc, CurrentReplicas: len(pods), CurrentCPURel: cpu_quota})
-	}
-	res := gen.Decode(current)
+	res := gen.Decode()
 
 	cpu_sum := 0.0
 	mem_sum := 0.0
@@ -49,9 +40,9 @@ func (f *ResourceOptimizerFitness) calculateR2(gen *genome.ReactionGenome) float
 		mem_sum += float64(svc.Replicas) * svc.MemoryRel
 		replics_sum += float64(svc.Replicas)
 	}
-	cpu_percent := cpu_sum / (float64(n) * f.Config.CpuMax)
-	mem_percent := mem_sum / (float64(n) * f.Config.MemMax)
-	replics_percent := replics_sum / (float64(n) * f.Config.ReplicasMax)
+	cpu_percent := cpu_sum / (f.Config.CpuMax)
+	mem_percent := mem_sum / (f.Config.MemMax)
+	replics_percent := replics_sum / (f.Config.ReplicasMax)
 
 	return 1 - max(cpu_percent, replics_percent, mem_percent)
 }

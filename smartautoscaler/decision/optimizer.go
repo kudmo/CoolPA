@@ -13,6 +13,7 @@ import (
 	reactionapplier "github.com/kudmo/CoolPA/reaction_applier"
 	"github.com/kudmo/CoolPA/storage"
 	"github.com/kudmo/CoolPA/storage/metrics"
+	"github.com/kudmo/CoolPA/storage/quotas"
 )
 
 type ScaleMode int
@@ -64,17 +65,18 @@ func (ro *ReactionOptimizer) runOptimization(
 	ce := &constraints.ConstraintEngine{
 		ServicePolicies: constraintsMap,
 		GlobalPolicy: constraints.GlobalPolicy{
-			ClusterCPULimit:     5000000.0,
-			ClusterReplicaLimit: 100,
+			ClusterCPULimit:     float64(ro.store.Limits.NamespaceLimits[quotas.MaxCpu]),
+			ClusterMemoryLimit:  float64(ro.store.Limits.NamespaceLimits[quotas.MaxMem]),
+			ClusterReplicaLimit: int(ro.store.Limits.NamespaceLimits[quotas.MaxPods]),
 		},
 	}
 
 	fit := slopredictor.NewResourceOptimizerFitness(ro.store)
-	// TODO: Вынести в получение из k8s конфигов
+
 	fit.Config = slopredictor.ResourceOptimizerFitnessConfig{
-		CpuMax:      2000,
-		MemMax:      24 * 1024,
-		ReplicasMax: 10,
+		CpuMax:      float64(ro.store.Limits.NamespaceLimits[quotas.MaxCpu]),
+		MemMax:      float64(ro.store.Limits.NamespaceLimits[quotas.MaxMem]),
+		ReplicasMax: float64(ro.store.Limits.NamespaceLimits[quotas.MaxPods]),
 	}
 
 	eng := &engine.Engine{
@@ -93,8 +95,7 @@ func (ro *ReactionOptimizer) runOptimization(
 
 	ro.logGenome(best)
 
-	current := ro.buildCurrentState(services)
-	cand := best.Decode(current)
+	cand := best.Decode()
 
 	ro.applyCandidate(context.Background(), &cand)
 }
@@ -123,19 +124,22 @@ func (ro *ReactionOptimizer) buildConstraints(
 
 		policy := constraints.ServicePolicy{
 			AllowedReactions: ro.choosePossibleReactions(svc),
-			MaxReplicas:      len(pods) + 10,
-			MaxCPU:           cpu * 4,
-			MaxMemory:        mem * 4, // Добавляем лимит памяти
 		}
 
 		if mode == ScaleUpMode {
-			policy.MinReplicas = len(pods) + 1
+			policy.MaxReplicas = len(pods) + 10
+			policy.MinReplicas = len(pods)
+			policy.MaxCPU = float64(ro.store.Limits.ServiceLimits[quotas.ServiceMaxCpu])
 			policy.MinCPU = cpu
+			policy.MaxMemory = float64(ro.store.Limits.ServiceLimits[quotas.ServiceMaxMem])
 			policy.MinMemory = mem
 		} else {
-			policy.MinReplicas = 1
-			policy.MinCPU = cpu * 0.25
-			policy.MinMemory = mem * 0.25
+			policy.MaxReplicas = len(pods)
+			policy.MinReplicas = max(1, len(pods)-10)
+			policy.MaxCPU = cpu
+			policy.MinCPU = float64(ro.store.Limits.ServiceLimits[quotas.ServiceMinCpu])
+			policy.MaxMemory = mem
+			policy.MinMemory = float64(ro.store.Limits.ServiceLimits[quotas.ServiceMinMem])
 		}
 
 		result[svc] = policy
@@ -158,45 +162,6 @@ func (ro *ReactionOptimizer) buildSeedGenome(
 			continue
 		}
 
-		rt := genome.HPA
-		if len(sp.AllowedReactions) == 1 {
-			rt = sp.AllowedReactions[0]
-		}
-
-		g := &genome.ServiceGene{
-			ServiceName:  svc,
-			ReactionType: rt,
-		}
-
-		sign := 1.0
-		if mode == ScaleDownMode {
-			sign = -1.0
-		}
-
-		switch rt {
-		case genome.HPA:
-			g.DeltaReplicas = 0.2 * sign
-			g.DeltaCPU = 0
-			g.DeltaMemory = 0
-		case genome.VPA:
-			g.DeltaReplicas = 0
-			g.DeltaCPU = 0.05 * sign
-			g.DeltaMemory = 0.05 * sign
-		}
-
-		seed.Genes = append(seed.Genes, g)
-	}
-
-	return seed
-}
-
-func (ro *ReactionOptimizer) buildCurrentState(
-	services []string,
-) []genome.ServiceState {
-
-	result := make([]genome.ServiceState, 0, len(services))
-
-	for _, svc := range services {
 		pods := ro.store.ResourceMetrics.GetServicePods(svc)
 		if len(pods) == 0 {
 			slog.Warn("No pods found for service", "service", svc)
@@ -206,15 +171,39 @@ func (ro *ReactionOptimizer) buildCurrentState(
 		cpu, _, _ := ro.store.ResourceMetrics.GetPodMetricHeadValue(svc, pods[0], metrics.CPUQuota)
 		mem, _, _ := ro.store.ResourceMetrics.GetPodMetricHeadValue(svc, pods[0], metrics.MemoryLimit)
 
-		result = append(result, genome.ServiceState{
-			Name:             svc,
-			CurrentReplicas:  len(pods),
-			CurrentCPURel:    cpu,
-			CurrentMemoryRel: mem,
-		})
+		rt := genome.HPA
+		if len(sp.AllowedReactions) == 1 {
+			rt = sp.AllowedReactions[0]
+		}
+
+		g := &genome.ServiceGene{
+			ServiceName:     svc,
+			ReactionType:    rt,
+			CurrentReplicas: float64(len(pods)),
+			CurrentCPU:      cpu,
+			CurrentMemory:   mem,
+		}
+
+		sign := 1.0
+		if mode == ScaleDownMode {
+			sign = -1.0
+		}
+
+		switch rt {
+		case genome.HPA:
+			g.DeltaReplicas = 2.0 * sign
+			g.DeltaCPU = 0
+			g.DeltaMemory = 0
+		case genome.VPA:
+			g.DeltaReplicas = 0
+			g.DeltaCPU = 500.0 * sign
+			g.DeltaMemory = 512.0 * sign
+		}
+
+		seed.Genes = append(seed.Genes, g)
 	}
 
-	return result
+	return seed
 }
 
 func (ro *ReactionOptimizer) logGenome(g *genome.ReactionGenome) {

@@ -10,7 +10,7 @@ metadata:
   name: kube-state-metrics
 rules:
   - apiGroups: [""]
-    resources: ["pods", "nodes", "namespaces", "services", "endpoints"]
+    resources: ["pods", "nodes", "namespaces", "services", "endpoints", "resourcequotas", "limitranges"]
     verbs: ["list", "watch"]
   - apiGroups: ["apps"]
     resources: ["deployments", "daemonsets", "replicasets", "statefulsets"]
@@ -57,6 +57,7 @@ spec:
             - --port=8080
             - --telemetry-port=8081
             - --metric-labels-allowlist=pods=[*]
+            - --resources=pods,nodes,namespaces,services,endpoints,resourcequotas,limitranges
 ---
 apiVersion: v1
 kind: Service

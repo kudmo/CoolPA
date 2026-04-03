@@ -8,7 +8,6 @@ import (
 	sloviolation "github.com/kudmo/CoolPA/analyzer/slo_violation"
 	"github.com/kudmo/CoolPA/analyzer/welchtest"
 	"github.com/kudmo/CoolPA/storage"
-	"github.com/kudmo/CoolPA/storage/metrics"
 	"github.com/kudmo/toporank/api"
 	"github.com/kudmo/toporank/types"
 )
@@ -128,21 +127,6 @@ func (a *Analyzer) analyzeUnderutilization() []string {
 	result := make([]string, 0)
 
 	anomalys := a.analyzeRPSlowing()
-
-	for _, service := range a.store.ResourceMetrics.GetServices() {
-		cpu_usage_mcores, _, _ := a.store.ResourceMetrics.GetServiceMetricAvg(service, metrics.CPUUsage)
-		cpu_quota_mcores, _, _ := a.store.ResourceMetrics.GetServiceMetricAvgHead(service, metrics.CPUQuota)
-		cpu_usage_percet := cpu_usage_mcores / cpu_quota_mcores
-
-		mem_usage_mbytes, _, _ := a.store.ResourceMetrics.GetServiceMetricAvg(service, metrics.MemoryUsage)
-		mem_quota_mbytes, _, _ := a.store.ResourceMetrics.GetServiceMetricAvgHead(service, metrics.MemoryLimit)
-		mem_usage_percet := mem_usage_mbytes / mem_quota_mbytes
-
-		usage_percent := min(cpu_usage_percet, mem_usage_percet)
-		if usage_percent < MIN_USAGE {
-			anomalys = append(anomalys, underutilizationAnalyzeResult{service, float64(len(a.store.ResourceMetrics.GetServicePods(service)))})
-		}
-	}
 
 	sort.Slice(anomalys, func(i, j int) bool {
 		return anomalys[i].Rate > anomalys[j].Rate

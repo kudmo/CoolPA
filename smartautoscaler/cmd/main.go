@@ -84,6 +84,16 @@ func main() {
 				Help:  "Kubernetes pod metadata",
 			},
 			{
+				Name:  "kube_resourcequota",
+				Query: `kube_resourcequota{namespace="microservices-demo",resource=~"limits.*|pods", type="hard"}`,
+				Help:  "Kubernetes namespace limits",
+			},
+			{
+				Name:  "kube_limitrange",
+				Query: `kube_limitrange{namespace="microservices-demo", constraint=~"min|max"}`,
+				Help:  "Kubernetes service limits",
+			},
+			{
 				Name:  "container_cpu_usage",
 				Query: `sum by (pod) (rate(container_cpu_usage_seconds_total{container!="",container!="istio-proxy",container!="POD",namespace="microservices-demo"}[1m]))`,
 				Help:  "CPU usage per container (cores)",
