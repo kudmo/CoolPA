@@ -101,7 +101,7 @@ func (ro *ReactionOptimizer) runOptimization(
 }
 
 func (ro *ReactionOptimizer) choosePossibleReactions(service string) []genome.ReactionType {
-	return []genome.ReactionType{genome.HPA}
+	return []genome.ReactionType{genome.HPA, genome.VPA}
 }
 
 func (ro *ReactionOptimizer) buildConstraints(
@@ -126,19 +126,22 @@ func (ro *ReactionOptimizer) buildConstraints(
 			AllowedReactions: ro.choosePossibleReactions(svc),
 		}
 
+		replicasMinStep := 1
+		cpuMinStep := 100.0
+		memMinStep := 128.0
 		if mode == ScaleUpMode {
 			policy.MaxReplicas = len(pods) + 10
-			policy.MinReplicas = len(pods)
+			policy.MinReplicas = len(pods) + replicasMinStep
 			policy.MaxCPU = float64(ro.store.Limits.ServiceLimits[quotas.ServiceMaxCpu])
-			policy.MinCPU = cpu
+			policy.MinCPU = cpu + cpuMinStep
 			policy.MaxMemory = float64(ro.store.Limits.ServiceLimits[quotas.ServiceMaxMem])
-			policy.MinMemory = mem
+			policy.MinMemory = mem + memMinStep
 		} else {
-			policy.MaxReplicas = len(pods)
+			policy.MaxReplicas = len(pods) - replicasMinStep
 			policy.MinReplicas = max(1, len(pods)-10)
-			policy.MaxCPU = cpu
+			policy.MaxCPU = cpu - cpuMinStep
 			policy.MinCPU = float64(ro.store.Limits.ServiceLimits[quotas.ServiceMinCpu])
-			policy.MaxMemory = mem
+			policy.MaxMemory = mem - memMinStep
 			policy.MinMemory = float64(ro.store.Limits.ServiceLimits[quotas.ServiceMinMem])
 		}
 

@@ -217,3 +217,44 @@ func (g *ReactionGenome) Decode() CandidateState {
 
 	return out
 }
+
+// Decode applies the genome deltas to the provided current state to produce a candidate state.
+func (g *ReactionGenome) DecodeAll(currentStates []ServiceState) CandidateState {
+	idx := make(map[string]*ServiceGene)
+	for _, sg := range g.Genes {
+		if sg != nil {
+			idx[sg.ServiceName] = sg
+		}
+	}
+	out := CandidateState{Services: make([]CandidateServiceState, 0, len(currentStates))}
+	for _, cs := range currentStates {
+		var cand CandidateServiceState
+		cand.ServiceName = cs.Name
+		if sg, ok := idx[cs.Name]; ok {
+			switch sg.ReactionType {
+			case HPA:
+				newRepF := float64(cs.CurrentReplicas) + sg.DeltaReplicas
+				cand.Replicas = int(math.Max(0, math.Round(newRepF)))
+				cand.CPURel = cs.CurrentCPURel
+				cand.MemoryRel = cs.CurrentMemoryRel
+			case VPA:
+				cand.CPURel = math.Max(0, cs.CurrentCPURel+sg.DeltaCPU)
+				cand.MemoryRel = math.Max(0, cs.CurrentMemoryRel+sg.DeltaMemory)
+				cand.Replicas = cs.CurrentReplicas
+			default:
+				cand.Replicas = cs.CurrentReplicas
+				cand.CPURel = cs.CurrentCPURel
+				cand.MemoryRel = cs.CurrentMemoryRel
+			}
+			cand.Reaction = sg.ReactionType
+		} else {
+			// No decision -> keep current
+			cand.Replicas = cs.CurrentReplicas
+			cand.CPURel = cs.CurrentCPURel
+			cand.MemoryRel = cs.CurrentMemoryRel
+			cand.Reaction = HPA
+		}
+		out.Services = append(out.Services, cand)
+	}
+	return out
+}
