@@ -8,6 +8,8 @@ import (
 	sloviolation "github.com/kudmo/CoolPA/analyzer/slo_violation"
 	"github.com/kudmo/CoolPA/analyzer/welchtest"
 	"github.com/kudmo/CoolPA/storage"
+	"github.com/kudmo/CoolPA/storage/metrics"
+	"github.com/kudmo/CoolPA/storage/quotas"
 	"github.com/kudmo/toporank/api"
 	"github.com/kudmo/toporank/types"
 )
@@ -102,6 +104,8 @@ func (a *Analyzer) analyzeRPSlowing() []underutilizationAnalyzeResult {
 		for _, i := range new {
 			newStats.Mean += i
 		}
+		newStats.Mean = newStats.Mean / float64(newStats.N)
+
 		for _, i := range new {
 			newStats.M2 += (i - newStats.Mean) * (i - newStats.Mean)
 		}
@@ -113,10 +117,30 @@ func (a *Analyzer) analyzeRPSlowing() []underutilizationAnalyzeResult {
 		oldStats.Mean = a.previousStatistics[service].Mean * BETA
 		oldStats.M2 = a.previousStatistics[service].M2 * BETA * BETA
 
-		welch_result := welchtest.WelchTTest(oldStats, newStats)
+		welch_result := welchtest.WelchTTest(newStats, oldStats)
 
 		if welch_result.TStatistic < 0 && welch_result.PValue <= a.config.Confidence {
-			anomalys = append(anomalys, underutilizationAnalyzeResult{service, float64(len(a.store.ResourceMetrics.GetServicePods(service)))})
+			service_cpu_limit, _, _ := a.store.ResourceMetrics.GetServiceMetricAvgHead(service, metrics.CPUQuota)
+			service_mem_limit, _, _ := a.store.ResourceMetrics.GetServiceMetricAvgHead(service, metrics.MemoryLimit)
+			replicas := float64(len(a.store.ResourceMetrics.GetServicePods(service)))
+
+			// Already minimal configuration
+			if /*a.store.Limits.ServiceLimits[quotas.ServiceMinCpu] >= int64(service_cpu_limit) &&
+			a.store.Limits.ServiceLimits[quotas.ServiceMinMem] >= int64(service_mem_limit) &&*/
+			1 >= replicas {
+				continue
+			}
+
+			service_cpu_utilization, _, _ := a.store.ResourceMetrics.GetServiceMetricAvgRange(service, metrics.CPUUsage, time_now_begin, time_now)
+			service_cpu_underutilization_total := (service_cpu_limit - service_cpu_utilization) * replicas
+			service_cpu_underutilization_total_percent := service_cpu_underutilization_total / float64(a.store.Limits.NamespaceLimits[quotas.MaxCpu])
+
+			service_mem_utilization, _, _ := a.store.ResourceMetrics.GetServiceMetricAvgRange(service, metrics.CPUUsage, time_now_begin, time_now)
+			service_mem_underutilization_total := (service_mem_limit - service_mem_utilization) * replicas
+			service_mem_underutilization_total_percent := service_mem_underutilization_total / float64(a.store.Limits.NamespaceLimits[quotas.MaxMem])
+
+			// Choose services with maximum underutilization percent
+			anomalys = append(anomalys, underutilizationAnalyzeResult{service, max(service_cpu_underutilization_total_percent, service_mem_underutilization_total_percent)})
 		}
 	}
 
@@ -167,6 +191,8 @@ func (a *Analyzer) Analyze() AnalysisResult {
 			for _, i := range new {
 				newStats.Mean += i
 			}
+			newStats.Mean = newStats.Mean / float64(newStats.N)
+
 			for _, i := range new {
 				newStats.M2 += (i - newStats.Mean) * (i - newStats.Mean)
 			}

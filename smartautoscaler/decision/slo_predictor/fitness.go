@@ -1,8 +1,6 @@
 package slopredictor
 
 import (
-	"log/slog"
-
 	"github.com/kudmo/CoolPA/decision/ga/genome"
 	"github.com/kudmo/CoolPA/storage"
 	"github.com/kudmo/CoolPA/storage/metrics"
@@ -69,7 +67,6 @@ func (f *ResourceOptimizerFitness) EvaluateBatch(pop []*genome.ReactionGenome) [
 		}
 		R1 := prod
 		R2 := f.calculateR2(g)
-		slog.Info("Fitness", "r1", R1, "r2", R2, "genome", g.Decode().Services)
 		scores[i] = LAMBDA*R1 + (1-LAMBDA)*R2
 	}
 	return scores

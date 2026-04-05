@@ -765,3 +765,39 @@ func (s *MetricStore) GetServiceMetricAvg(service string, metric MetricID) (floa
 
 	return totalSum / float64(totalCount), true, nil
 }
+
+// GetServiceMetricAvgValue returns the average value of a metric across all pods in a service
+// over the specified time range. It calculates the mean of all individual metric points
+// collected from all pods during the interval (from, to).
+// Returns (average, true, nil) when service exists, (0, false, nil) when service not found,
+// or (0, false, ErrInvalidMetric) when metric is invalid.
+func (s *MetricStore) GetServiceMetricAvgRange(service string, metric MetricID, from, to time.Time) (float64, bool, error) {
+	// Reuse existing method to get the time series of averages
+	series, exists, err := s.GetServiceMetricAvgSeries(service, metric, from, to)
+	if err != nil {
+		return 0, false, err
+	}
+	if !exists {
+		return 0, false, nil
+	}
+
+	if len(series) == 0 {
+		return 0, true, nil
+	}
+
+	// Calculate the average of the time series averages
+	var sum float64
+	var count int
+	for _, val := range series {
+		if val > 0 || !math.IsNaN(val) {
+			sum += val
+			count++
+		}
+	}
+
+	if count == 0 {
+		return 0, true, nil
+	}
+
+	return sum / float64(count), true, nil
+}

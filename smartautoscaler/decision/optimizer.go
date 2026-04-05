@@ -101,7 +101,7 @@ func (ro *ReactionOptimizer) runOptimization(
 }
 
 func (ro *ReactionOptimizer) choosePossibleReactions(service string) []genome.ReactionType {
-	return []genome.ReactionType{genome.HPA, genome.VPA}
+	return []genome.ReactionType{genome.HPA /*, genome.VPA*/}
 }
 
 func (ro *ReactionOptimizer) buildConstraints(
