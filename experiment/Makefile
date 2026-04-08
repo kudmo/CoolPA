@@ -529,12 +529,33 @@ deploy-demo:
 
 .PHONY: prometheus
 prometheus:
-	$(KUBECTL) -n $(MON_NS) port-forward svc/prometheus 9090:9090
+	$(KUBECTL) -n $(MON_NS) port-forward svc/prometheus 9090:9090 & \
+	echo $$! > .port-forward-prometheus.pid
+	@echo "Port-forward started with PID: $$(cat .port-forward-prometheus.pid)"
+
+.PHONY: stop-prometheus
+stop-prometheus:
+	@if [ -f .port-forward-prometheus.pid ]; then \
+		kill $$(cat .port-forward-prometheus.pid) && rm .port-forward-prometheus.pid; \
+		echo "Port-forward stopped"; \
+	else \
+		echo "No port-forward process found"; \
+	fi
 
 .PHONY: frontend
 frontend:
-	$(KUBECTL) port-forward -n $(ISTIO_NS) svc/istio-ingressgateway 8080:80
+	$(KUBECTL) port-forward -n $(ISTIO_NS) svc/istio-ingressgateway 8080:80 & \
+	echo $$! > .port-forward-frontend.pid
+	@echo "Port-forward started with PID: $$(cat .port-forward-frontend.pid)"
 
+.PHONY: stop-frontend
+stop-frontend:
+	@if [ -f .port-forward-frontend.pid ]; then \
+		kill $$(cat .port-forward-frontend.pid) && rm .port-forward-frontend.pid; \
+		echo "Port-forward stopped"; \
+	else \
+		echo "No port-forward process found"; \
+	fi
 # =====================================================
 # DEBUG
 # =====================================================
@@ -573,15 +594,6 @@ vpa-scale:
 		--requests=cpu=$(REQUESTS_CPU),memory=$(REQUESTS_MEM) \
 		--limits=cpu=$(LIMITS_CPU),memory=$(LIMITS_MEM)
 	$(KUBECTL) -n $(NS) rollout status deploy/$(SERVICE)
-
-# =====================================================
-# EXPERIMENT
-# =====================================================
-
-.PHONY: experiment
-experiment:
-	python experiment_runner/experiment_runner.py \
-		--namespace $(NS)
 
 # =====================================================
 # COMPOSITE
