@@ -115,6 +115,10 @@ func extractResourceMetricID(metricName string) (metrics.MetricID, bool) {
 		return metrics.CPUQuota, true
 	case "container_memory_limit":
 		return metrics.MemoryLimit, true
+	case "pod_cpu_quota":
+		return metrics.PodCPUQuota, true
+	case "pod_memory_limit":
+		return metrics.PodMemoryLimit, true
 	default:
 		return 0, false
 	}
@@ -140,6 +144,10 @@ func metricIDToName(metricID metrics.MetricID) string {
 		return "container_cpu_quota"
 	case metrics.MemoryLimit:
 		return "container_memory_limit"
+	case metrics.PodCPUQuota:
+		return "pod_cpu_quota"
+	case metrics.PodMemoryLimit:
+		return "pod_memory_limit"
 	default:
 		return "unknown_metric"
 	}
@@ -301,12 +309,12 @@ func (h *StorageHandler) handleNamespaceLimitsInfo(result collector.MetricResult
 	switch resource {
 	case "limits.cpu":
 		result.Value = result.Value * 1000
-		h.Store.SetNamespaceLimit(quotas.MaxCpu, int64(result.Value))
+		h.Store.SetNamespaceLimit(quotas.NamespaceMaxCpu, int64(result.Value))
 	case "limits.memory":
 		result.Value = result.Value / (1024 * 1024)
-		h.Store.SetNamespaceLimit(quotas.MaxMem, int64(result.Value))
+		h.Store.SetNamespaceLimit(quotas.NamespaceMaxMem, int64(result.Value))
 	case "pods":
-		h.Store.SetNamespaceLimit(quotas.MaxPods, int64(result.Value))
+		h.Store.SetNamespaceLimit(quotas.NamespaceMaxPods, int64(result.Value))
 	}
 
 	slog.Debug("Namespace limit processed",

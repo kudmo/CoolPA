@@ -17,9 +17,9 @@ type ServiceQuotas struct {
 type NamespaceLimitID uint8
 
 const (
-	MaxCpu NamespaceLimitID = iota
-	MaxMem
-	MaxPods
+	NamespaceMaxCpu NamespaceLimitID = iota
+	NamespaceMaxMem
+	NamespaceMaxPods
 
 	NamespaceLimitCount
 )

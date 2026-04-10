@@ -62,22 +62,28 @@ func (ro *ReactionOptimizer) runOptimization(
 
 	constraintsMap := ro.buildConstraints(services, ro.store, mode)
 
+	cpu_sum := 0.0
+	mem_sum := 0.0
+	replics_sum := 0
+
+	for _, svc := range ro.store.ResourceMetrics.GetServices() {
+		pods := ro.store.ResourceMetrics.GetServicePods(svc)
+		cpu_pod_quota, _, _ := ro.store.ResourceMetrics.GetServiceMetricAvgHead(svc, metrics.PodCPUQuota)
+		mem_pod_quota, _, _ := ro.store.ResourceMetrics.GetServiceMetricAvgHead(svc, metrics.PodMemoryLimit)
+		cpu_sum += cpu_pod_quota
+		mem_sum += mem_pod_quota
+		replics_sum += len(pods)
+	}
 	ce := &constraints.ConstraintEngine{
 		ServicePolicies: constraintsMap,
 		GlobalPolicy: constraints.GlobalPolicy{
-			ClusterCPULimit:     float64(ro.store.Limits.NamespaceLimits[quotas.MaxCpu]),
-			ClusterMemoryLimit:  float64(ro.store.Limits.NamespaceLimits[quotas.MaxMem]),
-			ClusterReplicaLimit: int(ro.store.Limits.NamespaceLimits[quotas.MaxPods]),
+			NamespaceCPUQuotaUnused:     float64(ro.store.Limits.NamespaceLimits[quotas.NamespaceMaxCpu]) - cpu_sum,
+			NamespaceMemoryQuotaUnused:  float64(ro.store.Limits.NamespaceLimits[quotas.NamespaceMaxMem]) - mem_sum,
+			NamespaceReplicaQuotaUnused: int(ro.store.Limits.NamespaceLimits[quotas.NamespaceMaxPods]) - replics_sum,
 		},
 	}
 
 	fit := slopredictor.NewResourceOptimizerFitness(ro.store)
-
-	fit.Config = slopredictor.ResourceOptimizerFitnessConfig{
-		CpuMax:      float64(ro.store.Limits.NamespaceLimits[quotas.MaxCpu]),
-		MemMax:      float64(ro.store.Limits.NamespaceLimits[quotas.MaxMem]),
-		ReplicasMax: float64(ro.store.Limits.NamespaceLimits[quotas.MaxPods]),
-	}
 
 	eng := &engine.Engine{
 		Config:      cfg,
@@ -171,8 +177,10 @@ func (ro *ReactionOptimizer) buildSeedGenome(
 			continue
 		}
 
-		cpu, _, _ := ro.store.ResourceMetrics.GetPodMetricHeadValue(svc, pods[0], metrics.CPUQuota)
-		mem, _, _ := ro.store.ResourceMetrics.GetPodMetricHeadValue(svc, pods[0], metrics.MemoryLimit)
+		cpu_app_quota, _, _ := ro.store.ResourceMetrics.GetPodMetricHeadValue(svc, pods[0], metrics.CPUQuota)
+		cpu_pod_quota, _, _ := ro.store.ResourceMetrics.GetPodMetricHeadValue(svc, pods[0], metrics.PodCPUQuota)
+		mem_app_quota, _, _ := ro.store.ResourceMetrics.GetPodMetricHeadValue(svc, pods[0], metrics.MemoryLimit)
+		mem_pod_quota, _, _ := ro.store.ResourceMetrics.GetPodMetricHeadValue(svc, pods[0], metrics.PodMemoryLimit)
 
 		rt := genome.HPA
 		if len(sp.AllowedReactions) == 1 {
@@ -180,11 +188,13 @@ func (ro *ReactionOptimizer) buildSeedGenome(
 		}
 
 		g := &genome.ServiceGene{
-			ServiceName:     svc,
-			ReactionType:    rt,
-			CurrentReplicas: float64(len(pods)),
-			CurrentCPU:      cpu,
-			CurrentMemory:   mem,
+			ServiceName:      svc,
+			ReactionType:     rt,
+			CurrentReplicas:  float64(len(pods)),
+			CurrentAppCPU:    cpu_app_quota,
+			CurrentPodCPU:    cpu_pod_quota,
+			CurrentAppMemory: mem_app_quota,
+			CurrentPodMemory: mem_pod_quota,
 		}
 
 		sign := 1.0
@@ -236,8 +246,8 @@ func (ro *ReactionOptimizer) applyCandidate(
 			"service", s.ServiceName,
 			"reaction", s.Reaction,
 			"replicas", s.Replicas,
-			"cpu", s.CPURel,
-			"memory", s.MemoryRel,
+			"cpu", s.AppCPU,
+			"memory", s.AppMemory,
 		)
 
 		switch s.Reaction {
@@ -246,8 +256,8 @@ func (ro *ReactionOptimizer) applyCandidate(
 				slog.Error("Failed to apply HPA", "service", s.ServiceName, "error", err)
 			}
 		case genome.VPA:
-			cpuStr := fmt.Sprintf("%dm", int(s.CPURel/1000))
-			memStr := fmt.Sprintf("%dMi", int(s.MemoryRel/(1024*1024)))
+			cpuStr := fmt.Sprintf("%dm", int(s.AppCPU/1000))
+			memStr := fmt.Sprintf("%dMi", int(s.AppMemory/(1024*1024)))
 			if err := ro.applier.ApplyVPS(ctx, namespace, s.ServiceName, cpuStr, memStr); err != nil {
 				slog.Error("Failed to apply VPA", "service", s.ServiceName, "error", err)
 			}

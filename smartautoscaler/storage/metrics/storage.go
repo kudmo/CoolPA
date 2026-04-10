@@ -37,7 +37,8 @@ const (
 	FSRead
 	NetworkReceive
 	NetworkTransmit
-
+	PodCPUQuota
+	PodMemoryLimit
 	MetricCount
 )
 

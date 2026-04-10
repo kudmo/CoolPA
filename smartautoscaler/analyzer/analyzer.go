@@ -133,11 +133,11 @@ func (a *Analyzer) analyzeRPSlowing() []underutilizationAnalyzeResult {
 
 			service_cpu_utilization, _, _ := a.store.ResourceMetrics.GetServiceMetricAvgRange(service, metrics.CPUUsage, time_now_begin, time_now)
 			service_cpu_underutilization_total := (service_cpu_limit - service_cpu_utilization) * replicas
-			service_cpu_underutilization_total_percent := service_cpu_underutilization_total / float64(a.store.Limits.NamespaceLimits[quotas.MaxCpu])
+			service_cpu_underutilization_total_percent := service_cpu_underutilization_total / float64(a.store.Limits.NamespaceLimits[quotas.NamespaceMaxCpu])
 
 			service_mem_utilization, _, _ := a.store.ResourceMetrics.GetServiceMetricAvgRange(service, metrics.CPUUsage, time_now_begin, time_now)
 			service_mem_underutilization_total := (service_mem_limit - service_mem_utilization) * replicas
-			service_mem_underutilization_total_percent := service_mem_underutilization_total / float64(a.store.Limits.NamespaceLimits[quotas.MaxMem])
+			service_mem_underutilization_total_percent := service_mem_underutilization_total / float64(a.store.Limits.NamespaceLimits[quotas.NamespaceMaxMem])
 
 			// Choose services with maximum underutilization percent
 			anomalys = append(anomalys, underutilizationAnalyzeResult{service, max(service_cpu_underutilization_total_percent, service_mem_underutilization_total_percent)})

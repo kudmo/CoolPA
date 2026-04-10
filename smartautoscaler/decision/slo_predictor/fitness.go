@@ -4,21 +4,14 @@ import (
 	"github.com/kudmo/CoolPA/decision/ga/genome"
 	"github.com/kudmo/CoolPA/storage"
 	"github.com/kudmo/CoolPA/storage/metrics"
+	"github.com/kudmo/CoolPA/storage/quotas"
 )
-
-type ResourceOptimizerFitnessConfig struct {
-	CpuMax      float64
-	MemMax      float64
-	ReplicasMax float64
-}
 
 // ResourceOptimizerFitness composes a FeatureBuilder and Predictor.
 type ResourceOptimizerFitness struct {
 	Builder   SLOPredictorFeatureBuilder
 	Predictor SLOPredictor
 	Store     *storage.Storage
-
-	Config ResourceOptimizerFitnessConfig
 }
 
 func NewResourceOptimizerFitness(store *storage.Storage) *ResourceOptimizerFitness {
@@ -33,8 +26,11 @@ func (f *ResourceOptimizerFitness) calculateR2(gen *genome.ReactionGenome) float
 	current := make([]genome.ServiceState, 0, len(gen.Genes))
 	for _, svc := range f.Store.ResourceMetrics.GetServices() {
 		pods := f.Store.ResourceMetrics.GetServicePods(svc)
-		cpu_quota, _, _ := f.Store.ResourceMetrics.GetPodMetricHeadValue(svc, pods[0], metrics.CPUQuota)
-		current = append(current, genome.ServiceState{Name: svc, CurrentReplicas: len(pods), CurrentCPURel: cpu_quota})
+		cpu_app_quota, _, _ := f.Store.ResourceMetrics.GetServiceMetricAvgHead(svc, metrics.CPUQuota)
+		cpu_pod_quota, _, _ := f.Store.ResourceMetrics.GetServiceMetricAvgHead(svc, metrics.PodCPUQuota)
+		mem_app_quota, _, _ := f.Store.ResourceMetrics.GetServiceMetricAvgHead(svc, metrics.MemoryLimit)
+		mem_pod_quota, _, _ := f.Store.ResourceMetrics.GetServiceMetricAvgHead(svc, metrics.PodMemoryLimit)
+		current = append(current, genome.ServiceState{Name: svc, CurrentReplicas: len(pods), CurrentAppCPU: cpu_app_quota, CurrentPodCPU: cpu_pod_quota, CurrentAppMemory: mem_app_quota, CurrentPodMemory: mem_pod_quota})
 	}
 	res := gen.DecodeAll(current)
 
@@ -43,13 +39,13 @@ func (f *ResourceOptimizerFitness) calculateR2(gen *genome.ReactionGenome) float
 	replics_sum := 0.0
 
 	for _, svc := range res.Services {
-		cpu_sum += float64(svc.Replicas) * svc.CPURel
-		mem_sum += float64(svc.Replicas) * svc.MemoryRel
+		cpu_sum += float64(svc.Replicas) * svc.PodCPU
+		mem_sum += float64(svc.Replicas) * svc.PodMemory
 		replics_sum += float64(svc.Replicas)
 	}
-	cpu_percent := cpu_sum / (f.Config.CpuMax)
-	mem_percent := mem_sum / (f.Config.MemMax)
-	replics_percent := replics_sum / (f.Config.ReplicasMax)
+	cpu_percent := cpu_sum / float64(f.Store.Limits.NamespaceLimits[quotas.NamespaceMaxCpu])
+	mem_percent := mem_sum / float64(f.Store.Limits.NamespaceLimits[quotas.NamespaceMaxMem])
+	replics_percent := replics_sum / float64(f.Store.Limits.NamespaceLimits[quotas.NamespaceMaxPods])
 
 	return 1 - max(cpu_percent, replics_percent, mem_percent)
 }

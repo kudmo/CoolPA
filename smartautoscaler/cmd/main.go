@@ -101,7 +101,7 @@ func main() {
 			{
 				Name:  "container_memory_usage",
 				Query: `sum by (pod) (container_memory_usage_bytes{container!="",container!="istio-proxy",container!="POD",namespace="microservices-demo"}) / (1024*1024)`,
-				Help:  "Memory usage per container (bytes)",
+				Help:  "Memory usage per container (Mbytes)",
 			},
 			{
 				Name:  "container_cpu_quota",
@@ -111,7 +111,17 @@ func main() {
 			{
 				Name:  "container_memory_limit",
 				Query: `sum by (pod) (container_spec_memory_limit_bytes{container!="",container!="istio-proxy",container!="POD",namespace="microservices-demo"})  / (1024*1024)`,
-				Help:  "Memory limit per container (bytes)",
+				Help:  "Memory limit per container (Mbytes)",
+			},
+			{
+				Name:  "pod_cpu_quota",
+				Query: `sum by (pod) (container_spec_cpu_quota{namespace="microservices-demo"}) / 100`,
+				Help:  "CPU quota per pod",
+			},
+			{
+				Name:  "pod_memory_limit",
+				Query: `sum by (pod) (container_spec_memory_limit_bytes{namespace="microservices-demo"})  / (1024*1024)`,
+				Help:  "Memory limit per pod",
 			},
 			{
 				Name:  "container_fs_usage",

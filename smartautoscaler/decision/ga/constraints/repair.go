@@ -22,24 +22,9 @@ func (ce *ConstraintEngine) Repair(g *genome.ReactionGenome) {
 				sg.ReactionType = sp.AllowedReactions[0]
 			}
 
-			currentReplicas := sg.CurrentReplicas
-			if currentReplicas <= 0 {
-				currentReplicas = 1
-			}
-
-			currentCPU := sg.CurrentCPU
-			if currentCPU <= 0 {
-				currentCPU = 1
-			}
-
-			currentMemory := sg.CurrentMemory
-			if currentMemory <= 0 {
-				currentMemory = 1
-			}
-
 			if sp.MaxReplicas > 0 && sp.MinReplicas >= 0 {
-				minDelta := float64(sp.MinReplicas) - currentReplicas
-				maxDelta := float64(sp.MaxReplicas) - currentReplicas
+				minDelta := float64(sp.MinReplicas) - sg.CurrentReplicas
+				maxDelta := float64(sp.MaxReplicas) - sg.CurrentReplicas
 				if sg.DeltaReplicas < minDelta {
 					sg.DeltaReplicas = minDelta
 				}
@@ -49,8 +34,8 @@ func (ce *ConstraintEngine) Repair(g *genome.ReactionGenome) {
 			}
 
 			if sp.MinCPU >= 0 && sp.MaxCPU > 0 {
-				minDelta := sp.MinCPU - currentCPU
-				maxDelta := sp.MaxCPU - currentCPU
+				minDelta := sp.MinCPU - sg.CurrentAppCPU
+				maxDelta := sp.MaxCPU - sg.CurrentAppCPU
 				if sg.DeltaCPU < minDelta {
 					sg.DeltaCPU = minDelta
 				}
@@ -60,8 +45,8 @@ func (ce *ConstraintEngine) Repair(g *genome.ReactionGenome) {
 			}
 
 			if sp.MinMemory >= 0 && sp.MaxMemory > 0 {
-				minDelta := sp.MinMemory - currentMemory
-				maxDelta := sp.MaxMemory - currentMemory
+				minDelta := sp.MinMemory - sg.CurrentAppMemory
+				maxDelta := sp.MaxMemory - sg.CurrentAppMemory
 				if sg.DeltaMemory < minDelta {
 					sg.DeltaMemory = minDelta
 				}
@@ -92,10 +77,30 @@ func (ce *ConstraintEngine) Repair(g *genome.ReactionGenome) {
 	}
 }
 
-// Validate returns true if the genome appears to respect policies.
-func (ce *ConstraintEngine) Validate(g *genome.ReactionGenome) bool {
-	if ce == nil || g == nil {
-		return false
+func (ce *ConstraintEngine) Validate(g *genome.ReactionGenome) {
+	totalCPUdelta := 0.0
+	totalMemorydelta := 0.0
+	totalReplicasdelta := 0
+
+	for _, sg := range g.Genes {
+		totalCPUdelta += ((sg.CurrentPodCPU + sg.DeltaCPU) * (sg.CurrentReplicas + sg.DeltaReplicas)) - (sg.CurrentPodCPU * sg.CurrentReplicas)
+		totalMemorydelta += ((sg.CurrentPodMemory + sg.DeltaMemory) * (sg.CurrentReplicas + sg.DeltaReplicas)) - (sg.CurrentPodMemory * sg.CurrentReplicas)
+		totalReplicasdelta += int(sg.DeltaReplicas)
+	}
+
+	cpuFactor := 1.0
+	if totalCPUdelta > ce.GlobalPolicy.NamespaceCPUQuotaUnused {
+		cpuFactor = ce.GlobalPolicy.NamespaceCPUQuotaUnused / totalCPUdelta
+	}
+
+	memFactor := 1.0
+	if totalMemorydelta > ce.GlobalPolicy.NamespaceMemoryQuotaUnused {
+		memFactor = ce.GlobalPolicy.NamespaceMemoryQuotaUnused / totalMemorydelta
+	}
+
+	repFactor := 1.0
+	if totalReplicasdelta > ce.GlobalPolicy.NamespaceReplicaQuotaUnused {
+		repFactor = float64(ce.GlobalPolicy.NamespaceReplicaQuotaUnused) / float64(totalReplicasdelta)
 	}
 
 	for _, sg := range g.Genes {
@@ -103,66 +108,14 @@ func (ce *ConstraintEngine) Validate(g *genome.ReactionGenome) bool {
 			continue
 		}
 
-		sp, ok := ce.ServicePolicies[sg.ServiceName]
-		if !ok {
-			continue
-		}
+		switch sg.ReactionType {
+		case genome.HPA:
+			strictestRepFactor := min(cpuFactor, min(memFactor, repFactor))
+			sg.DeltaReplicas = math.Floor(sg.DeltaReplicas * strictestRepFactor)
 
-		if len(sp.AllowedReactions) > 0 {
-			found := false
-			for _, r := range sp.AllowedReactions {
-				if r == sg.ReactionType {
-					found = true
-					break
-				}
-			}
-			if !found {
-				return false
-			}
-		}
-
-		currentReplicas := sg.CurrentReplicas
-		if currentReplicas <= 0 {
-			currentReplicas = 1
-		}
-
-		currentCPU := sg.CurrentCPU
-		if currentCPU <= 0 {
-			currentCPU = 1
-		}
-
-		currentMemory := sg.CurrentMemory
-		if currentMemory <= 0 {
-			currentMemory = 1
-		}
-
-		if sp.MaxReplicas > 0 {
-			if int(math.Round(currentReplicas+sg.DeltaReplicas)) > sp.MaxReplicas {
-				return false
-			}
-			if int(math.Round(currentReplicas+sg.DeltaReplicas)) < sp.MinReplicas {
-				return false
-			}
-		}
-
-		if sp.MaxCPU > 0 {
-			if currentCPU+sg.DeltaCPU > sp.MaxCPU {
-				return false
-			}
-			if currentCPU+sg.DeltaCPU < sp.MinCPU {
-				return false
-			}
-		}
-
-		if sp.MaxMemory > 0 {
-			if currentMemory+sg.DeltaMemory > sp.MaxMemory {
-				return false
-			}
-			if currentMemory+sg.DeltaMemory < sp.MinMemory {
-				return false
-			}
+		case genome.VPA:
+			sg.DeltaCPU *= cpuFactor
+			sg.DeltaMemory *= memFactor
 		}
 	}
-
-	return true
 }
