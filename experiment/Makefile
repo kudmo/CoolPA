@@ -98,7 +98,7 @@ help:
 
 .PHONY: scaler-build
 scaler-build:
-	docker build -t $(AUTOSCALER_IMAGE) /home/mk/Files/Work/CoolPA/smartautoscaler
+	docker build -t $(AUTOSCALER_IMAGE) ../smartautoscaler
 
 .PHONY: scaler-kind-load
 scaler-kind-load:
@@ -529,11 +529,11 @@ deploy-demo:
 
 .PHONY: prometheus
 prometheus:
-	$(KUBECTL) -n $(MON_NS) port-forward svc/prometheus 9090:9090
+	$(KUBECTL) -n $(MON_NS) port-forward svc/prometheus 9090:9090 > /dev/null 2>&1 &
 
 .PHONY: frontend
 frontend:
-	$(KUBECTL) port-forward -n $(ISTIO_NS) svc/istio-ingressgateway 8080:80
+	$(KUBECTL) port-forward -n $(ISTIO_NS) svc/istio-ingressgateway 8080:80 > /dev/null 2>&1 &
 
 # =====================================================
 # DEBUG
@@ -573,15 +573,6 @@ vpa-scale:
 		--requests=cpu=$(REQUESTS_CPU),memory=$(REQUESTS_MEM) \
 		--limits=cpu=$(LIMITS_CPU),memory=$(LIMITS_MEM)
 	$(KUBECTL) -n $(NS) rollout status deploy/$(SERVICE)
-
-# =====================================================
-# EXPERIMENT
-# =====================================================
-
-.PHONY: experiment
-experiment:
-	python experiment_runner/experiment_runner.py \
-		--namespace $(NS)
 
 # =====================================================
 # COMPOSITE

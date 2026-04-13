@@ -8,9 +8,16 @@ import (
 	sloviolation "github.com/kudmo/CoolPA/analyzer/slo_violation"
 	"github.com/kudmo/CoolPA/analyzer/welchtest"
 	"github.com/kudmo/CoolPA/storage"
+	"github.com/kudmo/CoolPA/storage/metrics"
+	"github.com/kudmo/CoolPA/storage/quotas"
 	"github.com/kudmo/toporank/api"
 	"github.com/kudmo/toporank/types"
 )
+
+// TODO: возможно в конфиги
+const BETA = 0.8
+const ANOMALY_SERVICES_COUNT = 2
+const MIN_USAGE = 0.3
 
 type AnalyzerConfig struct {
 	Confidence float64
@@ -22,12 +29,15 @@ type AnalyzerConfig struct {
 type Analyzer struct {
 	store  *storage.Storage
 	config AnalyzerConfig
+
+	previousStatistics map[string]*welchtest.Stats
 }
 
 func NewAnalyzer(config AnalyzerConfig, store *storage.Storage) *Analyzer {
 	return &Analyzer{
-		store:  store,
-		config: config,
+		store:              store,
+		config:             config,
+		previousStatistics: make(map[string]*welchtest.Stats),
 	}
 }
 
@@ -58,7 +68,7 @@ func (a *Analyzer) analyzeWithSLOViolation() []string {
 	})
 
 	// КОСТЫЛЬ, ЧТОБЫ НЕ БЫЛО LOADGEN
-	for i := 0; i < len(anomalys) && len(result) < 2; i++ {
+	for i := 0; i < len(anomalys) && len(result) < ANOMALY_SERVICES_COUNT; i++ {
 		if anomalys[i].ID != "istio-ingressgateway" {
 			result = append(result, anomalys[i].ID)
 		}
@@ -70,9 +80,14 @@ func (a *Analyzer) analyzeWithSLOViolation() []string {
 	return result
 }
 
-func (a *Analyzer) analyzeUnderutilization() []string {
-	BETA := 0.8
-	result := make([]string, 0)
+type underutilizationAnalyzeResult struct {
+	Service string
+	Rate    float64
+}
+
+func (a *Analyzer) analyzeRPSlowing() []underutilizationAnalyzeResult {
+	anomalys := make([]underutilizationAnalyzeResult, 0)
+
 	for _, service := range a.store.ResourceMetrics.GetServices() {
 		n, _ := a.store.Graph.GetNode(service)
 		if n == nil {
@@ -81,42 +96,109 @@ func (a *Analyzer) analyzeUnderutilization() []string {
 		}
 		time_now := time.Now()
 		time_now_begin := time_now.Add(-a.config.WelchNowIntervalBegin)
-		time_old_begin := time_now.Add(-a.config.WelchOldIntervalBegin)
 
-		old := n.RequestCount.SeriesRange(time_old_begin, time_now_begin)
-		for i, v := range old {
-			old[i] = v * BETA
-		}
 		new := n.RequestCount.SeriesRange(time_now_begin, time_now)
-		welch_result, _ := welchtest.TwoSampleWelch(new, old)
 
-		if welch_result.TStatistic < 0 && welch_result.PValueOneSided() <= a.config.Confidence {
-			result = append(result, service)
+		newStats := welchtest.NewOnlineStats()
+		newStats.N = len(new)
+		for _, i := range new {
+			newStats.Mean += i
+		}
+		newStats.Mean = newStats.Mean / float64(newStats.N)
+
+		for _, i := range new {
+			newStats.M2 += (i - newStats.Mean) * (i - newStats.Mean)
+		}
+		oldStats := welchtest.NewOnlineStats()
+		if _, ok := a.previousStatistics[service]; !ok {
+			continue
+		}
+		oldStats.N = a.previousStatistics[service].N
+		oldStats.Mean = a.previousStatistics[service].Mean * BETA
+		oldStats.M2 = a.previousStatistics[service].M2 * BETA * BETA
+
+		welch_result := welchtest.WelchTTest(newStats, oldStats)
+
+		if welch_result.TStatistic < 0 && welch_result.PValue <= a.config.Confidence {
+			service_cpu_limit, _, _ := a.store.ResourceMetrics.GetServiceMetricAvgHead(service, metrics.CPUQuota)
+			service_mem_limit, _, _ := a.store.ResourceMetrics.GetServiceMetricAvgHead(service, metrics.MemoryLimit)
+			replicas := float64(len(a.store.ResourceMetrics.GetServicePods(service)))
+
+			// Already minimal configuration
+			if /*a.store.Limits.ServiceLimits[quotas.ServiceMinCpu] >= int64(service_cpu_limit) &&
+			a.store.Limits.ServiceLimits[quotas.ServiceMinMem] >= int64(service_mem_limit) &&*/
+			1 >= replicas {
+				continue
+			}
+
+			service_cpu_utilization, _, _ := a.store.ResourceMetrics.GetServiceMetricAvgRange(service, metrics.CPUUsage, time_now_begin, time_now)
+			service_cpu_underutilization_total := (service_cpu_limit - service_cpu_utilization) * replicas
+			service_cpu_underutilization_total_percent := service_cpu_underutilization_total / float64(a.store.Limits.NamespaceLimits[quotas.NamespaceMaxCpu])
+
+			service_mem_utilization, _, _ := a.store.ResourceMetrics.GetServiceMetricAvgRange(service, metrics.CPUUsage, time_now_begin, time_now)
+			service_mem_underutilization_total := (service_mem_limit - service_mem_utilization) * replicas
+			service_mem_underutilization_total_percent := service_mem_underutilization_total / float64(a.store.Limits.NamespaceLimits[quotas.NamespaceMaxMem])
+
+			// Choose services with maximum underutilization percent
+			anomalys = append(anomalys, underutilizationAnalyzeResult{service, max(service_cpu_underutilization_total_percent, service_mem_underutilization_total_percent)})
 		}
 	}
+
+	return anomalys
+}
+
+func (a *Analyzer) analyzeUnderutilization() []string {
+	result := make([]string, 0)
+
+	anomalys := a.analyzeRPSlowing()
+
+	sort.Slice(anomalys, func(i, j int) bool {
+		return anomalys[i].Rate > anomalys[j].Rate
+	})
+
+	for i := 0; i < len(anomalys) && len(result) < ANOMALY_SERVICES_COUNT; i++ {
+		result = append(result, anomalys[i].Service)
+	}
+
 	slog.Info("Calculated underutilization", "services", result)
 	return result
 }
 
 func (a *Analyzer) Analyze() AnalysisResult {
-	bottlenecks := a.analyzeWithSLOViolation()
-	if len(bottlenecks) > 0 {
-		return AnalysisResult{
-			Services: bottlenecks,
-			Scale:    1,
-		}
-	}
-
-	underutilized := a.analyzeUnderutilization()
-	if len(underutilized) > 0 {
-		return AnalysisResult{
-			Services: underutilized,
-			Scale:    -1,
-		}
-	}
-
-	return AnalysisResult{
+	result := AnalysisResult{
 		Services: []string{},
 		Scale:    0,
 	}
+	bottlenecks := a.analyzeWithSLOViolation()
+
+	if len(bottlenecks) > 0 {
+		result.Services = bottlenecks
+		result.Scale = 1
+	} else {
+		underutilized := a.analyzeUnderutilization()
+		if len(underutilized) > 0 {
+			result.Services = underutilized
+			result.Scale = -1
+		}
+	}
+
+	if result.Scale != 0 {
+		for _, s := range a.store.ResourceMetrics.GetServices() {
+			n, _ := a.store.Graph.GetNode(s)
+			new := n.RequestCount.Values()
+			newStats := welchtest.NewOnlineStats()
+			newStats.N = len(new)
+			for _, i := range new {
+				newStats.Mean += i
+			}
+			newStats.Mean = newStats.Mean / float64(newStats.N)
+
+			for _, i := range new {
+				newStats.M2 += (i - newStats.Mean) * (i - newStats.Mean)
+			}
+			a.previousStatistics[s] = newStats
+		}
+	}
+
+	return result
 }

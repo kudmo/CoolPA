@@ -27,23 +27,18 @@ type call struct {
 // the list of abnormal edges along with an anomaly degree per service.
 func findAbnormalCalls(now time.Time, p AbnormalParams, g *graph.CallGraph) []call {
 	fromTime := now.Add(-p.Window)
-	prevFromTime := fromTime.Add(-p.Window)
-	prevToTime := fromTime
 
 	var anomalous []call
 
 	for _, from := range g.GetServices() {
 		node, _ := g.GetNode(from)
 		for to, edge := range node.OutboundEdges {
-			current := edge.Latency95.AvgRange(fromTime, now)
-			previous := edge.Latency95.AvgRange(prevFromTime, prevToTime)
-			if current > p.SLO*(1-p.Alpha) {
+			lat95 := edge.Latency95.AvgRange(fromTime, now)
+			lat50 := edge.Latency50.AvgRange(fromTime, now)
+			if lat95 > p.SLO*(1-p.Alpha) {
 				anomalous = append(anomalous, call{from, to})
-			} else if previous > 0 {
-				changeRatio := current / previous
-				if changeRatio > 2 {
-					anomalous = append(anomalous, call{from, to})
-				}
+			} else if lat95/lat50 > 10 {
+				anomalous = append(anomalous, call{from, to})
 			}
 		}
 	}

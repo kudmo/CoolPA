@@ -22,6 +22,12 @@ type ServiceGene struct {
 	DeltaReplicas float64
 	DeltaCPU      float64
 	DeltaMemory   float64
+
+	CurrentReplicas  float64
+	CurrentAppCPU    float64
+	CurrentPodCPU    float64
+	CurrentAppMemory float64
+	CurrentPodMemory float64
 }
 
 // ReactionGenome encodes scaling decisions for several services.
@@ -47,7 +53,7 @@ func (g *ReactionGenome) Clone() *ReactionGenome {
 func (g *ReactionGenome) Mutate(rng *rand.Rand, mutationRate, typeMutationRate float64, constraints interface {
 	GetAllowedReactions(service string) []ReactionType
 	Repair(*ReactionGenome)
-	Validate(*ReactionGenome) bool
+	Validate(*ReactionGenome)
 }) {
 	for _, gene := range g.Genes {
 		if gene == nil {
@@ -84,12 +90,12 @@ func (g *ReactionGenome) Mutate(rng *rand.Rand, mutationRate, typeMutationRate f
 		if rng.Float64() < mutationRate {
 			switch gene.ReactionType {
 			case HPA:
-				gene.DeltaReplicas += rng.NormFloat64() * 0.1
+				gene.DeltaReplicas += rng.NormFloat64() * 2.0
 				gene.DeltaCPU = 0
 				gene.DeltaMemory = 0
 			case VPA:
-				gene.DeltaCPU += rng.NormFloat64() * 0.05
-				gene.DeltaMemory += rng.NormFloat64() * 0.05
+				gene.DeltaCPU += rng.NormFloat64() * 300.0
+				gene.DeltaMemory += rng.NormFloat64() * 256.0
 				gene.DeltaReplicas = 0
 			}
 		} else {
@@ -118,7 +124,7 @@ func (g *ReactionGenome) Mutate(rng *rand.Rand, mutationRate, typeMutationRate f
 	// allow constraint engine to repair
 	if constraints != nil {
 		constraints.Repair(g)
-		_ = constraints.Validate(g)
+		constraints.Validate(g)
 	}
 }
 
@@ -162,16 +168,20 @@ func copyGene(s *ServiceGene) *ServiceGene {
 type ServiceState struct {
 	Name             string
 	CurrentReplicas  int
-	CurrentCPURel    float64
-	CurrentMemoryRel float64
+	CurrentAppCPU    float64 // in mCore
+	CurrentPodCPU    float64 // in mCore
+	CurrentAppMemory float64 // in MB
+	CurrentPodMemory float64 // in MB
 }
 
 // CandidateServiceState is a decoded proposed state for a single service.
 type CandidateServiceState struct {
 	ServiceName string
 	Replicas    int
-	CPURel      float64
-	MemoryRel   float64
+	AppCPU      float64 // in mCore
+	PodCPU      float64 // in mCore
+	AppMemory   float64 // in MB
+	PodMemory   float64 // in MB
 	Reaction    ReactionType
 }
 
@@ -180,8 +190,42 @@ type CandidateState struct {
 	Services []CandidateServiceState
 }
 
+// Decode applies the genome deltas using current values stored in each gene.
+func (g *ReactionGenome) Decode() CandidateState {
+	out := CandidateState{Services: make([]CandidateServiceState, 0, len(g.Genes))}
+
+	for _, sg := range g.Genes {
+		if sg == nil {
+			continue
+		}
+
+		var cand CandidateServiceState
+		cand.ServiceName = sg.ServiceName
+
+		switch sg.ReactionType {
+		case HPA:
+			newRepF := sg.CurrentReplicas + sg.DeltaReplicas
+			cand.Replicas = int(math.Max(0, math.Round(newRepF)))
+			cand.AppCPU = sg.CurrentAppCPU
+			cand.AppMemory = sg.CurrentAppMemory
+		case VPA:
+			cand.AppCPU = math.Max(0, sg.CurrentAppCPU+sg.DeltaCPU)
+			cand.AppMemory = math.Max(0, sg.CurrentAppMemory+sg.DeltaMemory)
+			cand.Replicas = int(math.Max(0, math.Round(sg.CurrentReplicas)))
+		default:
+			cand.Replicas = int(math.Max(0, math.Round(sg.CurrentReplicas)))
+			cand.AppCPU = sg.CurrentAppCPU
+			cand.AppMemory = sg.CurrentAppMemory
+		}
+		cand.Reaction = sg.ReactionType
+		out.Services = append(out.Services, cand)
+	}
+
+	return out
+}
+
 // Decode applies the genome deltas to the provided current state to produce a candidate state.
-func (g *ReactionGenome) Decode(currentStates []ServiceState) CandidateState {
+func (g *ReactionGenome) DecodeAll(currentStates []ServiceState) CandidateState {
 	idx := make(map[string]*ServiceGene)
 	for _, sg := range g.Genes {
 		if sg != nil {
@@ -197,23 +241,29 @@ func (g *ReactionGenome) Decode(currentStates []ServiceState) CandidateState {
 			case HPA:
 				newRepF := float64(cs.CurrentReplicas) + sg.DeltaReplicas
 				cand.Replicas = int(math.Max(0, math.Round(newRepF)))
-				cand.CPURel = cs.CurrentCPURel
-				cand.MemoryRel = cs.CurrentMemoryRel
+				cand.AppCPU = cs.CurrentAppCPU
+				cand.PodCPU = cs.CurrentPodCPU
+				cand.AppMemory = cs.CurrentAppMemory
+				cand.PodMemory = cs.CurrentPodMemory
 			case VPA:
-				cand.CPURel = math.Max(0, cs.CurrentCPURel+sg.DeltaCPU)
-				cand.MemoryRel = math.Max(0, cs.CurrentMemoryRel+sg.DeltaMemory)
+				cand.AppCPU = math.Max(0, cs.CurrentAppCPU+sg.DeltaCPU)
+				cand.PodCPU = math.Max(0, cs.CurrentPodCPU+sg.DeltaCPU)
+				cand.AppMemory = math.Max(0, cs.CurrentAppMemory+sg.DeltaMemory)
+				cand.PodMemory = math.Max(0, cs.CurrentPodMemory+sg.DeltaMemory)
 				cand.Replicas = cs.CurrentReplicas
 			default:
 				cand.Replicas = cs.CurrentReplicas
-				cand.CPURel = cs.CurrentCPURel
-				cand.MemoryRel = cs.CurrentMemoryRel
+				cand.AppCPU = cs.CurrentAppCPU
+				cand.PodCPU = cs.CurrentPodCPU
+				cand.AppMemory = cs.CurrentAppMemory
+				cand.PodMemory = cs.CurrentPodMemory
 			}
 			cand.Reaction = sg.ReactionType
 		} else {
 			// No decision -> keep current
 			cand.Replicas = cs.CurrentReplicas
-			cand.CPURel = cs.CurrentCPURel
-			cand.MemoryRel = cs.CurrentMemoryRel
+			cand.AppCPU = cs.CurrentAppCPU
+			cand.AppMemory = cs.CurrentAppMemory
 			cand.Reaction = HPA
 		}
 		out.Services = append(out.Services, cand)

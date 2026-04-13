@@ -8,6 +8,7 @@ import (
 	"github.com/kudmo/CoolPA/collector"
 	"github.com/kudmo/CoolPA/storage/graph"
 	"github.com/kudmo/CoolPA/storage/metrics"
+	"github.com/kudmo/CoolPA/storage/quotas"
 )
 
 // PodNameParser остался без изменений
@@ -114,6 +115,10 @@ func extractResourceMetricID(metricName string) (metrics.MetricID, bool) {
 		return metrics.CPUQuota, true
 	case "container_memory_limit":
 		return metrics.MemoryLimit, true
+	case "pod_cpu_quota":
+		return metrics.PodCPUQuota, true
+	case "pod_memory_limit":
+		return metrics.PodMemoryLimit, true
 	default:
 		return 0, false
 	}
@@ -139,6 +144,10 @@ func metricIDToName(metricID metrics.MetricID) string {
 		return "container_cpu_quota"
 	case metrics.MemoryLimit:
 		return "container_memory_limit"
+	case metrics.PodCPUQuota:
+		return "pod_cpu_quota"
+	case metrics.PodMemoryLimit:
+		return "pod_memory_limit"
 	default:
 		return "unknown_metric"
 	}
@@ -289,6 +298,71 @@ func (h *StorageHandler) handlePodsInfo(result collector.MetricResult) {
 	)
 }
 
+func (h *StorageHandler) handleNamespaceLimitsInfo(result collector.MetricResult) {
+	resource, ok := result.Labels["resource"]
+	if !ok {
+		slog.Warn("Missing resource label for kube_resourcequota",
+			"labels", result.Labels,
+		)
+		return
+	}
+	switch resource {
+	case "limits.cpu":
+		result.Value = result.Value * 1000
+		h.Store.SetNamespaceLimit(quotas.NamespaceMaxCpu, int64(result.Value))
+	case "limits.memory":
+		result.Value = result.Value / (1024 * 1024)
+		h.Store.SetNamespaceLimit(quotas.NamespaceMaxMem, int64(result.Value))
+	case "pods":
+		h.Store.SetNamespaceLimit(quotas.NamespaceMaxPods, int64(result.Value))
+	}
+
+	slog.Debug("Namespace limit processed",
+		"resource", resource,
+		"value", result.Value,
+	)
+}
+
+func (h *StorageHandler) handleServiceLimitsInfo(result collector.MetricResult) {
+	resource, ok := result.Labels["resource"]
+	if !ok {
+		slog.Warn("Missing resource label for kube_resourcequota",
+			"labels", result.Labels,
+		)
+		return
+	}
+	constraint, ok := result.Labels["constraint"]
+	if !ok {
+		slog.Warn("Missing constraint label for kube_limitrange",
+			"labels", result.Labels,
+		)
+		return
+	}
+
+	switch resource {
+	case "cpu":
+		result.Value = result.Value * 1000
+		if constraint == "min" {
+			h.Store.SetServiceLimit(quotas.ServiceMinCpu, int64(result.Value))
+		} else {
+			h.Store.SetServiceLimit(quotas.ServiceMaxCpu, int64(result.Value))
+		}
+	case "memory":
+		result.Value = result.Value / (1024 * 1024)
+		if constraint == "min" {
+			h.Store.SetServiceLimit(quotas.ServiceMinMem, int64(result.Value))
+		} else {
+			h.Store.SetServiceLimit(quotas.ServiceMaxMem, int64(result.Value))
+		}
+	}
+
+	slog.Debug("Service limit processed",
+		"resource", resource,
+		"constraint", constraint,
+		"value", result.Value,
+	)
+}
+
 func (h *StorageHandler) Handle(result collector.MetricResult) {
 	if _, ok := extractResourceMetricID(result.QueryName); ok {
 		h.handleResource(result)
@@ -296,6 +370,10 @@ func (h *StorageHandler) Handle(result collector.MetricResult) {
 		h.handleIstio(result)
 	} else if result.QueryName == "kube_pod_info" {
 		h.handlePodsInfo(result)
+	} else if result.QueryName == "kube_resourcequota" {
+		h.handleNamespaceLimitsInfo(result)
+	} else if result.QueryName == "kube_limitrange" {
+		h.handleServiceLimitsInfo(result)
 	} else {
 		slog.Debug("Unknown metric type, skipping",
 			"query_name", result.QueryName,

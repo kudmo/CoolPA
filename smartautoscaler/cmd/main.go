@@ -84,24 +84,44 @@ func main() {
 				Help:  "Kubernetes pod metadata",
 			},
 			{
+				Name:  "kube_resourcequota",
+				Query: `kube_resourcequota{namespace="microservices-demo",resource=~"limits.*|pods", type="hard"}`,
+				Help:  "Kubernetes namespace limits",
+			},
+			{
+				Name:  "kube_limitrange",
+				Query: `kube_limitrange{namespace="microservices-demo", constraint=~"min|max"}`,
+				Help:  "Kubernetes service limits",
+			},
+			{
 				Name:  "container_cpu_usage",
 				Query: `sum by (pod) (rate(container_cpu_usage_seconds_total{container!="",container!="istio-proxy",container!="POD",namespace="microservices-demo"}[1m]))`,
 				Help:  "CPU usage per container (cores)",
 			},
 			{
 				Name:  "container_memory_usage",
-				Query: `sum by (pod) (container_memory_usage_bytes{container!="",container!="istio-proxy",container!="POD",namespace="microservices-demo"})`,
-				Help:  "Memory usage per container (bytes)",
+				Query: `sum by (pod) (container_memory_usage_bytes{container!="",container!="istio-proxy",container!="POD",namespace="microservices-demo"}) / (1024*1024)`,
+				Help:  "Memory usage per container (Mbytes)",
 			},
 			{
 				Name:  "container_cpu_quota",
-				Query: `sum by (pod) (container_spec_cpu_quota{container!="",container!="istio-proxy",container!="POD",namespace="microservices-demo"})`,
+				Query: `sum by (pod) (container_spec_cpu_quota{container!="",container!="istio-proxy",container!="POD",namespace="microservices-demo"}) / 100`,
 				Help:  "CPU quota per container",
 			},
 			{
 				Name:  "container_memory_limit",
-				Query: `sum by (pod) (container_spec_memory_limit_bytes{container!="",container!="istio-proxy",container!="POD",namespace="microservices-demo"})`,
-				Help:  "Memory limit per container (bytes)",
+				Query: `sum by (pod) (container_spec_memory_limit_bytes{container!="",container!="istio-proxy",container!="POD",namespace="microservices-demo"})  / (1024*1024)`,
+				Help:  "Memory limit per container (Mbytes)",
+			},
+			{
+				Name:  "pod_cpu_quota",
+				Query: `sum by (pod) (container_spec_cpu_quota{namespace="microservices-demo"}) / 100`,
+				Help:  "CPU quota per pod",
+			},
+			{
+				Name:  "pod_memory_limit",
+				Query: `sum by (pod) (container_spec_memory_limit_bytes{namespace="microservices-demo"})  / (1024*1024)`,
+				Help:  "Memory limit per pod",
 			},
 			{
 				Name:  "container_fs_usage",
@@ -199,12 +219,12 @@ func main() {
 		slog.Error("Failed to start collector", "error", err)
 	}
 
-	slog.Info("Metric collector started. Press Ctrl+C to stop.")
+	slog.Info("Metric collector started.")
 
 	if err := analyzer.Start(ctx); err != nil {
 		slog.Error("Failed to start analyzer", "error", err)
 	}
-	slog.Info("Analyzer started. Press Ctrl+C to stop.")
+	slog.Info("Analyzer started.")
 
 	// Components destroying
 

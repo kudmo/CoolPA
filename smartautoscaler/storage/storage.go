@@ -5,12 +5,14 @@ import (
 
 	"github.com/kudmo/CoolPA/storage/graph"
 	"github.com/kudmo/CoolPA/storage/metrics"
+	"github.com/kudmo/CoolPA/storage/quotas"
 )
 
 // Storage is a container for resource-level and call-graph (istio) metrics.
 type Storage struct {
 	Graph           *graph.CallGraph
 	ResourceMetrics *metrics.MetricStore
+	Limits          quotas.QuotasStorage
 	servicePods     map[string][]string
 }
 
@@ -19,7 +21,10 @@ func NewStorage(window, step time.Duration) *Storage {
 	return &Storage{
 		Graph:           graph.NewCallGraph(window, step),
 		ResourceMetrics: metrics.NewMetricStore(window, step),
-		servicePods:     make(map[string][]string),
+		Limits:          quotas.QuotasStorage{
+			// ServiceQuotas: make(map[string]quotas.ServiceQuotas),
+		},
+		servicePods: make(map[string][]string),
 	}
 }
 
@@ -55,6 +60,27 @@ func (s *Storage) AddIstioEdgeMetric(from, to string, ts time.Time, id graph.Met
 	return s.Graph.AddEdgeMetric(from, to, ts, id, value)
 }
 
+// func (s *Storage) SetServiceQuota(service string, quotaID quotas.ServiceQuotaID, value int64) error {
+// 	serviceQuotas, ok := s.Limits.ServiceQuotas[service]
+// 	if !ok {
+// 		serviceQuotas = quotas.ServiceQuotas{}
+// 	}
+// 	serviceQuotas.Quotas[quotaID] = value
+// 	s.Limits.ServiceQuotas[service] = serviceQuotas
+
+// 	return nil
+// }
+
+func (s *Storage) SetNamespaceLimit(limitID quotas.NamespaceLimitID, value int64) error {
+	s.Limits.NamespaceLimits[limitID] = value
+	return nil
+}
+
+func (s *Storage) SetServiceLimit(limitID quotas.ServiceLimitRangeID, value int64) error {
+	s.Limits.ServiceLimits[limitID] = value
+	return nil
+}
+
 // Sync synchronizes active services and their pods. The input map maps service->list of active pods.
 // It will call the resource store to sync pods per-service and will sync services in the call graph.
 func (s *Storage) Sync(active map[string][]string) {
@@ -70,11 +96,11 @@ func (s *Storage) Sync(active map[string][]string) {
 	}
 
 	// Sync services in call graph
-	if s.Graph != nil {
-		services := make([]string, 0, len(active))
-		for svc := range active {
-			services = append(services, svc)
-		}
-		s.Graph.SyncServices(services)
-	}
+	// if s.Graph != nil {
+	// 	services := make([]string, 0, len(active))
+	// 	for svc := range active {
+	// 		services = append(services, svc)
+	// 	}
+	// 	s.Graph.SyncServices(services)
+	// }
 }

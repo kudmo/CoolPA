@@ -15,9 +15,9 @@ type ServicePolicy struct {
 
 // GlobalPolicy defines cluster-wide constraints.
 type GlobalPolicy struct {
-	ClusterCPULimit     float64
-	ClusterMemoryLimit  float64
-	ClusterReplicaLimit int
+	NamespaceCPUQuotaUnused     float64
+	NamespaceMemoryQuotaUnused  float64
+	NamespaceReplicaQuotaUnused int
 }
 
 // ConstraintEngine holds per-service and global policies.
