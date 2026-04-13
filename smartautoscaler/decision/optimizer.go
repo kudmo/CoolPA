@@ -52,9 +52,9 @@ func (ro *ReactionOptimizer) runOptimization(
 	cfg := gaconfig.Config{
 		PopulationSize:   20,
 		Generations:      15,
-		EliteRatio:       0.1,
-		MutationRate:     0.2,
-		TypeMutationRate: 0.02,
+		EliteRatio:       0.05,
+		MutationRate:     0.8,
+		TypeMutationRate: 0.1,
 		CrossoverRate:    0.7,
 		TournamentSize:   3,
 		RandomSeed:       seed,
