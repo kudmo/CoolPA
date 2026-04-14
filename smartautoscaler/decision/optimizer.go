@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"time"
 
 	gaconfig "github.com/kudmo/CoolPA/decision/ga/config"
 	"github.com/kudmo/CoolPA/decision/ga/constraints"
@@ -47,11 +48,11 @@ func (ro *ReactionOptimizer) runOptimization(
 	services []string,
 	mode ScaleMode,
 ) {
-	seed := int64(42)
+	seed := int64(time.Now().Unix())
 
 	cfg := gaconfig.Config{
-		PopulationSize:   20,
-		Generations:      15,
+		PopulationSize:   10,
+		Generations:      8,
 		EliteRatio:       0.05,
 		MutationRate:     0.8,
 		TypeMutationRate: 0.1,
@@ -256,8 +257,8 @@ func (ro *ReactionOptimizer) applyCandidate(
 				slog.Error("Failed to apply HPA", "service", s.ServiceName, "error", err)
 			}
 		case genome.VPA:
-			cpuStr := fmt.Sprintf("%dm", int(s.AppCPU/1000))
-			memStr := fmt.Sprintf("%dMi", int(s.AppMemory/(1024*1024)))
+			cpuStr := fmt.Sprintf("%dm", int(s.AppCPU))
+			memStr := fmt.Sprintf("%dMi", int(s.AppMemory))
 			if err := ro.applier.ApplyVPS(ctx, namespace, s.ServiceName, cpuStr, memStr); err != nil {
 				slog.Error("Failed to apply VPA", "service", s.ServiceName, "error", err)
 			}

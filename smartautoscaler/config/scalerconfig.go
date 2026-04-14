@@ -9,6 +9,7 @@ import (
 
 // ScalerConfig holds configuration parameters for the autoscaler.
 type ScalerConfig struct {
+	ScalingNamespace   string        `yaml:"scaling_namespace"`
 	PrometheusURL      string        `yaml:"prometheus_url"`
 	PrometheusInterval time.Duration `yaml:"prometheus_interval"`
 	AnalyzerInterval   time.Duration `yaml:"analyzer_interval"`

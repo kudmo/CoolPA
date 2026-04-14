@@ -4,6 +4,7 @@ package main
 import (
 	"context"
 	"flag"
+	"fmt"
 	"log/slog"
 	"os"
 	"os/signal"
@@ -80,101 +81,101 @@ func main() {
 		Queries: []collector.MetricQuery{
 			{
 				Name:  "kube_pod_info",
-				Query: `kube_pod_info{namespace="microservices-demo"}`,
+				Query: fmt.Sprintf(`kube_pod_info{namespace="%s"}`, cfg.ScalingNamespace),
 				Help:  "Kubernetes pod metadata",
 			},
 			{
 				Name:  "kube_resourcequota",
-				Query: `kube_resourcequota{namespace="microservices-demo",resource=~"limits.*|pods", type="hard"}`,
+				Query: fmt.Sprintf(`kube_resourcequota{namespace="%s",resource=~"limits.*|pods", type="hard"}`, cfg.ScalingNamespace),
 				Help:  "Kubernetes namespace limits",
 			},
 			{
 				Name:  "kube_limitrange",
-				Query: `kube_limitrange{namespace="microservices-demo", constraint=~"min|max"}`,
+				Query: fmt.Sprintf(`kube_limitrange{namespace="%s", constraint=~"min|max"}`, cfg.ScalingNamespace),
 				Help:  "Kubernetes service limits",
 			},
 			{
 				Name:  "container_cpu_usage",
-				Query: `sum by (pod) (rate(container_cpu_usage_seconds_total{container!="",container!="istio-proxy",container!="POD",namespace="microservices-demo"}[1m]))`,
+				Query: fmt.Sprintf(`sum by (pod) (rate(container_cpu_usage_seconds_total{container!="",container!="istio-proxy",container!="POD",namespace="%s"}[1m]))`, cfg.ScalingNamespace),
 				Help:  "CPU usage per container (cores)",
 			},
 			{
 				Name:  "container_memory_usage",
-				Query: `sum by (pod) (container_memory_usage_bytes{container!="",container!="istio-proxy",container!="POD",namespace="microservices-demo"}) / (1024*1024)`,
+				Query: fmt.Sprintf(`sum by (pod) (container_memory_usage_bytes{container!="",container!="istio-proxy",container!="POD",namespace="%s"}) / (1024*1024)`, cfg.ScalingNamespace),
 				Help:  "Memory usage per container (Mbytes)",
 			},
 			{
 				Name:  "container_cpu_quota",
-				Query: `sum by (pod) (container_spec_cpu_quota{container!="",container!="istio-proxy",container!="POD",namespace="microservices-demo"}) / 100`,
+				Query: fmt.Sprintf(`sum by (pod) (container_spec_cpu_quota{container!="",container!="istio-proxy",container!="POD",namespace="%s"}) / 100`, cfg.ScalingNamespace),
 				Help:  "CPU quota per container",
 			},
 			{
 				Name:  "container_memory_limit",
-				Query: `sum by (pod) (container_spec_memory_limit_bytes{container!="",container!="istio-proxy",container!="POD",namespace="microservices-demo"})  / (1024*1024)`,
+				Query: fmt.Sprintf(`sum by (pod) (container_spec_memory_limit_bytes{container!="",container!="istio-proxy",container!="POD",namespace="%s"})  / (1024*1024)`, cfg.ScalingNamespace),
 				Help:  "Memory limit per container (Mbytes)",
 			},
 			{
 				Name:  "pod_cpu_quota",
-				Query: `sum by (pod) (container_spec_cpu_quota{namespace="microservices-demo"}) / 100`,
+				Query: fmt.Sprintf(`sum by (pod) (container_spec_cpu_quota{namespace="%s"}) / 100`, cfg.ScalingNamespace),
 				Help:  "CPU quota per pod",
 			},
 			{
 				Name:  "pod_memory_limit",
-				Query: `sum by (pod) (container_spec_memory_limit_bytes{namespace="microservices-demo"})  / (1024*1024)`,
+				Query: fmt.Sprintf(`sum by (pod) (container_spec_memory_limit_bytes{namespace="%s"})  / (1024*1024)`, cfg.ScalingNamespace),
 				Help:  "Memory limit per pod",
 			},
 			{
 				Name:  "container_fs_usage",
-				Query: `sum by (pod) (container_fs_usage_bytes{container!="",container!="istio-proxy",container!="POD",namespace="microservices-demo"})`,
+				Query: fmt.Sprintf(`sum by (pod) (container_fs_usage_bytes{container!="",container!="istio-proxy",container!="POD",namespace="%s"})`, cfg.ScalingNamespace),
 				Help:  "Filesystem usage per container (bytes)",
 			},
 			{
 				Name:  "container_fs_write",
-				Query: `sum by (pod) (rate(container_fs_writes_bytes_total{container!="",container!="istio-proxy",container!="POD",namespace="microservices-demo"}[1m]))`,
+				Query: fmt.Sprintf(`sum by (pod) (rate(container_fs_writes_bytes_total{container!="",container!="istio-proxy",container!="POD",namespace="%s"}[1m]))`, cfg.ScalingNamespace),
 				Help:  "Filesystem write bytes per container",
 			},
 			{
 				Name:  "container_fs_read",
-				Query: `sum by (pod) (rate(container_fs_reads_bytes_total{container!="",container!="istio-proxy",container!="POD",namespace="microservices-demo"}[1m]))`,
+				Query: fmt.Sprintf(`sum by (pod) (rate(container_fs_reads_bytes_total{container!="",container!="istio-proxy",container!="POD",namespace="%s"}[1m]))`, cfg.ScalingNamespace),
 				Help:  "Filesystem read bytes per container",
 			},
 			{
 				Name:  "container_network_receive",
-				Query: `sum by (pod) (rate(container_network_receive_bytes_total{namespace="microservices-demo"}[1m]))`,
+				Query: fmt.Sprintf(`sum by (pod) (rate(container_network_receive_bytes_total{namespace="%s"}[1m]))`, cfg.ScalingNamespace),
 				Help:  "Network receive bytes per pod",
 			},
 			{
 				Name:  "container_network_transmit",
-				Query: `sum by (pod) (rate(container_network_transmit_bytes_total{namespace="microservices-demo"}[1m]))`,
+				Query: fmt.Sprintf(`sum by (pod) (rate(container_network_transmit_bytes_total{namespace="%s"}[1m]))`, cfg.ScalingNamespace),
 				Help:  "Network transmit bytes per pod",
 			},
 			{
 				Name: "istio_request_duration_p95",
-				Query: `histogram_quantile(0.95, 
-					sum by (le, destination_workload, source_workload) (rate(istio_request_duration_milliseconds_bucket{destination_workload!="",destination_workload_namespace="microservices-demo"}[1m])) 
-				)`,
+				Query: fmt.Sprintf(`histogram_quantile(0.95, 
+					sum by (le, destination_workload, source_workload) (rate(istio_request_duration_milliseconds_bucket{destination_workload!="",destination_workload_namespace="%s"}[1m])) 
+				)`, cfg.ScalingNamespace),
 				Help: "Istio P95 request latency per app (both source and destination must have autoscaling-enabled)",
 			},
 			{
 				Name: "istio_request_duration_p50",
-				Query: `histogram_quantile(0.50, 
-					sum by (le, destination_workload, source_workload) (rate(istio_request_duration_milliseconds_bucket{destination_workload!="",destination_workload_namespace="microservices-demo"}[1m])) 
-				)`,
+				Query: fmt.Sprintf(`histogram_quantile(0.50, 
+					sum by (le, destination_workload, source_workload) (rate(istio_request_duration_milliseconds_bucket{destination_workload!="",destination_workload_namespace="%s"}[1m])) 
+				)`, cfg.ScalingNamespace),
 				Help: "Istio P95 request latency per app (both source and destination must have autoscaling-enabled)",
 			},
 			{
 				Name:  "istio_requests_total",
-				Query: `sum by (destination_workload) (rate(istio_requests_total{destination_workload!="", reporter="destination",destination_workload_namespace="microservices-demo"}[1m]))`,
+				Query: fmt.Sprintf(`sum by (destination_workload) (rate(istio_requests_total{destination_workload!="", reporter="destination",destination_workload_namespace="%s"}[1m]))`, cfg.ScalingNamespace),
 				Help:  "Istio HTTP requests per app (RPS) - both source and destination must have autoscaling-enabled",
 			},
 			{
 				Name:  "istio_tcp_received_bytes_total",
-				Query: `sum by (destination_workload) (rate(istio_tcp_received_bytes_total{destination_workload!="",destination_workload_namespace="microservices-demo"}[1m]))`,
+				Query: fmt.Sprintf(`sum by (destination_workload) (rate(istio_tcp_received_bytes_total{destination_workload!="",destination_workload_namespace="%s"}[1m]))`, cfg.ScalingNamespace),
 				Help:  "Istio TCP received bytes per app - both source and destination must have autoscaling-enabled",
 			},
 			{
 				Name:  "istio_tcp_sent_bytes_total",
-				Query: `sum by (destination_workload) (rate(istio_tcp_sent_bytes_total{destination_workload!="",destination_workload_namespace="microservices-demo"}[1m]))`,
+				Query: fmt.Sprintf(`sum by (destination_workload) (rate(istio_tcp_sent_bytes_total{destination_workload!="",destination_workload_namespace="%s"}[1m]))`, cfg.ScalingNamespace),
 				Help:  "Istio TCP sent bytes per app - both source and destination must have autoscaling-enabled",
 			},
 		},

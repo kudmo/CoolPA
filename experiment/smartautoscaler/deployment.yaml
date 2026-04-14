@@ -21,6 +21,13 @@ spec:
           ports:
             - containerPort: 8088
           args: ["-config", "/etc/config/config.yaml"]
+          resources:
+            requests:
+              cpu: "500m"
+              memory: "256Mi"
+            limits:
+              cpu: "500m"
+              memory: "256Mi"
           volumeMounts:
           - name: config
             mountPath: /etc/config
