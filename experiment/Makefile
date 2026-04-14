@@ -86,6 +86,19 @@ help:
 	@echo "                 LIMITS_MEM=лимит памяти (default: 1Gi)"
 	@echo "      Пример: make vpa-scale SERVICE=test-go-app-client REQUESTS_CPU=300m LIMITS_MEM=2Gi"
 	@echo ""
+	# 	@echo "HPA Management:"
+	@echo "  hpa-apply               - apply HPA config from file"
+	@echo "  hpa-delete              - delete all HPA in namespace"
+	@echo "  hpa-get                 - show all HPA"
+	@echo "  hpa-watch               - watch HPA status"
+	@echo ""
+	@echo "HPA Parameters:"
+	@echo "  TARGET_CPU=70           - target CPU utilization percentage"
+	@echo "  MIN=1                   - minimum replicas"
+	@echo "  MAX=5                   - maximum replicas"
+	@echo "  HPA_DIR=./path          - directory for HPA configs"
+	@echo "  HPA_CONFIG=./file.yaml  - path to HPA config file"
+	@echo ""
 	@echo "Composite:"
 	@echo "  up"
 	@echo "  destroy"
@@ -573,6 +586,59 @@ vpa-scale:
 		--requests=cpu=$(REQUESTS_CPU),memory=$(REQUESTS_MEM) \
 		--limits=cpu=$(LIMITS_CPU),memory=$(LIMITS_MEM)
 	$(KUBECTL) -n $(NS) rollout status deploy/$(SERVICE)
+
+# =====================================================
+# HPA (Horizontal Pod Autoscaler) Management
+# =====================================================
+
+HPA_DIR ?= $(BENCH_DIR)/hpa
+HPA_CONFIG ?= $(HPA_DIR)/hpa.yaml
+HPA_TARGET_CPU ?= 70
+
+# Список сервисов для HPA
+HPA_SERVICES ?= adservice cartservice checkoutservice currencyservice emailservice \
+                frontend paymentservice productcatalogservice recommendationservice \
+                redis-cart shippingservice
+
+.PHONY: hpa-apply
+hpa-apply:
+	@echo "Applying HPA configurations..."
+	@if [ -f "$(HPA_CONFIG)" ]; then \
+		$(KUBECTL) apply -f $(HPA_CONFIG); \
+	else \
+		echo "HPA config not found at $(HPA_CONFIG)"; \
+		echo "Creating default HPA for all services..."; \
+		$(MAKE) hpa-create-all; \
+	fi
+	$(KUBECTL) -n $(NS) get hpa
+
+.PHONY: hpa-delete
+hpa-delete:
+	@echo "🗑️  Deleting all HPA in namespace $(NS)..."
+	$(KUBECTL) -n $(NS) delete hpa --all
+	@echo "✅ All HPA deleted"
+
+.PHONY: hpa-get
+hpa-get:
+	@echo "📊 HPA status in namespace $(NS):"
+	$(KUBECTL) -n $(NS) get hpa
+	@echo ""
+	@echo "📈 Detailed HPA info:"
+	$(KUBECTL) -n $(NS) describe hpa
+
+.PHONY: hpa-watch
+hpa-watch:
+	@echo "👀 Watching HPA status (press Ctrl+C to stop)..."
+	$(KUBECTL) -n $(NS) get hpa -w
+
+.PHONY: hpa-metrics
+hpa-metrics:
+	@echo "📊 Current metrics for pods in $(NS):"
+	@echo "=== Pod Metrics ==="
+	$(KUBECTL) -n $(NS) top pods
+	@echo ""
+	@echo "=== Node Metrics ==="
+	$(KUBECTL) top nodes
 
 # =====================================================
 # COMPOSITE
