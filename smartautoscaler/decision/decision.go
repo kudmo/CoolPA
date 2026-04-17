@@ -14,6 +14,7 @@ import (
 type DecisionMakerConfig struct {
 	Interval time.Duration
 	Cooldown time.Duration
+	SLO      float64
 }
 
 type DecisionMaker struct {
@@ -35,6 +36,7 @@ func NewDecisionMaker(config DecisionMakerConfig, store *storage.Storage, applie
 
 		ServiceAnalyzer: analyzer.NewAnalyzer(
 			analyzer.AnalyzerConfig{
+				SLO:                   config.SLO,
 				Confidence:            0.05,
 				WelchOldIntervalBegin: time.Duration(300 * time.Second),
 				WelchNowIntervalBegin: time.Duration(60 * time.Second),

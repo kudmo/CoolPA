@@ -20,6 +20,7 @@ const ANOMALY_SERVICES_COUNT = 2
 const MIN_USAGE = 0.3
 
 type AnalyzerConfig struct {
+	SLO        float64
 	Confidence float64
 
 	WelchOldIntervalBegin time.Duration
@@ -49,7 +50,7 @@ type AnalysisResult struct {
 func (a *Analyzer) analyzeWithSLOViolation() []string {
 	params := sloviolation.AbnormalParams{
 		Window: 1 * time.Minute,
-		SLO:    150,
+		SLO:    a.config.SLO,
 		Alpha:  0.2,
 	}
 	result := make([]string, 0)

@@ -183,6 +183,7 @@ func main() {
 	analyzerConfig := decision.DecisionMakerConfig{
 		Interval: cfg.AnalyzerInterval,
 		Cooldown: cfg.ScalingCooldown,
+		SLO:      float64(cfg.SLO),
 	}
 
 	// Components creating

@@ -9,6 +9,7 @@ data:
     prometheus_url: "http://prometheus.monitoring.svc.cluster.local:9090"
     prometheus_interval: 5s
     analyzer_interval: 15s
+    slo: 100
     scaling_cooldown: 300s
     logger:
       level: "info"

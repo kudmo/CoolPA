@@ -13,6 +13,7 @@ type ScalerConfig struct {
 	PrometheusURL      string        `yaml:"prometheus_url"`
 	PrometheusInterval time.Duration `yaml:"prometheus_interval"`
 	AnalyzerInterval   time.Duration `yaml:"analyzer_interval"`
+	SLO                int           `yaml:"slo"`
 	ScalingCooldown    time.Duration `yaml:"scaling_cooldown"`
 	Logger             LoggerConfig  `yaml:"logger"`
 }

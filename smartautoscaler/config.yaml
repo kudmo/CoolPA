@@ -1,0 +1,8 @@
+prometheus_url: "http://localhost:9090"
+prometheus_interval: 5s
+analyzer_interval: 15s
+slo: 100
+scaling_cooldown: 800s
+logger:
+  level: "info"
+  format: "text"
