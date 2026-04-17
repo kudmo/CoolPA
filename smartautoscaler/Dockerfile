@@ -49,3 +49,5 @@ RUN useradd -u 10001 -m appuser && chown -R appuser:appuser /app
 USER appuser
 
 ENTRYPOINT ["/app/smartautoscaler"]
+
+# EXPOSE 6060

@@ -1,6 +1,8 @@
 package slopredictor
 
 import (
+	"log/slog"
+
 	"github.com/kudmo/CoolPA/decision/ga/genome"
 	"github.com/kudmo/CoolPA/storage"
 	"github.com/kudmo/CoolPA/storage/metrics"
@@ -10,16 +12,24 @@ import (
 // ResourceOptimizerFitness composes a FeatureBuilder and Predictor.
 type ResourceOptimizerFitness struct {
 	Builder   SLOPredictorFeatureBuilder
-	Predictor SLOPredictor
+	Predictor *SLOPredictor
 	Store     *storage.Storage
 }
 
 func NewResourceOptimizerFitness(store *storage.Storage) *ResourceOptimizerFitness {
+	predictor, err := NewSLOPredictor("random_forest_model.onnx", 11)
+	if err != nil {
+		slog.Error("Error init predictor", "error", err)
+	}
 	return &ResourceOptimizerFitness{
 		Builder:   SLOPredictorFeatureBuilder{Store: store},
-		Predictor: SLOPredictor{},
+		Predictor: predictor,
 		Store:     store,
 	}
+}
+
+func (f *ResourceOptimizerFitness) Close() {
+	f.Predictor.Close()
 }
 
 func (f *ResourceOptimizerFitness) calculateR2(gen *genome.ReactionGenome) float64 {
@@ -50,18 +60,22 @@ func (f *ResourceOptimizerFitness) calculateR2(gen *genome.ReactionGenome) float
 	return 1 - max(cpu_percent, replics_percent, mem_percent)
 }
 
+func (f *ResourceOptimizerFitness) calculateR1(g *genome.ReactionGenome) float64 {
+	X := f.Builder.Build(g)
+	risks := f.Predictor.PredictBatch(X)
+	prod := 1.0
+	for _, r := range risks {
+		prod *= (1.0 - r)
+	}
+	return prod
+}
+
 func (f *ResourceOptimizerFitness) EvaluateBatch(pop []*genome.ReactionGenome) []float64 {
 	LAMBDA := 0.5
 
 	scores := make([]float64, len(pop))
 	for i, g := range pop {
-		X := f.Builder.Build(g)
-		risks := f.Predictor.PredictBatch(X)
-		prod := 1.0
-		for _, r := range risks {
-			prod *= (1.0 - r)
-		}
-		R1 := prod
+		R1 := f.calculateR1(g)
 		R2 := f.calculateR2(g)
 		scores[i] = LAMBDA*R1 + (1-LAMBDA)*R2
 	}

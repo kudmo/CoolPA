@@ -85,6 +85,7 @@ func (ro *ReactionOptimizer) runOptimization(
 	}
 
 	fit := slopredictor.NewResourceOptimizerFitness(ro.store)
+	defer fit.Close()
 
 	eng := &engine.Engine{
 		Config:      cfg,

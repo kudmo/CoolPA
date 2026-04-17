@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/kudmo/CoolPA/storage/graph"
+	latencyhist "github.com/kudmo/CoolPA/storage/latency_hist"
 	"github.com/kudmo/CoolPA/storage/metrics"
 	"github.com/kudmo/CoolPA/storage/quotas"
 )
@@ -13,6 +14,7 @@ type Storage struct {
 	Graph           *graph.CallGraph
 	ResourceMetrics *metrics.MetricStore
 	Limits          quotas.QuotasStorage
+	Hist            latencyhist.HistStore
 	servicePods     map[string][]string
 }
 
@@ -24,6 +26,7 @@ func NewStorage(window, step time.Duration) *Storage {
 		Limits:          quotas.QuotasStorage{
 			// ServiceQuotas: make(map[string]quotas.ServiceQuotas),
 		},
+		Hist:        latencyhist.HistStore{},
 		servicePods: make(map[string][]string),
 	}
 }
@@ -103,4 +106,11 @@ func (s *Storage) Sync(active map[string][]string) {
 	// 	}
 	// 	s.Graph.SyncServices(services)
 	// }
+
+	bounds := []float64{10, 20, 30, 50, 70, 90, 120, 150, 200, 250}
+	for svc := range active {
+		if s.Hist.GetHistogram(svc) == nil {
+			s.Hist.Register(svc, bounds)
+		}
+	}
 }
