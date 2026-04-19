@@ -13,7 +13,7 @@ type Predictor interface {
 	PredictBatch(X [][]float64) []float64
 }
 
-type SLOPredictor struct {
+type LatencyDeltaPredictor struct {
 	session *ort.DynamicAdvancedSession
 	mu      sync.Mutex
 }
@@ -28,25 +28,25 @@ func initORT() {
 	}
 }
 
-func NewSLOPredictor(modelPath string, inputSize int) (*SLOPredictor, error) {
+func NewSLOPredictor(modelPath string, inputSize int) (*LatencyDeltaPredictor, error) {
 	initOnce.Do(initORT)
 
 	session, err := ort.NewDynamicAdvancedSession(
 		modelPath,
-		[]string{"double_input"},
-		[]string{"probabilities"},
+		[]string{"float_input"},
+		[]string{"variable"},
 		nil,
 	)
 	if err != nil {
 		return nil, err
 	}
 
-	return &SLOPredictor{
+	return &LatencyDeltaPredictor{
 		session: session,
 	}, nil
 }
 
-func (p *SLOPredictor) PredictBatch(X [][]float64) []float64 {
+func (p *LatencyDeltaPredictor) PredictBatch(X [][]float64) []float64 {
 	if len(X) == 0 {
 		return nil
 	}
@@ -57,22 +57,23 @@ func (p *SLOPredictor) PredictBatch(X [][]float64) []float64 {
 	batch := len(X)
 	features := len(X[0])
 
-	// flatten
-	inputData := make([]float64, 0, batch*features)
+	inputData := make([]float32, 0, batch*features)
 	for _, row := range X {
-		inputData = append(inputData, row...)
+		for _, val := range row {
+			inputData = append(inputData, float32(val))
+		}
 	}
 
 	inputShape := ort.NewShape(int64(batch), int64(features))
 
-	inputTensor, err := ort.NewTensor[float64](inputShape, inputData)
+	inputTensor, err := ort.NewTensor[float32](inputShape, inputData)
 	if err != nil {
 		slog.Error("input tensor error", "error", err)
 		return nil
 	}
 	defer inputTensor.Destroy()
 
-	outputShape := ort.NewShape(int64(batch), 2)
+	outputShape := ort.NewShape(int64(batch), 1)
 
 	outputTensor, err := ort.NewEmptyTensor[float32](outputShape)
 	if err != nil {
@@ -88,16 +89,15 @@ func (p *SLOPredictor) PredictBatch(X [][]float64) []float64 {
 	}
 
 	output := outputTensor.GetData()
-
 	result := make([]float64, batch)
 	for i := 0; i < batch; i++ {
-		result[i] = float64(output[i*2+1]) // класс 1
+		result[i] = float64(output[i])
 	}
 
 	return result
 }
 
-func (p *SLOPredictor) Close() {
+func (p *LatencyDeltaPredictor) Close() {
 	if p.session != nil {
 		p.session.Destroy()
 	}

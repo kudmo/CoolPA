@@ -35,7 +35,7 @@ type modelCache struct {
 }
 
 type Histogram struct {
-	bins  []Bin
+	Bins  []Bin
 	cache atomic.Pointer[modelCache]
 }
 
@@ -53,11 +53,11 @@ func NewHistogram(bounds []float64) *Histogram {
 		UpperBound: math.Inf(1),
 	}
 
-	return &Histogram{bins: bins}
+	return &Histogram{Bins: bins}
 }
 
 func (h *Histogram) RebuildModel() {
-	n := len(h.bins)
+	n := len(h.Bins)
 
 	cumT := make([]float64, n)
 	cumV := make([]float64, n)
@@ -66,15 +66,15 @@ func (h *Histogram) RebuildModel() {
 	var sumT, sumV float64
 
 	for i := 0; i < n; i++ {
-		t := float64(h.bins[i].total.Load())
-		v := float64(h.bins[i].violations.Load())
+		t := float64(h.Bins[i].total.Load())
+		v := float64(h.Bins[i].violations.Load())
 
 		sumT += t
 		sumV += v
 
 		cumT[i] = sumT
 		cumV[i] = sumV
-		bounds[i] = h.bins[i].UpperBound
+		bounds[i] = h.Bins[i].UpperBound
 	}
 
 	globalRate := 0.0
@@ -93,15 +93,15 @@ func (h *Histogram) RebuildModel() {
 }
 
 func (h *Histogram) findBin(latency float64) int {
-	return sort.Search(len(h.bins), func(i int) bool {
-		return latency <= h.bins[i].UpperBound
+	return sort.Search(len(h.Bins), func(i int) bool {
+		return latency <= h.Bins[i].UpperBound
 	})
 }
 
 func (h *Histogram) Observe(latency float64, violation bool) {
 	idx := h.findBin(latency)
 
-	b := &h.bins[idx]
+	b := &h.Bins[idx]
 
 	b.total.Add(1)
 	if violation {
@@ -115,44 +115,72 @@ func (h *Histogram) Risk(x float64) float64 {
 		return math.NaN()
 	}
 
+	if x <= 0 {
+		return 0
+	}
+
 	i := sort.Search(len(cache.bounds), func(i int) bool {
 		return x <= cache.bounds[i]
 	})
 
-	left := max(0, i-1)
-	right := min(len(cache.bounds)-1, i+1)
+	n := len(cache.bounds)
 
-	// расширяем окно пока мало данных
-	const minCount = 50
-
-	for {
-		t := windowTotal(cache, left, right)
-		if t >= minCount || (left == 0 && right == len(cache.bounds)-1) {
+	leftIdx := -1
+	for j := i; j >= 0; j-- {
+		if windowTotal(cache, j, j) > 0 {
+			leftIdx = j
 			break
 		}
+	}
 
-		if left > 0 {
-			left--
-		}
-		if right < len(cache.bounds)-1 {
-			right++
+	rightIdx := -1
+	for j := i; j < n; j++ {
+		if windowTotal(cache, j, j) > 0 {
+			rightIdx = j
+			break
 		}
 	}
 
-	total := windowTotal(cache, left, right)
-	viol := windowViolations(cache, left, right)
+	var li, ri float64
+	var ly, ry float64
 
+	if leftIdx == -1 {
+		li = -1
+		ly = 0
+	} else {
+		li = float64(leftIdx)
+		ly = safeBinRisk(cache, leftIdx)
+	}
+
+	if rightIdx == -1 {
+		ri = float64(n)
+		ry = 1
+	} else {
+		ri = float64(rightIdx)
+		ry = safeBinRisk(cache, rightIdx)
+	}
+
+	xi := float64(i)
+
+	if leftIdx == rightIdx && leftIdx != -1 {
+		return ly
+	}
+
+	if ri == li {
+		return ly
+	}
+
+	t := (xi - li) / (ri - li)
+
+	return ly + t*(ry-ly)
+}
+
+func safeBinRisk(c *modelCache, i int) float64 {
+	total := windowTotal(c, i, i)
 	if total == 0 {
-		return cache.globalRate
+		return c.globalRate
 	}
-
-	localRate := viol / total
-
-	const alpha = 100.0
-	w := total / (total + alpha)
-	// w := 1 - math.Exp(-total/alpha)
-
-	return w*localRate + (1-w)*cache.globalRate
+	return windowViolations(c, i, i) / total
 }
 
 func windowTotal(c *modelCache, l, r int) float64 {
@@ -190,4 +218,24 @@ func (s *HistStore) GetHistogram(service string) *Histogram {
 		return h.(*Histogram)
 	}
 	return nil
+}
+
+func LogBounds(max float64) []float64 {
+	if max <= 0 {
+		return nil
+	}
+
+	var bounds []float64
+
+	v := 1.0
+	for v < max {
+		bounds = append(bounds, v)
+		v *= 2
+	}
+
+	if len(bounds) == 0 || bounds[len(bounds)-1] != max {
+		bounds = append(bounds, max)
+	}
+
+	return bounds
 }

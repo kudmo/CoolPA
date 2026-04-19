@@ -6,99 +6,89 @@ import (
 	"github.com/kudmo/CoolPA/decision/ga/genome"
 	"github.com/kudmo/CoolPA/storage"
 	"github.com/kudmo/CoolPA/storage/metrics"
-	"github.com/kudmo/CoolPA/utils"
 )
 
-type SLOPredictorFeatureBuilder struct {
+type LatencyDeltaPredictorFeatureBuilder struct {
 	Store *storage.Storage
 }
 
-// container_cpu_quota
-// container_memory_limit
-// replicas_count
-// istio_requests_total
-// slo_threshold
-// rps_per_replica = istio_requests_total / replicas_count
-// cpu_per_rps = container_cpu_quota / istio_requests_total
-// memory_per_rps = container_memory_limit / istio_requests_total
-// total_cpu_limit = replicas_count * container_cpu_quota
-// total_memory_limit = replicas_count * container_memory_limit
-func (b *SLOPredictorFeatureBuilder) Build(g *genome.ReactionGenome) [][]float64 {
+func (b *LatencyDeltaPredictorFeatureBuilder) Build(g *genome.ReactionGenome) [][]float64 {
 	if g == nil {
 		return nil
 	}
 	out := make([][]float64, 0, len(g.Genes))
+	eps := 1e-6
+
 	for _, sg := range g.Genes {
 		if sg == nil {
 			continue
 		}
+
 		svc := sg.ServiceName
-		node, _ := b.Store.Graph.GetNode(svc)
 		pods := b.Store.ResourceMetrics.GetServicePods(svc)
+
+		if len(pods) == 0 {
+			continue
+		}
 
 		containerCPUQuota, _, _ := b.Store.ResourceMetrics.GetPodMetricHeadValue(svc, pods[0], metrics.CPUQuota)
 		containerMemoryLimit, _, _ := b.Store.ResourceMetrics.GetPodMetricHeadValue(svc, pods[0], metrics.MemoryLimit)
-		replicasCount := float64(len(pods))
-		istioRequestsTotal := node.RequestCount.Avg()
-
-		switch sg.ReactionType {
-		case genome.HPA:
-			replicasCount = math.Max(0, math.Round(float64(replicasCount)+sg.DeltaReplicas))
-		case genome.VPA:
-			containerCPUQuota = math.Max(0, containerCPUQuota+sg.DeltaCPU)
-			containerMemoryLimit = math.Max(0, containerMemoryLimit+sg.DeltaMemory)
-		}
-
-		eps := 1e-6
-		if istioRequestsTotal < eps {
-			istioRequestsTotal = eps
-		}
-
-		totalCPULimit := replicasCount * containerCPUQuota
-		totalMemoryLimit := replicasCount * containerMemoryLimit
-
-		rpsPerReplica := istioRequestsTotal / replicasCount
-		cpuPerRps := containerCPUQuota / istioRequestsTotal
-		memoryPerRps := containerMemoryLimit / istioRequestsTotal
+		replicas := float64(len(pods))
 
 		cpuUsageWindow, _, _ := b.Store.ResourceMetrics.GetPodMetricWindow(svc, pods[0], metrics.CPUUsage)
 		memUsageWindow, _, _ := b.Store.ResourceMetrics.GetPodMetricWindow(svc, pods[0], metrics.MemoryUsage)
-		avgCPUUsage := cpuUsageWindow.Avg()
-		avgMemUsage := memUsageWindow.Avg()
 
-		cpuUtilization := avgCPUUsage / (totalCPULimit + eps)
-		memUtilization := avgMemUsage / (totalMemoryLimit + eps)
+		cpu := cpuUsageWindow.Avg()
+		memory := memUsageWindow.Avg()
 
-		rpsCV := node.RequestCount.StdDev() / (node.RequestCount.Avg() + eps)
-		cpuCV := cpuUsageWindow.StdDev() / (cpuUsageWindow.Avg() + eps)
+		cpuLimit := containerCPUQuota
+		memLimit := containerMemoryLimit
 
-		rpsValues := node.RequestCount.Values()
-		cpuValues := cpuUsageWindow.Values()
-		memValues := memUsageWindow.Values()
-
-		cpuRpsCorr := 0.0
-		if len(rpsValues) > 1 && len(cpuValues) > 1 && len(rpsValues) == len(cpuValues) {
-			cpuRpsCorr = utils.Pearson(rpsValues, cpuValues)
+		switch sg.ReactionType {
+		case genome.HPA:
+			replicas = math.Max(0, replicas+sg.DeltaReplicas)
+		case genome.VPA:
+			cpuLimit = math.Max(0, cpuLimit+sg.DeltaCPU)
+			memLimit = math.Max(0, memLimit+sg.DeltaMemory)
 		}
 
-		memRpsCorr := 0.0
-		if len(rpsValues) > 1 && len(memValues) > 1 && len(rpsValues) == len(memValues) {
-			memRpsCorr = utils.Pearson(rpsValues, memValues)
-		}
+		totalCPULimit := replicas * cpuLimit
+		totalMemLimit := replicas * memLimit
 
-		out = append(out, []float64{
-			totalCPULimit,
-			totalMemoryLimit,
-			rpsPerReplica,
-			cpuPerRps,
-			memoryPerRps,
-			cpuUtilization,
-			memUtilization,
-			rpsCV,
-			cpuCV,
-			cpuRpsCorr,
-			memRpsCorr,
-		})
+		replicasDelta := sg.DeltaReplicas
+		totalCPULimitDelta := (replicas+sg.DeltaReplicas)*(cpuLimit+sg.DeltaCPU) - totalCPULimit
+		totalMemLimitDelta := (replicas+sg.DeltaReplicas)*(memLimit+sg.DeltaMemory) - totalMemLimit
+
+		netRecv, _, _ := b.Store.ResourceMetrics.GetPodMetricHeadValue(svc, pods[0], metrics.NetworkReceive)
+		netTrans, _, _ := b.Store.ResourceMetrics.GetPodMetricHeadValue(svc, pods[0], metrics.NetworkTransmit)
+
+		features := make([]float64, 11)
+
+		// 1. cpu_utilization
+		features[0] = cpu / (replicas*cpuLimit + eps)
+		// 2. mem_utilization
+		features[1] = memory / (replicas*memLimit + eps)
+		// 3. cpu_cv
+		features[2] = cpuUsageWindow.StdDev() / (cpu + eps)
+		// 4. memory_cv
+		features[3] = memUsageWindow.StdDev() / (memory + eps)
+		// 5. net_recv_trans_ratio
+		features[4] = netRecv / (netTrans + eps)
+		// 6. replicas
+		features[5] = replicas
+		// 7. total_cpu_limit
+		features[6] = totalCPULimit
+		// 8. total_mem_limit
+		features[7] = totalMemLimit
+		// 9. replicas_delta
+		features[8] = replicasDelta
+		// 10. total_cpu_limit_delta
+		features[9] = totalCPULimitDelta
+		// 11. total_mem_limit_delta
+		features[10] = totalMemLimitDelta
+
+		out = append(out, features)
 	}
+
 	return out
 }

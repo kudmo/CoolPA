@@ -3,6 +3,7 @@ package storage
 import (
 	"time"
 
+	"github.com/kudmo/CoolPA/config"
 	"github.com/kudmo/CoolPA/storage/graph"
 	latencyhist "github.com/kudmo/CoolPA/storage/latency_hist"
 	"github.com/kudmo/CoolPA/storage/metrics"
@@ -11,6 +12,7 @@ import (
 
 // Storage is a container for resource-level and call-graph (istio) metrics.
 type Storage struct {
+	GlobalConfig    *config.ScalerConfig
 	Graph           *graph.CallGraph
 	ResourceMetrics *metrics.MetricStore
 	Limits          quotas.QuotasStorage
@@ -19,8 +21,9 @@ type Storage struct {
 }
 
 // NewStorage creates a new storage with given window and step for internal windows.
-func NewStorage(window, step time.Duration) *Storage {
+func NewStorage(window, step time.Duration, config *config.ScalerConfig) *Storage {
 	return &Storage{
+		GlobalConfig:    config,
 		Graph:           graph.NewCallGraph(window, step),
 		ResourceMetrics: metrics.NewMetricStore(window, step),
 		Limits:          quotas.QuotasStorage{
@@ -107,9 +110,9 @@ func (s *Storage) Sync(active map[string][]string) {
 	// 	s.Graph.SyncServices(services)
 	// }
 
-	bounds := []float64{10, 20, 30, 50, 70, 90, 120, 150, 200, 250}
 	for svc := range active {
 		if s.Hist.GetHistogram(svc) == nil {
+			bounds := latencyhist.LogBounds(float64(s.GlobalConfig.SLO))
 			s.Hist.Register(svc, bounds)
 		}
 	}

@@ -37,7 +37,7 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /usr/local/lib/libonnxruntime.so* /usr/local/lib/
-COPY --from=builder /app/random_forest_model.onnx /app/
+COPY --from=builder /app/latency_model.onnx /app/
 COPY --from=builder /app/smartautoscaler /app/
 
 RUN ln -sf /usr/local/lib/libonnxruntime.so.1.24.3 /usr/local/lib/libonnxruntime.so \
@@ -50,4 +50,4 @@ USER appuser
 
 ENTRYPOINT ["/app/smartautoscaler"]
 
-# EXPOSE 6060
+EXPOSE 6060

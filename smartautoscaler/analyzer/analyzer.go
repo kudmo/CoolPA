@@ -2,6 +2,7 @@ package analyzer
 
 import (
 	"log/slog"
+	"slices"
 	"sort"
 	"time"
 
@@ -181,6 +182,15 @@ func (a *Analyzer) Analyze() AnalysisResult {
 			result.Services = underutilized
 			result.Scale = -1
 		}
+	}
+
+	for _, s := range a.store.ResourceMetrics.GetServices() {
+		h := a.store.Hist.GetHistogram(s)
+		now := time.Now()
+		fromTime := now.Add(-1 * time.Minute)
+		viol := slices.Contains(bottlenecks, s)
+		h.Observe(a.store.Graph.AverageLatencyByInboundRange(s, fromTime, now, true), viol)
+		h.RebuildModel()
 	}
 
 	if result.Scale != 0 {
