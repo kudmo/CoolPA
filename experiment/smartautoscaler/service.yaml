@@ -6,6 +6,6 @@ metadata:
 spec:
   selector:
     app: smartautoscaler
-  # ports:
-    # - port: 6060
-      # targetPort: 6060
+  ports:
+    - port: 6060
+      targetPort: 6060
