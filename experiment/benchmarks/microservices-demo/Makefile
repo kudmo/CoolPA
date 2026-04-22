@@ -15,15 +15,16 @@ CHAOS_NS ?= chaos-mesh
 
 KUBECTL := kubectl --context=$(KCTX)
 
-BENCH_DIR := ./benchmarks/microservices-demo
+BENCH_DIR := .
 BENCH_MANIFESTS_DIR := $(BENCH_DIR)/release
 
 ISTIO_PROFILE ?= demo
 ISTIO_NS ?= istio-system
 ISTIOCTL ?= istioctl
 
-MONITORING_DIR ?= ./monitoring
-SCALER_DIR ?= ./smartautoscaler
+MONITORING_DIR ?= $(BENCH_DIR)/monitoring
+SCALER_DIR ?= $(BENCH_DIR)/smartautoscaler
+SCALER_CODE_DIR ?= $(BENCH_DIR)/smartautoscaler
 
 METRICS_URL ?= https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
 
@@ -111,7 +112,7 @@ help:
 
 .PHONY: scaler-build
 scaler-build:
-	docker build -t $(AUTOSCALER_IMAGE) ../smartautoscaler
+	docker build -t $(AUTOSCALER_IMAGE) $(SCALER_CODE_DIR)/
 
 .PHONY: scaler-kind-load
 scaler-kind-load:
