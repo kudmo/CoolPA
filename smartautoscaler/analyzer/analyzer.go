@@ -7,10 +7,10 @@ import (
 	"time"
 
 	sloviolation "github.com/kudmo/CoolPA/analyzer/slo_violation"
-	"github.com/kudmo/CoolPA/analyzer/welchtest"
 	"github.com/kudmo/CoolPA/storage"
 	"github.com/kudmo/CoolPA/storage/metrics"
 	"github.com/kudmo/CoolPA/storage/quotas"
+	"github.com/kudmo/CoolPA/utils/welchtest"
 	"github.com/kudmo/toporank/api"
 	"github.com/kudmo/toporank/types"
 )
@@ -18,7 +18,6 @@ import (
 // TODO: возможно в конфиги
 const BETA = 0.8
 const ANOMALY_SERVICES_COUNT = 2
-const MIN_USAGE = 0.3
 
 type AnalyzerConfig struct {
 	SLO        float64
@@ -120,7 +119,7 @@ func (a *Analyzer) analyzeRPSlowing() []underutilizationAnalyzeResult {
 		oldStats.M2 = a.previousStatistics[service].M2 * BETA * BETA
 
 		welch_result := welchtest.WelchTTest(newStats, oldStats)
-
+		slog.Warn("Welchtest", "service", service, "old", oldStats.Mean, "new", newStats.Mean, "t", welch_result.TStatistic, "p", welch_result.PValue)
 		if welch_result.TStatistic < 0 && welch_result.PValue <= a.config.Confidence {
 			service_cpu_limit, _, _ := a.store.ResourceMetrics.GetServiceMetricAvgHead(service, metrics.CPUQuota)
 			service_mem_limit, _, _ := a.store.ResourceMetrics.GetServiceMetricAvgHead(service, metrics.MemoryLimit)
@@ -137,7 +136,7 @@ func (a *Analyzer) analyzeRPSlowing() []underutilizationAnalyzeResult {
 			service_cpu_underutilization_total := (service_cpu_limit - service_cpu_utilization) * replicas
 			service_cpu_underutilization_total_percent := service_cpu_underutilization_total / float64(a.store.Limits.NamespaceLimits[quotas.NamespaceMaxCpu])
 
-			service_mem_utilization, _, _ := a.store.ResourceMetrics.GetServiceMetricAvgRange(service, metrics.CPUUsage, time_now_begin, time_now)
+			service_mem_utilization, _, _ := a.store.ResourceMetrics.GetServiceMetricAvgRange(service, metrics.MemoryUsage, time_now_begin, time_now)
 			service_mem_underutilization_total := (service_mem_limit - service_mem_utilization) * replicas
 			service_mem_underutilization_total_percent := service_mem_underutilization_total / float64(a.store.Limits.NamespaceLimits[quotas.NamespaceMaxMem])
 
@@ -184,31 +183,36 @@ func (a *Analyzer) Analyze() AnalysisResult {
 		}
 	}
 
+	time_now := time.Now()
+	time_now_begin := time_now.Add(-a.config.WelchNowIntervalBegin)
+
 	for _, s := range a.store.ResourceMetrics.GetServices() {
 		h := a.store.Hist.GetHistogram(s)
-		now := time.Now()
-		fromTime := now.Add(-1 * time.Minute)
 		viol := slices.Contains(bottlenecks, s)
-		h.Observe(a.store.Graph.AverageLatencyByInboundRange(s, fromTime, now, true), viol)
+		h.Observe(a.store.Graph.AverageLatencyByInboundRange(s, time_now_begin, time_now, true), viol)
 		h.RebuildModel()
 	}
 
-	if result.Scale != 0 {
-		for _, s := range a.store.ResourceMetrics.GetServices() {
-			n, _ := a.store.Graph.GetNode(s)
-			new := n.RequestCount.Values()
-			newStats := welchtest.NewOnlineStats()
-			newStats.N = len(new)
-			for _, i := range new {
-				newStats.Mean += i
-			}
-			newStats.Mean = newStats.Mean / float64(newStats.N)
-
-			for _, i := range new {
-				newStats.M2 += (i - newStats.Mean) * (i - newStats.Mean)
-			}
-			a.previousStatistics[s] = newStats
+	for _, s := range result.Services {
+		n, _ := a.store.Graph.GetNode(s)
+		new := n.RequestCount.SeriesRange(time_now_begin, time_now)
+		newStats := welchtest.NewOnlineStats()
+		newStats.N = len(new)
+		for _, i := range new {
+			newStats.Mean += i
 		}
+		newStats.Mean = newStats.Mean / float64(newStats.N)
+
+		for _, i := range new {
+			newStats.M2 += (i - newStats.Mean) * (i - newStats.Mean)
+		}
+		if a.previousStatistics[s] != nil {
+			slog.Warn("stats UPDATE", "service", s, "old", a.previousStatistics[s].Mean, "new", newStats.Mean)
+		} else {
+			slog.Warn("stats Create", "service", s, "new", newStats.Mean)
+
+		}
+		a.previousStatistics[s] = newStats
 	}
 
 	return result
