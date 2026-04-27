@@ -113,11 +113,11 @@ func (g *CallGraph) AddServiceMetric(service string, ts time.Time, id MetricID, 
 	n := g.getOrCreateNode(service)
 	switch id {
 	case ServiceRequestCount:
-		n.RequestCount.AddDelta(ts, value)
+		n.RequestCount.Add(ts, value)
 	case ServiceBytesSent:
-		n.BytesSent.AddDelta(ts, value)
+		n.BytesSent.Add(ts, value)
 	case ServiceBytesReceived:
-		n.BytesReceived.AddDelta(ts, value)
+		n.BytesReceived.Add(ts, value)
 	default:
 		return fmt.Errorf("invalid service metric id: %d", id)
 	}
@@ -204,4 +204,75 @@ func (g *CallGraph) SyncServices(active []string) {
 			}
 		}
 	}
+}
+
+// AverageLatencyByInbound calculates weighted average latency by request count.
+// This gives more weight to edges with higher traffic volume.
+func (g *CallGraph) AverageLatencyByInbound(service string, useP95 bool) float64 {
+	g.mu.RLock()
+	defer g.mu.RUnlock()
+
+	node, ok := g.nodes[service]
+	if !ok {
+		return 0
+	}
+
+	var weightedSum float64
+	var totalWeight float64
+
+	for _, edgeMetrics := range node.InboundEdges {
+
+		weight := 1.0
+
+		var latency float64
+		if useP95 {
+			latency = edgeMetrics.Latency95.Avg()
+		} else {
+			latency = edgeMetrics.Latency50.Avg()
+		}
+
+		weightedSum += latency * weight
+		totalWeight += weight
+	}
+
+	if totalWeight == 0 {
+		return 0
+	}
+
+	return weightedSum / totalWeight
+}
+
+// AverageLatencyByInboundRange calculates weighted average latency by request count
+// within a specific time range. This gives more weight to edges with higher traffic volume.
+func (g *CallGraph) AverageLatencyByInboundRange(service string, from, to time.Time, useP95 bool) float64 {
+	g.mu.RLock()
+	defer g.mu.RUnlock()
+
+	node, ok := g.nodes[service]
+	if !ok {
+		return 0
+	}
+
+	var weightedSum float64
+	var totalWeight float64
+
+	for _, edgeMetrics := range node.InboundEdges {
+		weight := 1.0
+
+		var latency float64
+		if useP95 {
+			latency = edgeMetrics.Latency95.AvgRange(from, to)
+		} else {
+			latency = edgeMetrics.Latency50.AvgRange(from, to)
+		}
+
+		weightedSum += latency * weight
+		totalWeight += weight
+	}
+
+	if totalWeight == 0 {
+		return 0
+	}
+
+	return weightedSum / totalWeight
 }

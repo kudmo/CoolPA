@@ -11,6 +11,9 @@ import (
 	"syscall"
 	"time"
 
+	"net/http"
+	_ "net/http/pprof"
+
 	"github.com/kudmo/CoolPA/collector"
 	"github.com/kudmo/CoolPA/config"
 	"github.com/kudmo/CoolPA/decision"
@@ -71,6 +74,10 @@ func main() {
 	}
 
 	setupLogging(cfg.Logger)
+
+	go func() {
+		slog.Info("Pprof", "1", http.ListenAndServe("0.0.0.0:6060", nil))
+	}()
 
 	// Configs
 
@@ -188,7 +195,7 @@ func main() {
 
 	// Components creating
 
-	store := storage.NewStorage(10*time.Minute, collectorConfig.Interval)
+	store := storage.NewStorage(10*time.Minute, collectorConfig.Interval, cfg)
 	handler := storage.NewStorageHandler(store)
 
 	promCollector, err := collector.NewPrometheusCollector(

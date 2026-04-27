@@ -7,5 +7,5 @@ spec:
   selector:
     app: smartautoscaler
   ports:
-    - port: 8088
-      targetPort: 8088
+    - port: 6060
+      targetPort: 6060

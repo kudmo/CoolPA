@@ -2,6 +2,7 @@ package analyzer
 
 import (
 	"log/slog"
+	"slices"
 	"sort"
 	"time"
 
@@ -184,6 +185,13 @@ func (a *Analyzer) Analyze() AnalysisResult {
 
 	time_now := time.Now()
 	time_now_begin := time_now.Add(-a.config.WelchNowIntervalBegin)
+
+	for _, s := range a.store.ResourceMetrics.GetServices() {
+		h := a.store.Hist.GetHistogram(s)
+		viol := slices.Contains(bottlenecks, s)
+		h.Observe(a.store.Graph.AverageLatencyByInboundRange(s, time_now_begin, time_now, true), viol)
+		h.RebuildModel()
+	}
 
 	for _, s := range result.Services {
 		n, _ := a.store.Graph.GetNode(s)

@@ -1,6 +1,10 @@
 package slopredictor
 
 import (
+	"log/slog"
+	"math"
+	"time"
+
 	"github.com/kudmo/CoolPA/decision/ga/genome"
 	"github.com/kudmo/CoolPA/storage"
 	"github.com/kudmo/CoolPA/storage/metrics"
@@ -9,17 +13,34 @@ import (
 
 // ResourceOptimizerFitness composes a FeatureBuilder and Predictor.
 type ResourceOptimizerFitness struct {
-	Builder   SLOPredictorFeatureBuilder
-	Predictor SLOPredictor
-	Store     *storage.Storage
+	Builder               LatencyDeltaPredictorFeatureBuilder
+	Predictor             *LatencyDeltaPredictor
+	Store                 *storage.Storage
+	cachedP95LatencyState map[string]float64
 }
 
 func NewResourceOptimizerFitness(store *storage.Storage) *ResourceOptimizerFitness {
-	return &ResourceOptimizerFitness{
-		Builder:   SLOPredictorFeatureBuilder{Store: store},
-		Predictor: SLOPredictor{},
-		Store:     store,
+	predictor, err := NewSLOPredictor("latency_model.onnx", 11)
+	if err != nil {
+		slog.Error("Error init predictor", "error", err)
 	}
+
+	now := time.Now()
+	fromTime := now.Add(-1 * time.Minute)
+	cachedP95LatencyState := map[string]float64{}
+	for _, s := range store.ResourceMetrics.GetServices() {
+		cachedP95LatencyState[s] = store.Graph.AverageLatencyByInboundRange(s, fromTime, now, true)
+	}
+	return &ResourceOptimizerFitness{
+		Builder:               LatencyDeltaPredictorFeatureBuilder{Store: store},
+		Predictor:             predictor,
+		Store:                 store,
+		cachedP95LatencyState: cachedP95LatencyState,
+	}
+}
+
+func (f *ResourceOptimizerFitness) Close() {
+	f.Predictor.Close()
 }
 
 func (f *ResourceOptimizerFitness) calculateR2(gen *genome.ReactionGenome) float64 {
@@ -50,18 +71,26 @@ func (f *ResourceOptimizerFitness) calculateR2(gen *genome.ReactionGenome) float
 	return 1 - max(cpu_percent, replics_percent, mem_percent)
 }
 
+func (f *ResourceOptimizerFitness) calculateR1(g *genome.ReactionGenome) float64 {
+	X := f.Builder.Build(g)
+	deltas := f.Predictor.PredictBatch(X)
+	prod := 1.0
+
+	for i, g := range g.Genes {
+		lat_95_curr_avg := f.cachedP95LatencyState[g.ServiceName]
+		lat_95_new := lat_95_curr_avg * math.Pow(math.E, deltas[i])
+		risk := f.Store.Hist.GetHistogram(g.ServiceName).Risk(lat_95_new)
+		prod *= (1.0 - risk)
+	}
+	return prod
+}
+
 func (f *ResourceOptimizerFitness) EvaluateBatch(pop []*genome.ReactionGenome) []float64 {
 	LAMBDA := 0.5
 
 	scores := make([]float64, len(pop))
 	for i, g := range pop {
-		X := f.Builder.Build(g)
-		risks := f.Predictor.PredictBatch(X)
-		prod := 1.0
-		for _, r := range risks {
-			prod *= (1.0 - r)
-		}
-		R1 := prod
+		R1 := f.calculateR1(g)
 		R2 := f.calculateR2(g)
 		scores[i] = LAMBDA*R1 + (1-LAMBDA)*R2
 	}
