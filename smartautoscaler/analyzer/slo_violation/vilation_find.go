@@ -37,7 +37,7 @@ func findAbnormalCalls(now time.Time, p AbnormalParams, g *graph.CallGraph) []ca
 			lat50 := edge.Latency50.AvgRange(fromTime, now)
 			if lat95 > p.SLO*(1-p.Alpha) {
 				anomalous = append(anomalous, call{from, to})
-			} else if lat95/lat50 > 10 {
+			} else if lat95/lat50 > 12 {
 				anomalous = append(anomalous, call{from, to})
 			}
 		}

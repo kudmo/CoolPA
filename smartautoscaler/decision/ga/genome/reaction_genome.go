@@ -90,12 +90,12 @@ func (g *ReactionGenome) Mutate(rng *rand.Rand, mutationRate, typeMutationRate f
 		if rng.Float64() < mutationRate {
 			switch gene.ReactionType {
 			case HPA:
-				gene.DeltaReplicas += (rng.NormFloat64() + 0.50) * 2.0
+				gene.DeltaReplicas += (rng.NormFloat64()) * 2.0
 				gene.DeltaCPU = 0
 				gene.DeltaMemory = 0
 			case VPA:
-				gene.DeltaCPU += (rng.NormFloat64() + 0.50) * 300.0
-				gene.DeltaMemory += (rng.NormFloat64() + 0.50) * 256.0
+				gene.DeltaCPU += (rng.NormFloat64()) * 300.0
+				gene.DeltaMemory += (rng.NormFloat64()) * 256.0
 				gene.DeltaReplicas = 0
 			}
 		} else {

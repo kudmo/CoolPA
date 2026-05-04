@@ -86,7 +86,7 @@ func (f *ResourceOptimizerFitness) calculateR1(g *genome.ReactionGenome) float64
 }
 
 func (f *ResourceOptimizerFitness) EvaluateBatch(pop []*genome.ReactionGenome) []float64 {
-	LAMBDA := 0.5
+	LAMBDA := 0.6
 
 	scores := make([]float64, len(pop))
 	for i, g := range pop {

@@ -2,7 +2,6 @@ package analyzer
 
 import (
 	"log/slog"
-	"slices"
 	"sort"
 	"time"
 
@@ -17,7 +16,8 @@ import (
 
 // TODO: возможно в конфиги
 const BETA = 0.8
-const ANOMALY_SERVICES_COUNT = 2
+const ANOMALY_SERVICES_COUNT = 3
+const UNDERUTILIZATION_SERVICES_COUNT = 3
 
 type AnalyzerConfig struct {
 	SLO        float64
@@ -119,7 +119,6 @@ func (a *Analyzer) analyzeRPSlowing() []underutilizationAnalyzeResult {
 		oldStats.M2 = a.previousStatistics[service].M2 * BETA * BETA
 
 		welch_result := welchtest.WelchTTest(newStats, oldStats)
-		slog.Warn("Welchtest", "service", service, "old", oldStats.Mean, "new", newStats.Mean, "t", welch_result.TStatistic, "p", welch_result.PValue)
 		if welch_result.TStatistic < 0 && welch_result.PValue <= a.config.Confidence {
 			service_cpu_limit, _, _ := a.store.ResourceMetrics.GetServiceMetricAvgHead(service, metrics.CPUQuota)
 			service_mem_limit, _, _ := a.store.ResourceMetrics.GetServiceMetricAvgHead(service, metrics.MemoryLimit)
@@ -157,7 +156,7 @@ func (a *Analyzer) analyzeUnderutilization() []string {
 		return anomalys[i].Rate > anomalys[j].Rate
 	})
 
-	for i := 0; i < len(anomalys) && len(result) < ANOMALY_SERVICES_COUNT; i++ {
+	for i := 0; i < len(anomalys) && len(result) < UNDERUTILIZATION_SERVICES_COUNT; i++ {
 		result = append(result, anomalys[i].Service)
 	}
 
@@ -185,13 +184,6 @@ func (a *Analyzer) Analyze() AnalysisResult {
 
 	time_now := time.Now()
 	time_now_begin := time_now.Add(-a.config.WelchNowIntervalBegin)
-
-	for _, s := range a.store.ResourceMetrics.GetServices() {
-		h := a.store.Hist.GetHistogram(s)
-		viol := slices.Contains(bottlenecks, s)
-		h.Observe(a.store.Graph.AverageLatencyByInboundRange(s, time_now_begin, time_now, true), viol)
-		h.RebuildModel()
-	}
 
 	for _, s := range result.Services {
 		n, _ := a.store.Graph.GetNode(s)

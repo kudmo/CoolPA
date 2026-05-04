@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"math"
 	"time"
 
 	gaconfig "github.com/kudmo/CoolPA/decision/ga/config"
@@ -51,10 +52,10 @@ func (ro *ReactionOptimizer) runOptimization(
 	seed := int64(time.Now().Unix())
 
 	cfg := gaconfig.Config{
-		PopulationSize:   10,
-		Generations:      8,
+		PopulationSize:   20,
+		Generations:      15,
 		EliteRatio:       0.05,
-		MutationRate:     0.8,
+		MutationRate:     0.6,
 		TypeMutationRate: 0.1,
 		CrossoverRate:    0.7,
 		TournamentSize:   3,
@@ -138,14 +139,22 @@ func (ro *ReactionOptimizer) buildConstraints(
 		cpuMinStep := 100.0
 		memMinStep := 128.0
 		if mode == ScaleUpMode {
-			policy.MaxReplicas = len(pods) + 10
+			targetCPUUtil := 40.0
+			time_now := time.Now()
+			time_now_begin := time_now.Add(-time.Minute)
+			cpuU, _, _ := store.ResourceMetrics.GetServiceMetricAvgRange(svc, metrics.CPUUsage, time_now_begin, time_now)
+
+			desiredReplicas := int(math.Ceil(
+				float64(len(pods)) * (cpuU / targetCPUUtil),
+			))
 			policy.MinReplicas = len(pods) + replicasMinStep
+			policy.MaxReplicas = max(policy.MinReplicas, min(len(pods)+10, desiredReplicas+1))
 			policy.MaxCPU = float64(ro.store.Limits.ServiceLimits[quotas.ServiceMaxCpu])
 			policy.MinCPU = cpu + cpuMinStep
 			policy.MaxMemory = float64(ro.store.Limits.ServiceLimits[quotas.ServiceMaxMem])
 			policy.MinMemory = mem + memMinStep
 		} else {
-			policy.MaxReplicas = len(pods) - replicasMinStep
+			policy.MaxReplicas = max(1, len(pods)-replicasMinStep)
 			policy.MinReplicas = max(1, len(pods)-10)
 			policy.MaxCPU = cpu - cpuMinStep
 			policy.MinCPU = float64(ro.store.Limits.ServiceLimits[quotas.ServiceMinCpu])
