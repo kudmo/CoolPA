@@ -25,15 +25,27 @@ const (
 	ScaleDownMode
 )
 
+type ReactionOptimizerConfig struct {
+	CpuStep      float64
+	MemoryStep   float64
+	ReplicasStep int
+
+	TargetCpuUtilization float64
+	Lambda               float64
+}
+
 type ReactionOptimizer struct {
 	store   *storage.Storage
 	applier reactionapplier.Applier
+
+	config ReactionOptimizerConfig
 }
 
-func NewReactionOptimizer(store *storage.Storage, applier reactionapplier.Applier) *ReactionOptimizer {
+func NewReactionOptimizer(store *storage.Storage, applier reactionapplier.Applier, config ReactionOptimizerConfig) *ReactionOptimizer {
 	return &ReactionOptimizer{
 		store:   store,
 		applier: applier,
+		config:  config,
 	}
 }
 
@@ -85,7 +97,7 @@ func (ro *ReactionOptimizer) runOptimization(
 		},
 	}
 
-	fit := slopredictor.NewResourceOptimizerFitness(ro.store)
+	fit := slopredictor.NewResourceOptimizerFitness(ro.store, ro.config.Lambda)
 	defer fit.Close()
 
 	eng := &engine.Engine{
@@ -135,30 +147,26 @@ func (ro *ReactionOptimizer) buildConstraints(
 			AllowedReactions: ro.choosePossibleReactions(svc),
 		}
 
-		replicasMinStep := 1
-		cpuMinStep := 100.0
-		memMinStep := 128.0
 		if mode == ScaleUpMode {
-			targetCPUUtil := 40.0
 			time_now := time.Now()
 			time_now_begin := time_now.Add(-time.Minute)
 			cpuU, _, _ := store.ResourceMetrics.GetServiceMetricAvgRange(svc, metrics.CPUUsage, time_now_begin, time_now)
 
 			desiredReplicas := int(math.Ceil(
-				float64(len(pods)) * (cpuU / targetCPUUtil),
+				float64(len(pods)) * (cpuU / ro.config.TargetCpuUtilization),
 			))
-			policy.MinReplicas = len(pods) + replicasMinStep
+			policy.MinReplicas = len(pods) + ro.config.ReplicasStep
 			policy.MaxReplicas = max(policy.MinReplicas, min(len(pods)+10, desiredReplicas+1))
 			policy.MaxCPU = float64(ro.store.Limits.ServiceLimits[quotas.ServiceMaxCpu])
-			policy.MinCPU = cpu + cpuMinStep
+			policy.MinCPU = cpu + ro.config.CpuStep
 			policy.MaxMemory = float64(ro.store.Limits.ServiceLimits[quotas.ServiceMaxMem])
-			policy.MinMemory = mem + memMinStep
+			policy.MinMemory = mem + ro.config.MemoryStep
 		} else {
-			policy.MaxReplicas = max(1, len(pods)-replicasMinStep)
-			policy.MinReplicas = max(1, len(pods)-10)
-			policy.MaxCPU = cpu - cpuMinStep
+			policy.MaxReplicas = max(1, len(pods)-ro.config.ReplicasStep)
+			policy.MinReplicas = max(1, len(pods)-ro.config.ReplicasStep)
+			policy.MaxCPU = cpu - ro.config.CpuStep
 			policy.MinCPU = float64(ro.store.Limits.ServiceLimits[quotas.ServiceMinCpu])
-			policy.MaxMemory = mem - memMinStep
+			policy.MaxMemory = mem - ro.config.MemoryStep
 			policy.MinMemory = float64(ro.store.Limits.ServiceLimits[quotas.ServiceMinMem])
 		}
 

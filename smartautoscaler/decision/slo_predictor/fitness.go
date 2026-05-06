@@ -17,9 +17,10 @@ type ResourceOptimizerFitness struct {
 	Predictor             *LatencyDeltaPredictor
 	Store                 *storage.Storage
 	cachedP95LatencyState map[string]float64
+	Lambda                float64
 }
 
-func NewResourceOptimizerFitness(store *storage.Storage) *ResourceOptimizerFitness {
+func NewResourceOptimizerFitness(store *storage.Storage, lambda float64) *ResourceOptimizerFitness {
 	predictor, err := NewSLOPredictor("latency_model.onnx", 11)
 	if err != nil {
 		slog.Error("Error init predictor", "error", err)
@@ -36,6 +37,7 @@ func NewResourceOptimizerFitness(store *storage.Storage) *ResourceOptimizerFitne
 		Predictor:             predictor,
 		Store:                 store,
 		cachedP95LatencyState: cachedP95LatencyState,
+		Lambda:                lambda,
 	}
 }
 
@@ -86,13 +88,11 @@ func (f *ResourceOptimizerFitness) calculateR1(g *genome.ReactionGenome) float64
 }
 
 func (f *ResourceOptimizerFitness) EvaluateBatch(pop []*genome.ReactionGenome) []float64 {
-	LAMBDA := 0.6
-
 	scores := make([]float64, len(pop))
 	for i, g := range pop {
 		R1 := f.calculateR1(g)
 		R2 := f.calculateR2(g)
-		scores[i] = LAMBDA*R1 + (1-LAMBDA)*R2
+		scores[i] = f.Lambda*R1 + (1-f.Lambda)*R2
 	}
 	return scores
 }

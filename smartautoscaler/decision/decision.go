@@ -2,7 +2,7 @@ package decision
 
 import (
 	"context"
-	"errors"
+	"fmt"
 	"log/slog"
 	"time"
 
@@ -15,6 +15,7 @@ type DecisionMakerConfig struct {
 	Interval time.Duration
 	Cooldown time.Duration
 	SLO      float64
+	Lambda   float64
 }
 
 type DecisionMaker struct {
@@ -42,13 +43,19 @@ func NewDecisionMaker(config DecisionMakerConfig, store *storage.Storage, applie
 				WelchNowIntervalBegin: time.Duration(60 * time.Second),
 			},
 			store),
-		Optimizer: NewReactionOptimizer(store, applier),
+		Optimizer: NewReactionOptimizer(store, applier, ReactionOptimizerConfig{
+			CpuStep:              100,
+			MemoryStep:           256,
+			ReplicasStep:         1,
+			TargetCpuUtilization: 0.40,
+			Lambda:               config.Lambda,
+		}),
 	}
 }
 
 func (d *DecisionMaker) Start(ctx context.Context) error {
 	if d.isRunning {
-		return errors.New("Analyzer is already running")
+		return fmt.Errorf("Analyzer is already running")
 	}
 
 	d.isRunning = true

@@ -2,7 +2,7 @@ package collector
 
 import (
 	"context"
-	"errors"
+	"fmt"
 	"log/slog"
 	"time"
 
@@ -166,7 +166,7 @@ func extractResults(query MetricQuery, val model.Value) ([]MetricResult, error) 
 		}
 
 	default:
-		return nil, errors.New("unsupported value type")
+		return nil, fmt.Errorf("unsupported value type")
 	}
 
 	return results, nil
@@ -174,7 +174,7 @@ func extractResults(query MetricQuery, val model.Value) ([]MetricResult, error) 
 
 func (pc *PrometheusCollector) Start(ctx context.Context) error {
 	if pc.isRunning {
-		return errors.New("collector is already running")
+		return fmt.Errorf("collector is already running")
 	}
 
 	pc.isRunning = true

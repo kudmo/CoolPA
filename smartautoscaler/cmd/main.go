@@ -191,6 +191,7 @@ func main() {
 		Interval: cfg.AnalyzerInterval,
 		Cooldown: cfg.ScalingCooldown,
 		SLO:      float64(cfg.SLO),
+		Lambda:   cfg.Lambda,
 	}
 
 	// Components creating
