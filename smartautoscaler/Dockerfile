@@ -1,20 +1,21 @@
 FROM golang:1.21-bullseye AS builder
 
+# Удалены ненужные для Go сборки пакеты (build-essential и cmake)
 RUN apt-get update && apt-get install -y \
-    build-essential \
-    cmake \
     libopenblas-dev \
     libprotobuf-dev \
     protobuf-compiler \
     wget \
     && rm -rf /var/lib/apt/lists/*
 
-RUN wget https://github.com/microsoft/onnxruntime/releases/download/v1.24.3/onnxruntime-linux-x64-1.24.3.tgz \
+RUN wget -q https://github.com/microsoft/onnxruntime/releases/download/v1.24.3/onnxruntime-linux-x64-1.24.3.tgz \
     && tar -xzf onnxruntime-linux-x64-1.24.3.tgz \
     && cp -r onnxruntime-linux-x64-1.24.3/include/* /usr/local/include/ \
     && cp -r onnxruntime-linux-x64-1.24.3/lib/* /usr/local/lib/ \
     && ln -sf /usr/local/lib/libonnxruntime.so.1.24.3 /usr/local/lib/libonnxruntime.so \
-    && ldconfig
+    && ldconfig \
+    && rm onnxruntime-linux-x64-1.24.3.tgz \
+    && rm -rf onnxruntime-linux-x64-1.24.3
 
 WORKDIR /app
 
@@ -23,9 +24,11 @@ RUN go mod download
 
 COPY . .
 
+# Удалены отладочные флаги (были -gcflags="all=-N -l" или подобные)
+# Добавлены -s -w для уменьшения размера бинарника (удаляют отладочную информацию)
 RUN CGO_ENABLED=1 \
     go build \
-    -ldflags="-r /usr/local/lib" \
+    -ldflags="-s -w -r /usr/local/lib" \
     -o smartautoscaler \
     ./cmd/main.go
 
@@ -49,5 +52,3 @@ RUN useradd -u 10001 -m appuser && chown -R appuser:appuser /app
 USER appuser
 
 ENTRYPOINT ["/app/smartautoscaler"]
-
-EXPOSE 6060

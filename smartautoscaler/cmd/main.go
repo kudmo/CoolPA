@@ -12,9 +12,6 @@ import (
 
 	"github.com/kudmo/CoolPA/logger"
 
-	"net/http"
-	_ "net/http/pprof"
-
 	"github.com/kudmo/CoolPA/collector"
 	"github.com/kudmo/CoolPA/config"
 	"github.com/kudmo/CoolPA/decision"
@@ -38,15 +35,6 @@ func main() {
 	}
 
 	logger.Init(cfg.Logger)
-
-	go func() {
-		err := http.ListenAndServe("0.0.0.0:6060", nil)
-		if err != nil {
-			logger.Error("main", "pprof listen failed", "error", err)
-		} else {
-			logger.Info("main", "pprof started", "addr", "0.0.0.0:6060")
-		}
-	}()
 
 	// Configs
 

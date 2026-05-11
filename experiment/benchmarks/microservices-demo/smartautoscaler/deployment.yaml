@@ -18,8 +18,6 @@ spec:
         - name: smartautoscaler
           image: smartautoscaler:latest
           imagePullPolicy: IfNotPresent
-          ports:
-            - containerPort: 6060
           args: ["-config", "/etc/config/config.yaml"]
           resources:
             requests:
