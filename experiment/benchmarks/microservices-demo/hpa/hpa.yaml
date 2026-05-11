@@ -9,7 +9,7 @@ spec:
     kind: Deployment
     name: adservice
   minReplicas: 1
-  maxReplicas: 5
+  maxReplicas: 10
   metrics:
   - type: Resource
     resource:
@@ -42,7 +42,7 @@ spec:
     kind: Deployment
     name: cartservice
   minReplicas: 1
-  maxReplicas: 5
+  maxReplicas: 10
   metrics:
   - type: Resource
     resource:
@@ -75,7 +75,7 @@ spec:
     kind: Deployment
     name: checkoutservice
   minReplicas: 1
-  maxReplicas: 5
+  maxReplicas: 10
   metrics:
   - type: Resource
     resource:
@@ -108,7 +108,7 @@ spec:
     kind: Deployment
     name: currencyservice
   minReplicas: 1
-  maxReplicas: 5
+  maxReplicas: 10
   metrics:
   - type: Resource
     resource:
@@ -141,7 +141,7 @@ spec:
     kind: Deployment
     name: emailservice
   minReplicas: 1
-  maxReplicas: 5
+  maxReplicas: 10
   metrics:
   - type: Resource
     resource:
@@ -207,7 +207,7 @@ spec:
     kind: Deployment
     name: paymentservice
   minReplicas: 1
-  maxReplicas: 5
+  maxReplicas: 10
   metrics:
   - type: Resource
     resource:
@@ -240,7 +240,7 @@ spec:
     kind: Deployment
     name: productcatalogservice
   minReplicas: 1
-  maxReplicas: 5
+  maxReplicas: 10
   metrics:
   - type: Resource
     resource:
@@ -273,7 +273,7 @@ spec:
     kind: Deployment
     name: recommendationservice
   minReplicas: 1
-  maxReplicas: 5
+  maxReplicas: 10
   metrics:
   - type: Resource
     resource:
@@ -306,7 +306,7 @@ spec:
     kind: Deployment
     name: redis-cart
   minReplicas: 1
-  maxReplicas: 3
+  maxReplicas: 10
   metrics:
   - type: Resource
     resource:
@@ -339,7 +339,7 @@ spec:
     kind: Deployment
     name: shippingservice
   minReplicas: 1
-  maxReplicas: 5
+  maxReplicas: 10
   metrics:
   - type: Resource
     resource:

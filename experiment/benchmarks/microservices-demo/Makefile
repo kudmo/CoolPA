@@ -24,7 +24,7 @@ ISTIOCTL ?= istioctl
 
 MONITORING_DIR ?= $(BENCH_DIR)/monitoring
 SCALER_DIR ?= $(BENCH_DIR)/smartautoscaler
-SCALER_CODE_DIR ?= $(BENCH_DIR)/smartautoscaler
+SCALER_APP_DIR ?= $(BENCH_DIR)/../../../smartautoscaler
 
 METRICS_URL ?= https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
 
@@ -112,7 +112,7 @@ help:
 
 .PHONY: scaler-build
 scaler-build:
-	docker build -t $(AUTOSCALER_IMAGE) $(SCALER_CODE_DIR)/
+	docker build -t $(AUTOSCALER_IMAGE) $(SCALER_APP_DIR)
 
 .PHONY: scaler-kind-load
 scaler-kind-load:
@@ -212,32 +212,6 @@ loadgen-down: check-loadgen
 	@$(LOADGEN_MAKE) down || true
 	@rm -rf $(LOADGEN_CONFIG_DIR) 2>/dev/null || true
 
-# Плавное изменение RATE
-.PHONY: loadgen-set-rate
-loadgen-set-rate: check-loadgen
-	@if [ -z "$(RATE)" ]; then \
-		echo "❌ Error: RATE is required. Usage: make loadgen-set-rate RATE=200"; \
-		exit 1; \
-	fi
-	@echo "📊 Smoothly changing RATE to $(RATE)..."
-	@$(LOADGEN_MAKE) set-rate RATE=$(RATE)
-
-# Плавное изменение USERS
-.PHONY: loadgen-set-users
-loadgen-set-users: check-loadgen
-	@if [ -z "$(USERS)" ]; then \
-		echo "❌ Error: USERS is required. Usage: make loadgen-set-users USERS=20"; \
-		exit 1; \
-	fi
-	@echo "👥 Smoothly changing USERS to $(USERS)..."
-	@$(LOADGEN_MAKE) set-users USERS=$(USERS)
-
-# Обновление обоих параметров
-.PHONY: loadgen-set-config
-loadgen-set-config: check-loadgen
-	@echo "⚙️  Updating configuration: USERS=$(USERS), RATE=$(RATE)"
-	@$(LOADGEN_MAKE) set-config USERS=$(USERS) RATE=$(RATE)
-
 # Просмотр логов
 .PHONY: loadgen-logs
 loadgen-logs: check-loadgen
@@ -249,11 +223,6 @@ loadgen-status: check-loadgen
 	@echo "📊 Loadgenerator status:"
 	@$(LOADGEN_MAKE) status || echo "Loadgenerator is not running"
 
-# Показать конфигурацию
-.PHONY: loadgen-show-config
-loadgen-show-config: check-loadgen
-	@$(LOADGEN_MAKE) show-config
-
 # Открыть Web UI (только для locust)
 .PHONY: loadgen-webui
 loadgen-webui: check-loadgen
@@ -262,30 +231,6 @@ loadgen-webui: check-loadgen
 	else \
 		echo "Web UI only available for Locust-based loadgen"; \
 	fi
-
-# Быстрый тест
-.PHONY: loadgen-test
-loadgen-test: check-loadgen
-	@echo "🧪 Running quick test with USERS=$(USERS), RATE=$(RATE)"
-	@$(LOADGEN_MAKE) test USERS=$(USERS) RATE=$(RATE)
-
-# Бенчмарк с разными RPS
-.PHONY: loadgen-benchmark
-loadgen-benchmark: check-loadgen
-	@echo "🏃 Running benchmark..."
-	@$(LOADGEN_MAKE) benchmark
-
-# Стресс-тест с разными пользователями
-.PHONY: loadgen-stress-test
-loadgen-stress-test: check-loadgen
-	@echo "💪 Running stress test..."
-	@$(LOADGEN_MAKE) stress-test
-
-# Мониторинг конфигурации
-.PHONY: loadgen-watch
-loadgen-watch: check-loadgen
-	@$(LOADGEN_MAKE) watch
-
 # Очистка
 .PHONY: loadgen-clean
 loadgen-clean: check-loadgen
