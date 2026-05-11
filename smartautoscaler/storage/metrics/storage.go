@@ -5,6 +5,8 @@ import (
 	"math"
 	"sync"
 	"time"
+
+	"github.com/kudmo/CoolPA/logger"
 )
 
 /*
@@ -472,6 +474,7 @@ func (s *MetricStore) getOrCreateService(name string) *ServiceStore {
 	}
 
 	s.services[name] = svc
+	logger.Debug("metrics", "created service store", "service", name)
 	return svc
 }
 
@@ -487,6 +490,7 @@ func (svc *ServiceStore) getOrCreatePod(name string, window, step time.Duration)
 	}
 
 	svc.pods[name] = p
+	logger.Debug("metrics", "created pod store", "pod", name)
 	return p
 }
 
@@ -511,6 +515,7 @@ func (s *MetricStore) AddSample(
 	p.metrics[metric].Add(ts, value)
 
 	p.lastSeen = ts
+	logger.Debug("metrics", "sample added", "service", service, "pod", pod, "metric", metric, "value", value, "ts", ts)
 	return nil
 }
 
@@ -532,6 +537,7 @@ func (s *MetricStore) SyncPods(service string, active []string) {
 	for pod := range svc.pods {
 		if _, ok := activeSet[pod]; !ok {
 			delete(svc.pods, pod)
+			logger.Debug("metrics", "pod removed during sync", "service", service, "pod", pod)
 		}
 	}
 }

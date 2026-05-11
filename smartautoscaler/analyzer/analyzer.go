@@ -1,9 +1,10 @@
 package analyzer
 
 import (
-	"log/slog"
 	"sort"
 	"time"
+
+	"github.com/kudmo/CoolPA/logger"
 
 	sloviolation "github.com/kudmo/CoolPA/analyzer/slo_violation"
 	"github.com/kudmo/CoolPA/storage"
@@ -57,7 +58,7 @@ func (a *Analyzer) analyzeWithSLOViolation() []string {
 
 	graph, err := sloviolation.BuildAbnormalCorrelationGraph(time.Now(), params, a.store)
 	if err != nil {
-		slog.Error("Failed to build abnormal correlation graph", "error", err)
+		logger.Error("analyzer", "failed to build abnormal correlation graph", "error", err)
 	} else {
 		if graph == nil {
 			return result
@@ -76,7 +77,7 @@ func (a *Analyzer) analyzeWithSLOViolation() []string {
 	}
 
 	for _, service := range anomalys {
-		slog.Info("Calculated anomaly", "service", service.ID, "value", service.Rank)
+		logger.Info("analyzer", "calculated anomaly", "service", service.ID, "value", service.Rank)
 	}
 	return result
 }
@@ -92,7 +93,7 @@ func (a *Analyzer) analyzeRPSlowing() []underutilizationAnalyzeResult {
 	for _, service := range a.store.ResourceMetrics.GetServices() {
 		n, _ := a.store.Graph.GetNode(service)
 		if n == nil {
-			slog.Error("Unexisting service", "service name", service)
+			logger.Error("analyzer", "unexisting service", "service", service)
 			continue
 		}
 		time_now := time.Now()
@@ -160,7 +161,7 @@ func (a *Analyzer) analyzeUnderutilization() []string {
 		result = append(result, anomalys[i].Service)
 	}
 
-	slog.Info("Calculated underutilization", "services", result)
+	logger.Info("analyzer", "calculated underutilization", "services", result)
 	return result
 }
 
@@ -197,12 +198,6 @@ func (a *Analyzer) Analyze() AnalysisResult {
 
 		for _, i := range new {
 			newStats.M2 += (i - newStats.Mean) * (i - newStats.Mean)
-		}
-		if a.previousStatistics[s] != nil {
-			slog.Warn("stats UPDATE", "service", s, "old", a.previousStatistics[s].Mean, "new", newStats.Mean)
-		} else {
-			slog.Warn("stats Create", "service", s, "new", newStats.Mean)
-
 		}
 		a.previousStatistics[s] = newStats
 	}

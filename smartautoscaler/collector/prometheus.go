@@ -3,9 +3,9 @@ package collector
 import (
 	"context"
 	"fmt"
-	"log/slog"
 	"time"
 
+	"github.com/kudmo/CoolPA/logger"
 	"github.com/prometheus/client_golang/api"
 	v1 "github.com/prometheus/client_golang/api/prometheus/v1"
 	"github.com/prometheus/common/model"
@@ -81,7 +81,7 @@ func (pc *PrometheusCollector) Collect(ctx context.Context) ([]MetricResult, err
 
 		results, err := pc.collectQuery(ctx, query)
 		if err != nil {
-			slog.Error("Failed to collect metric", query.Name, "error", err)
+			logger.Error("collector", "failed to collect metric", "query", query.Name, "error", err)
 			continue
 		}
 
@@ -101,7 +101,7 @@ func (pc *PrometheusCollector) collectQuery(ctx context.Context, query MetricQue
 	}
 
 	if len(warnings) > 0 {
-		slog.Info("Warnings for query", query.Name, warnings)
+		logger.Info("collector", "warnings for query", "query", query.Name, "warnings", warnings)
 	}
 
 	return extractResults(query, promResult)
@@ -184,14 +184,14 @@ func (pc *PrometheusCollector) Start(ctx context.Context) error {
 		defer ticker.Stop()
 
 		if _, err := pc.Collect(ctx); err != nil {
-			slog.Error("Initial collection failed", "error", err)
+			logger.Error("collector", "initial collection failed", "error", err)
 		}
 
 		for {
 			select {
 			case <-ticker.C:
 				if _, err := pc.Collect(ctx); err != nil {
-					slog.Error("Periodic collection failed", "error", err)
+					logger.Error("collector", "periodic collection failed", "error", err)
 				}
 			case <-pc.stopChan:
 				return

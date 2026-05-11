@@ -1,10 +1,10 @@
 package sloviolation
 
 import (
-	"log/slog"
 	"math"
 	"time"
 
+	"github.com/kudmo/CoolPA/logger"
 	"github.com/kudmo/CoolPA/storage"
 	"github.com/kudmo/CoolPA/storage/graph"
 	"github.com/kudmo/CoolPA/storage/metrics"
@@ -129,9 +129,9 @@ func BuildAbnormalCorrelationGraph(
 	s *storage.Storage,
 ) (*types.CorrelationGraph, error) {
 	abnormalCalls := findAbnormalCalls(now, p, s.Graph)
-	slog.Info("Finded abnormal calls", "count", len(abnormalCalls))
+	logger.Info("slo_violation", "found abnormal calls", "count", len(abnormalCalls))
 	serviceAnomaly := computeAnomalyDegree(now, p, s.Graph, abnormalCalls)
-	slog.Info("Calculatet anomaly degrees", "services", serviceAnomaly)
+	logger.Info("slo_violation", "calculated anomaly degrees", "services", serviceAnomaly)
 	for _, a := range serviceAnomaly {
 		if a != 0 {
 			return buildCorrelationGraphFromCalls(now, p, s, abnormalCalls, serviceAnomaly)

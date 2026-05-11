@@ -1,11 +1,11 @@
 package storage
 
 import (
-	"log/slog"
 	"regexp"
 	"strings"
 
 	"github.com/kudmo/CoolPA/collector"
+	"github.com/kudmo/CoolPA/logger"
 	"github.com/kudmo/CoolPA/storage/graph"
 	"github.com/kudmo/CoolPA/storage/metrics"
 	"github.com/kudmo/CoolPA/storage/quotas"
@@ -156,7 +156,7 @@ func metricIDToName(metricID metrics.MetricID) string {
 func (h *StorageHandler) handleResource(result collector.MetricResult) {
 	pod, ok := result.Labels["pod"]
 	if !ok {
-		slog.Warn("Missing pod label for resource metric",
+		logger.Warn("storage", "missing pod label for resource metric",
 			"query_name", result.QueryName,
 			"timestamp", result.Timestamp,
 			"labels", result.Labels,
@@ -167,7 +167,7 @@ func (h *StorageHandler) handleResource(result collector.MetricResult) {
 	service := h.parser.ExtractServiceName(pod)
 	metricID, ok := extractResourceMetricID(result.QueryName)
 	if !ok {
-		slog.Debug("Unknown resource metric, skipping",
+		logger.Debug("storage", "unknown resource metric, skipping",
 			"query_name", result.QueryName,
 			"pod", pod,
 			"service", service,
@@ -177,7 +177,7 @@ func (h *StorageHandler) handleResource(result collector.MetricResult) {
 
 	h.Store.AddResourceSample(service, pod, metricID, result.Timestamp, result.Value)
 
-	slog.Debug("Resource metric processed",
+	logger.Debug("storage", "resource metric processed",
 		"service", service,
 		"pod", pod,
 		"metric", metricIDToName(metricID),
@@ -206,7 +206,7 @@ func extractIstioMetricID(metricName string) (graph.MetricID, bool) {
 func (h *StorageHandler) handleIstio(result collector.MetricResult) {
 	dst, ok := result.Labels["destination_workload"]
 	if !ok {
-		slog.Warn("Missing destination_workload label for istio metric",
+		logger.Warn("storage", "missing destination_workload label for istio metric",
 			"query_name", result.QueryName,
 			"labels", result.Labels,
 		)
@@ -217,14 +217,14 @@ func (h *StorageHandler) handleIstio(result collector.MetricResult) {
 	case "istio_request_duration_p95":
 		src, ok := result.Labels["source_workload"]
 		if !ok {
-			slog.Warn("Missing source_workload label for istio_request_duration_p95",
+			logger.Warn("storage", "missing source_workload label for istio_request_duration_p95",
 				"destination", dst,
 				"labels", result.Labels,
 			)
 			return
 		}
 		h.Store.AddIstioEdgeMetric(src, dst, result.Timestamp, graph.EdgeLatency95, result.Value)
-		slog.Debug("Istio edge metric processed",
+		logger.Debug("storage", "istio edge metric processed",
 			"source", src,
 			"destination", dst,
 			"metric", "latency_p95",
@@ -234,14 +234,14 @@ func (h *StorageHandler) handleIstio(result collector.MetricResult) {
 	case "istio_request_duration_p50":
 		src, ok := result.Labels["source_workload"]
 		if !ok {
-			slog.Warn("Missing source_workload label for istio_request_duration_p50",
+			logger.Warn("storage", "missing source_workload label for istio_request_duration_p50",
 				"destination", dst,
 				"labels", result.Labels,
 			)
 			return
 		}
 		h.Store.AddIstioEdgeMetric(src, dst, result.Timestamp, graph.EdgeLatency50, result.Value)
-		slog.Debug("Istio edge metric processed",
+		logger.Debug("storage", "istio edge metric processed",
 			"source", src,
 			"destination", dst,
 			"metric", "latency_p50",
@@ -250,7 +250,7 @@ func (h *StorageHandler) handleIstio(result collector.MetricResult) {
 
 	case "istio_requests_total":
 		h.Store.AddIstioServiceMetric(dst, result.Timestamp, graph.ServiceRequestCount, result.Value)
-		slog.Debug("Istio service metric processed",
+		logger.Debug("storage", "istio service metric processed",
 			"service", dst,
 			"metric", "request_count",
 			"value", result.Value,
@@ -258,7 +258,7 @@ func (h *StorageHandler) handleIstio(result collector.MetricResult) {
 
 	case "istio_tcp_sent_bytes_total":
 		h.Store.AddIstioServiceMetric(dst, result.Timestamp, graph.ServiceBytesSent, result.Value)
-		slog.Debug("Istio service metric processed",
+		logger.Debug("storage", "istio service metric processed",
 			"service", dst,
 			"metric", "bytes_sent",
 			"value", result.Value,
@@ -266,14 +266,14 @@ func (h *StorageHandler) handleIstio(result collector.MetricResult) {
 
 	case "istio_tcp_received_bytes_total":
 		h.Store.AddIstioServiceMetric(dst, result.Timestamp, graph.ServiceBytesReceived, result.Value)
-		slog.Debug("Istio service metric processed",
+		logger.Debug("storage", "istio service metric processed",
 			"service", dst,
 			"metric", "bytes_received",
 			"value", result.Value,
 		)
 
 	default:
-		slog.Warn("Unknown istio metric",
+		logger.Warn("storage", "unknown istio metric",
 			"query_name", result.QueryName,
 			"destination", dst,
 		)
@@ -283,7 +283,7 @@ func (h *StorageHandler) handleIstio(result collector.MetricResult) {
 func (h *StorageHandler) handlePodsInfo(result collector.MetricResult) {
 	pod, ok := result.Labels["pod"]
 	if !ok {
-		slog.Warn("Missing pod label for kube_pod_info",
+		logger.Warn("storage", "missing pod label for kube_pod_info",
 			"labels", result.Labels,
 		)
 		return
@@ -292,7 +292,7 @@ func (h *StorageHandler) handlePodsInfo(result collector.MetricResult) {
 	service := h.parser.ExtractServiceName(pod)
 	h.Store.servicePods[service] = append(h.Store.servicePods[service], pod)
 
-	slog.Debug("Pod info processed",
+	logger.Debug("storage", "pod info processed",
 		"service", service,
 		"pod", pod,
 	)
@@ -301,7 +301,7 @@ func (h *StorageHandler) handlePodsInfo(result collector.MetricResult) {
 func (h *StorageHandler) handleNamespaceLimitsInfo(result collector.MetricResult) {
 	resource, ok := result.Labels["resource"]
 	if !ok {
-		slog.Warn("Missing resource label for kube_resourcequota",
+		logger.Warn("storage", "missing resource label for kube_resourcequota",
 			"labels", result.Labels,
 		)
 		return
@@ -317,7 +317,7 @@ func (h *StorageHandler) handleNamespaceLimitsInfo(result collector.MetricResult
 		h.Store.SetNamespaceLimit(quotas.NamespaceMaxPods, int64(result.Value))
 	}
 
-	slog.Debug("Namespace limit processed",
+	logger.Debug("storage", "namespace limit processed",
 		"resource", resource,
 		"value", result.Value,
 	)
@@ -326,14 +326,14 @@ func (h *StorageHandler) handleNamespaceLimitsInfo(result collector.MetricResult
 func (h *StorageHandler) handleServiceLimitsInfo(result collector.MetricResult) {
 	resource, ok := result.Labels["resource"]
 	if !ok {
-		slog.Warn("Missing resource label for kube_resourcequota",
+		logger.Warn("storage", "missing resource label for kube_resourcequota",
 			"labels", result.Labels,
 		)
 		return
 	}
 	constraint, ok := result.Labels["constraint"]
 	if !ok {
-		slog.Warn("Missing constraint label for kube_limitrange",
+		logger.Warn("storage", "missing constraint label for kube_limitrange",
 			"labels", result.Labels,
 		)
 		return
@@ -356,7 +356,7 @@ func (h *StorageHandler) handleServiceLimitsInfo(result collector.MetricResult) 
 		}
 	}
 
-	slog.Debug("Service limit processed",
+	logger.Debug("storage", "service limit processed",
 		"resource", resource,
 		"constraint", constraint,
 		"value", result.Value,
@@ -375,7 +375,7 @@ func (h *StorageHandler) Handle(result collector.MetricResult) {
 	} else if result.QueryName == "kube_limitrange" {
 		h.handleServiceLimitsInfo(result)
 	} else {
-		slog.Debug("Unknown metric type, skipping",
+		logger.Debug("storage", "unknown metric type, skipping",
 			"query_name", result.QueryName,
 			"labels", result.Labels,
 		)

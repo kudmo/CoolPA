@@ -3,9 +3,10 @@ package decision
 import (
 	"context"
 	"fmt"
-	"log/slog"
 	"math"
 	"time"
+
+	"github.com/kudmo/CoolPA/logger"
 
 	gaconfig "github.com/kudmo/CoolPA/decision/ga/config"
 	"github.com/kudmo/CoolPA/decision/ga/constraints"
@@ -110,7 +111,7 @@ func (ro *ReactionOptimizer) runOptimization(
 
 	best, err := eng.Run(seedGenome)
 	if err != nil {
-		slog.Error("GA engine run error", "error", err)
+		logger.Error("optimizer", "ga engine run error", "error", err)
 		return
 	}
 
@@ -136,7 +137,7 @@ func (ro *ReactionOptimizer) buildConstraints(
 	for _, svc := range services {
 		pods := store.ResourceMetrics.GetServicePods(svc)
 		if len(pods) == 0 {
-			slog.Warn("No pods found for service", "service", svc)
+			logger.Warn("optimizer", "no pods found for service", "service", svc)
 			continue
 		}
 
@@ -192,7 +193,7 @@ func (ro *ReactionOptimizer) buildSeedGenome(
 
 		pods := ro.store.ResourceMetrics.GetServicePods(svc)
 		if len(pods) == 0 {
-			slog.Warn("No pods found for service", "service", svc)
+			logger.Warn("optimizer", "no pods found for service", "service", svc)
 			continue
 		}
 
@@ -240,7 +241,7 @@ func (ro *ReactionOptimizer) buildSeedGenome(
 
 func (ro *ReactionOptimizer) logGenome(g *genome.ReactionGenome) {
 	for _, gene := range g.Genes {
-		slog.Debug("Best genome",
+		logger.Debug("optimizer", "best genome",
 			"service", gene.ServiceName,
 			"reaction", gene.ReactionType,
 			"delta replicas", gene.DeltaReplicas,
@@ -256,12 +257,12 @@ func (ro *ReactionOptimizer) applyCandidate(
 ) {
 	namespace := "microservices-demo"
 	if ro.applier == nil {
-		slog.Error("Failed apply reaction: applier is nil")
+		logger.Error("optimizer", "failed apply reaction: applier is nil")
 		return
 	}
 
 	for _, s := range cand.Services {
-		slog.Info("Applying candidate",
+		logger.Info("optimizer", "applying candidate",
 			"service", s.ServiceName,
 			"reaction", s.Reaction,
 			"replicas", s.Replicas,
@@ -272,13 +273,13 @@ func (ro *ReactionOptimizer) applyCandidate(
 		switch s.Reaction {
 		case genome.HPA:
 			if err := ro.applier.ApplyHPS(ctx, namespace, s.ServiceName, int32(s.Replicas)); err != nil {
-				slog.Error("Failed to apply HPA", "service", s.ServiceName, "error", err)
+				logger.Error("optimizer", "failed to apply hpa", "service", s.ServiceName, "error", err)
 			}
 		case genome.VPA:
 			cpuStr := fmt.Sprintf("%dm", int(s.AppCPU))
 			memStr := fmt.Sprintf("%dMi", int(s.AppMemory))
 			if err := ro.applier.ApplyVPS(ctx, namespace, s.ServiceName, cpuStr, memStr); err != nil {
-				slog.Error("Failed to apply VPA", "service", s.ServiceName, "error", err)
+				logger.Error("optimizer", "failed to apply vpa", "service", s.ServiceName, "error", err)
 			}
 		}
 	}

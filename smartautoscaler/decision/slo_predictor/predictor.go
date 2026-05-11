@@ -2,8 +2,9 @@ package slopredictor
 
 import (
 	"fmt"
-	"log/slog"
 	"sync"
+
+	"github.com/kudmo/CoolPA/logger"
 
 	ort "github.com/yalue/onnxruntime_go"
 )
@@ -24,6 +25,8 @@ func initORT() {
 	ort.SetSharedLibraryPath("/usr/local/lib/libonnxruntime.so")
 
 	if err := ort.InitializeEnvironment(); err != nil {
+		// Log the initialization error before panicking so administrators see the cause.
+		logger.Error("slo_predictor", "failed to initialize ONNX env", "error", err)
 		panic(fmt.Errorf("failed to initialize ONNX env: %w", err))
 	}
 }
@@ -68,7 +71,7 @@ func (p *LatencyDeltaPredictor) PredictBatch(X [][]float64) []float64 {
 
 	inputTensor, err := ort.NewTensor[float32](inputShape, inputData)
 	if err != nil {
-		slog.Error("input tensor error", "error", err)
+		logger.Error("slo_predictor", "input tensor error", "error", err)
 		return nil
 	}
 	defer inputTensor.Destroy()
@@ -77,14 +80,14 @@ func (p *LatencyDeltaPredictor) PredictBatch(X [][]float64) []float64 {
 
 	outputTensor, err := ort.NewEmptyTensor[float32](outputShape)
 	if err != nil {
-		slog.Error("output tensor error", "error", err)
+		logger.Error("slo_predictor", "output tensor error", "error", err)
 		return nil
 	}
 	defer outputTensor.Destroy()
 
 	err = p.session.Run([]ort.Value{inputTensor}, []ort.Value{outputTensor})
 	if err != nil {
-		slog.Error("run error", "error", err)
+		logger.Error("slo_predictor", "run error", "error", err)
 		return nil
 	}
 

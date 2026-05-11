@@ -5,11 +5,12 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"log/slog"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
+
+	"github.com/kudmo/CoolPA/logger"
 
 	"net/http"
 	_ "net/http/pprof"
@@ -21,45 +22,7 @@ import (
 	"github.com/kudmo/CoolPA/storage"
 )
 
-func setupLogging(loggerConfig config.LoggerConfig) {
-	var logLevel slog.Level
-	switch loggerConfig.Level {
-	case "debug":
-		logLevel = slog.LevelDebug
-	case "info":
-		logLevel = slog.LevelInfo
-	case "warn":
-		logLevel = slog.LevelWarn
-	case "error":
-		logLevel = slog.LevelError
-	default:
-		logLevel = slog.LevelInfo
-	}
-
-	handlerOpts := &slog.HandlerOptions{
-		Level:     logLevel,
-		AddSource: true,
-		ReplaceAttr: func(groups []string, a slog.Attr) slog.Attr {
-			if a.Key == slog.TimeKey {
-				a.Value = slog.StringValue(time.Now().Format(time.RFC3339))
-			}
-			return a
-		},
-	}
-
-	var handler slog.Handler
-	switch loggerConfig.Format {
-	case "json":
-		handler = slog.NewJSONHandler(os.Stdout, handlerOpts)
-	case "text":
-		handler = slog.NewTextHandler(os.Stdout, handlerOpts)
-	default:
-		handler = slog.NewTextHandler(os.Stdout, handlerOpts)
-	}
-
-	logger := slog.New(handler)
-	slog.SetDefault(logger)
-}
+// Logging is configured via the shared logger package.
 
 func main() {
 	var configPath string
@@ -70,13 +33,19 @@ func main() {
 
 	cfg := &config.ScalerConfig{}
 	if err := cfg.LoadFromYAML(configPath); err != nil {
-		panic(err)
+		logger.Error("main", "failed to load config", "error", err, "path", configPath)
+		os.Exit(1)
 	}
 
-	setupLogging(cfg.Logger)
+	logger.Init(cfg.Logger)
 
 	go func() {
-		slog.Info("Pprof", "1", http.ListenAndServe("0.0.0.0:6060", nil))
+		err := http.ListenAndServe("0.0.0.0:6060", nil)
+		if err != nil {
+			logger.Error("main", "pprof listen failed", "error", err)
+		} else {
+			logger.Info("main", "pprof started", "addr", "0.0.0.0:6060")
+		}
 	}()
 
 	// Configs
@@ -204,12 +173,12 @@ func main() {
 		collector.WithHandler(handler),
 	)
 	if err != nil {
-		slog.Error("Failed to create collector", "error", err)
+		logger.Error("main", "failed to create collector", "error", err)
 	}
 
 	applier, err := reactionapplier.BuildApplier()
 	if err != nil {
-		slog.Error("Failed to create applier", "error", err)
+		logger.Error("main", "failed to create applier", "error", err)
 	}
 
 	analyzer := decision.NewDecisionMaker(
@@ -226,29 +195,29 @@ func main() {
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 
 	if err := promCollector.Start(ctx); err != nil {
-		slog.Error("Failed to start collector", "error", err)
+		logger.Error("main", "failed to start collector", "error", err)
 	}
 
-	slog.Info("Metric collector started.")
+	logger.Info("main", "metric collector started")
 
 	if err := analyzer.Start(ctx); err != nil {
-		slog.Error("Failed to start analyzer", "error", err)
+		logger.Error("main", "failed to start analyzer", "error", err)
 	}
-	slog.Info("Analyzer started.")
+	logger.Info("main", "analyzer started")
 
 	// Components destroying
 
 	<-sigChan
-	slog.Info("Shutdown signal received")
+	logger.Info("main", "shutdown signal received")
 
 	if err := analyzer.Stop(); err != nil {
-		slog.Error("Error stopping analyzer", "error", err)
+		logger.Error("main", "error stopping analyzer", "error", err)
 	}
-	slog.Info("Analyzer stopped")
+	logger.Info("main", "analyzer stopped")
 
 	if err := promCollector.Stop(); err != nil {
-		slog.Error("Error stopping collector", "error", err)
+		logger.Error("main", "error stopping collector", "error", err)
 	}
 
-	slog.Info("Collector stopped")
+	logger.Info("main", "collector stopped")
 }

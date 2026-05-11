@@ -1,11 +1,11 @@
 package slopredictor
 
 import (
-	"log/slog"
 	"math"
 	"time"
 
 	"github.com/kudmo/CoolPA/decision/ga/genome"
+	"github.com/kudmo/CoolPA/logger"
 	"github.com/kudmo/CoolPA/storage"
 	"github.com/kudmo/CoolPA/storage/metrics"
 	"github.com/kudmo/CoolPA/storage/quotas"
@@ -23,7 +23,7 @@ type ResourceOptimizerFitness struct {
 func NewResourceOptimizerFitness(store *storage.Storage, lambda float64) *ResourceOptimizerFitness {
 	predictor, err := NewSLOPredictor("latency_model.onnx", 11)
 	if err != nil {
-		slog.Error("Error init predictor", "error", err)
+		logger.Error("slo_predictor", "error init predictor", "error", err)
 	}
 
 	now := time.Now()

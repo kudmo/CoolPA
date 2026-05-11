@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/kudmo/CoolPA/config"
+	"github.com/kudmo/CoolPA/logger"
 	"github.com/kudmo/CoolPA/storage/graph"
 	latencyhist "github.com/kudmo/CoolPA/storage/latency_hist"
 	"github.com/kudmo/CoolPA/storage/metrics"
@@ -22,16 +23,17 @@ type Storage struct {
 
 // NewStorage creates a new storage with given window and step for internal windows.
 func NewStorage(window, step time.Duration, config *config.ScalerConfig) *Storage {
-	return &Storage{
+	s := &Storage{
 		GlobalConfig:    config,
 		Graph:           graph.NewCallGraph(window, step),
 		ResourceMetrics: metrics.NewMetricStore(window, step),
-		Limits:          quotas.QuotasStorage{
-			// ServiceQuotas: make(map[string]quotas.ServiceQuotas),
-		},
-		Hist:        latencyhist.HistStore{},
-		servicePods: make(map[string][]string),
+		Limits:          quotas.QuotasStorage{},
+		Hist:            latencyhist.HistStore{},
+		servicePods:     make(map[string][]string),
 	}
+
+	logger.Info("storage", "new storage created", "window", window.String(), "step", step.String())
+	return s
 }
 
 // AddResourceSample forwards a resource metric sample to the resource metric store.
@@ -114,6 +116,8 @@ func (s *Storage) Sync(active map[string][]string) {
 		if s.Hist.GetHistogram(svc) == nil {
 			bounds := latencyhist.LogBounds(float64(s.GlobalConfig.SLO))
 			s.Hist.Register(svc, bounds)
+			logger.Debug("storage", "registered histogram for service", "service", svc)
 		}
 	}
+	logger.Debug("storage", "sync completed", "services_count", len(active))
 }

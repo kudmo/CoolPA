@@ -3,8 +3,9 @@ package decision
 import (
 	"context"
 	"fmt"
-	"log/slog"
 	"time"
+
+	"github.com/kudmo/CoolPA/logger"
 
 	"github.com/kudmo/CoolPA/analyzer"
 	reactionapplier "github.com/kudmo/CoolPA/reaction_applier"
@@ -70,7 +71,7 @@ func (d *DecisionMaker) Start(ctx context.Context) error {
 			case <-ticker.C:
 				timeSinceLastReaction := time.Since(d.lastReactionTime)
 				if timeSinceLastReaction < d.config.Cooldown {
-					slog.Info("In cooldown period",
+					logger.Info("decision", "in cooldown period",
 						"remaining", d.config.Cooldown-timeSinceLastReaction)
 					continue
 				}
@@ -78,15 +79,15 @@ func (d *DecisionMaker) Start(ctx context.Context) error {
 
 				switch result.Scale {
 				case 1:
-					slog.Info("Proposing scale up for services", "services", result.Services)
+					logger.Info("decision", "proposing scale up for services", "services", result.Services)
 					d.Optimizer.ScaleUp(result.Services)
 					d.lastReactionTime = time.Now()
 				case -1:
-					slog.Info("Proposing scale down for services", "services", result.Services)
+					logger.Info("decision", "proposing scale down for services", "services", result.Services)
 					d.Optimizer.ScaleDown(result.Services)
 					d.lastReactionTime = time.Now()
 				default:
-					slog.Info("No scaling action proposed")
+					logger.Info("decision", "no scaling action proposed")
 				}
 			case <-d.stopChan:
 				return
