@@ -12,6 +12,7 @@ data:
     analyzer_interval: 15s
     scaling_cooldown: 150s
     lambda: 0.6
+    anomaly_services_count: 3
     logger:
       level: "info"
       format: "text"
