@@ -119,7 +119,7 @@ func (ro *ReactionOptimizer) runOptimization(
 
 	cand := best.Decode()
 
-	ro.applyCandidate(context.Background(), &cand)
+	ro.applyCandidate(context.Background(), &cand, ro.store.GlobalConfig.ScalingNamespace)
 }
 
 func (ro *ReactionOptimizer) choosePossibleReactions(service string) []genome.ReactionType {
@@ -254,8 +254,8 @@ func (ro *ReactionOptimizer) logGenome(g *genome.ReactionGenome) {
 func (ro *ReactionOptimizer) applyCandidate(
 	ctx context.Context,
 	cand *genome.CandidateState,
+	namespace string,
 ) {
-	namespace := "microservices-demo"
 	if ro.applier == nil {
 		logger.Error("optimizer", "failed apply reaction: applier is nil")
 		return
