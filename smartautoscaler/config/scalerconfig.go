@@ -5,19 +5,21 @@ import (
 	"os"
 	"time"
 
+	"github.com/kudmo/CoolPA/logger"
 	"gopkg.in/yaml.v3"
 )
 
 // ScalerConfig holds configuration parameters for the autoscaler.
 type ScalerConfig struct {
-	ScalingNamespace   string        `yaml:"scaling_namespace"`
-	PrometheusURL      string        `yaml:"prometheus_url"`
-	PrometheusInterval time.Duration `yaml:"prometheus_interval"`
-	AnalyzerInterval   time.Duration `yaml:"analyzer_interval"`
-	SLO                int           `yaml:"slo"`
-	ScalingCooldown    time.Duration `yaml:"scaling_cooldown"`
-	Lambda             float64       `yaml:"lambda"`
-	Logger             LoggerConfig  `yaml:"logger"`
+	ScalingNamespace     string              `yaml:"scaling_namespace"`
+	PrometheusURL        string              `yaml:"prometheus_url"`
+	PrometheusInterval   time.Duration       `yaml:"prometheus_interval"`
+	AnalyzerInterval     time.Duration       `yaml:"analyzer_interval"`
+	SLO                  int                 `yaml:"slo"`
+	ScalingCooldown      time.Duration       `yaml:"scaling_cooldown"`
+	Lambda               float64             `yaml:"lambda"`
+	AnomalyServicesCount int                 `yaml:"anomaly_services_count"`
+	Logger               logger.LoggerConfig `yaml:"logger"`
 }
 
 func (c *ScalerConfig) Validate() error {

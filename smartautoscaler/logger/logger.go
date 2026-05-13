@@ -4,12 +4,10 @@ import (
 	"log/slog"
 	"os"
 	"time"
-
-	"github.com/kudmo/CoolPA/config"
 )
 
 // Init configures the global slog logger according to cfg.
-func Init(cfg config.LoggerConfig) {
+func Init(cfg LoggerConfig) {
 	var logLevel slog.Level
 	switch cfg.Level {
 	case "debug":

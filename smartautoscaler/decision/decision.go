@@ -42,6 +42,7 @@ func NewDecisionMaker(config DecisionMakerConfig, store *storage.Storage, applie
 				Confidence:            0.05,
 				WelchOldIntervalBegin: time.Duration(300 * time.Second),
 				WelchNowIntervalBegin: time.Duration(60 * time.Second),
+				AnomalyServicesCount:  store.GlobalConfig.AnomalyServicesCount,
 			},
 			store),
 		Optimizer: NewReactionOptimizer(store, applier, ReactionOptimizerConfig{

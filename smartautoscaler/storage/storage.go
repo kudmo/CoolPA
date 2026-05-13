@@ -103,14 +103,7 @@ func (s *Storage) Sync(active map[string][]string) {
 		}
 	}
 
-	// Sync services in call graph
-	// if s.Graph != nil {
-	// 	services := make([]string, 0, len(active))
-	// 	for svc := range active {
-	// 		services = append(services, svc)
-	// 	}
-	// 	s.Graph.SyncServices(services)
-	// }
+	// Sync services in call graph (handled internally by graph package when needed)
 
 	for svc := range active {
 		if s.Hist.GetHistogram(svc) == nil {

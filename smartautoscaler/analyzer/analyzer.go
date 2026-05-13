@@ -15,10 +15,7 @@ import (
 	"github.com/kudmo/toporank/types"
 )
 
-// TODO: возможно в конфиги
 const BETA = 0.8
-const ANOMALY_SERVICES_COUNT = 3
-const UNDERUTILIZATION_SERVICES_COUNT = 3
 
 type AnalyzerConfig struct {
 	SLO        float64
@@ -26,6 +23,7 @@ type AnalyzerConfig struct {
 
 	WelchOldIntervalBegin time.Duration
 	WelchNowIntervalBegin time.Duration
+	AnomalyServicesCount  int
 }
 
 type Analyzer struct {
@@ -70,7 +68,7 @@ func (a *Analyzer) analyzeWithSLOViolation() []string {
 	})
 
 	// КОСТЫЛЬ, ЧТОБЫ НЕ БЫЛО LOADGEN
-	for i := 0; i < len(anomalys) && len(result) < ANOMALY_SERVICES_COUNT; i++ {
+	for i := 0; i < len(anomalys) && len(result) < a.config.AnomalyServicesCount; i++ {
 		if anomalys[i].ID != "istio-ingressgateway" {
 			result = append(result, anomalys[i].ID)
 		}
@@ -157,7 +155,7 @@ func (a *Analyzer) analyzeUnderutilization() []string {
 		return anomalys[i].Rate > anomalys[j].Rate
 	})
 
-	for i := 0; i < len(anomalys) && len(result) < UNDERUTILIZATION_SERVICES_COUNT; i++ {
+	for i := 0; i < len(anomalys) && len(result) < a.config.AnomalyServicesCount; i++ {
 		result = append(result, anomalys[i].Service)
 	}
 
@@ -165,6 +163,8 @@ func (a *Analyzer) analyzeUnderutilization() []string {
 	return result
 }
 
+// Analyze runs analysis to detect anomalous or underutilized services and
+// returns an AnalysisResult describing affected services and scaling action.
 func (a *Analyzer) Analyze() AnalysisResult {
 	result := AnalysisResult{
 		Services: []string{},
