@@ -1,0 +1,35 @@
+name: Release only smartautoscaler
+
+on:
+  push:
+    tags:
+      - '*'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Prepare release content
+        run: |
+          mkdir release_content
+          cp -r smartautoscaler/. release_content/
+          cd release_content
+          zip -r ../smartautoscaler-${{ github.ref_name }}.zip .
+          cd ..
+          tar -czf smartautoscaler-${{ github.ref_name }}.tar.gz -C release_content .
+
+      - name: Create GitHub Release and upload assets
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            smartautoscaler-${{ github.ref_name }}.zip
+            smartautoscaler-${{ github.ref_name }}.tar.gz
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
