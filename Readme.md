@@ -8,6 +8,16 @@ This repository contains components and experiments for researching and benchmar
 - `smartautoscaler/` — main autoscaler implementation (Go), models and config files.
 - `experiment/benchmarks/OnlineBoutique/` — prepared benchmark for the Google OnlineBoutique demo (Make targets for KinD, Istio, Prometheus, Chaos Mesh, loadgen).
 
+## Table of Contents
+- [CoolPA — Smart Autoscaler Research Project](#coolpa--smart-autoscaler-research-project)
+  - [Contents](#contents)
+  - [Table of Contents](#table-of-contents)
+  - [Overview](#overview)
+  - [How it works](#how-it-works)
+  - [Quick start](#quick-start)
+  - [Building and running `smartautoscaler` locally](#building-and-running-smartautoscaler-locally)
+  - [License](#license)
+
 ## Overview
 
 The goal of this repository is to provide a complete local environment for experimenting with autoscaling algorithms, monitoring pipelines and chaos scenarios. Typical workflows include:
@@ -79,4 +89,6 @@ Configuration for the autoscaler lives in `smartautoscaler/config.yaml` and `sma
 
 There is also a prebuilt model file `smartautoscaler/latency_model.onnx` used by the predictor.
 
+## License
 
+This project is licensed under the Apache License 2.0 — see the [LICENSE](LICENSE) file for details.
