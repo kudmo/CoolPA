@@ -3,7 +3,7 @@ package engine
 import (
 	"math/rand"
 
-	"github.com/kudmo/CoolPA/decision/ga/genome"
+	"github.com/kudmo/CoolPA/internal/optimizer/ga/genome"
 )
 
 // UniformCrossover applies uniform crossover between two parents to produce two children.

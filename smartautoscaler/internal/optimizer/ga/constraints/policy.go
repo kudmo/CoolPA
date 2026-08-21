@@ -1,6 +1,6 @@
 package constraints
 
-import "github.com/kudmo/CoolPA/decision/ga/genome"
+import "github.com/kudmo/CoolPA/internal/optimizer/ga/genome"
 
 // ServicePolicy defines allowed reaction types and resource bounds for a single service.
 type ServicePolicy struct {

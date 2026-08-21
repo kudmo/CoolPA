@@ -59,4 +59,10 @@ type MetricsProvider interface {
 	GetGlobalTotalMemoryLimit(ctx context.Context) (float64, error)
 	GetGlobalTotalCpuLimit(ctx context.Context) (float64, error)
 	GetGlobalTotalPodsLimit(ctx context.Context) (float64, error)
+
+	GetGlobalServiceMinCpu(ctx context.Context) (float64, error)
+	GetGlobalServiceMaxCpu(ctx context.Context) (float64, error)
+
+	GetGlobalServiceMinMemory(ctx context.Context) (float64, error)
+	GetGlobalServiceMaxMemory(ctx context.Context) (float64, error)
 }
