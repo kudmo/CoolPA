@@ -1,4 +1,4 @@
-package reactionapplier
+package applierprovider
 
 import (
 	"context"
@@ -19,10 +19,6 @@ import (
 
 type K8sApplier struct {
 	client kubernetes.Interface
-}
-
-func NewK8sApplier(client kubernetes.Interface) *K8sApplier {
-	return &K8sApplier{client: client}
 }
 
 func (k *K8sApplier) ApplyHPS(
@@ -154,7 +150,7 @@ func (k *K8sApplier) ApplyVPS(
 	return nil
 }
 
-func BuildApplier() (Applier, error) {
+func NewK8sApplier() (*K8sApplier, error) {
 	cfg, err := rest.InClusterConfig()
 	if err != nil {
 		logger.Error("applier", "failed to get in-cluster config", "error", err)
@@ -168,5 +164,5 @@ func BuildApplier() (Applier, error) {
 	}
 
 	logger.Info("applier", "kubernetes applier created")
-	return NewK8sApplier(clientset), nil
+	return &K8sApplier{client: clientset}, nil
 }

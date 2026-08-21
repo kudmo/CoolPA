@@ -1,4 +1,4 @@
-package reactionapplier
+package applier
 
 import "context"
 
