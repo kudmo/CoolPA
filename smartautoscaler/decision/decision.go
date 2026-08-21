@@ -76,7 +76,7 @@ func (d *DecisionMaker) Start(ctx context.Context) error {
 						"remaining", d.config.Cooldown-timeSinceLastReaction)
 					continue
 				}
-				result := d.ServiceAnalyzer.Analyze()
+				result := d.ServiceAnalyzer.Analyze(ctx)
 
 				switch result.Scale {
 				case 1:
