@@ -1,13 +1,14 @@
 package engine
 
 import (
+	"context"
 	"math/rand"
 	"time"
 
-	"github.com/kudmo/CoolPA/decision/ga/config"
-	"github.com/kudmo/CoolPA/decision/ga/constraints"
-	"github.com/kudmo/CoolPA/decision/ga/fitness"
-	"github.com/kudmo/CoolPA/decision/ga/genome"
+	"github.com/kudmo/CoolPA/internal/optimizer/ga/config"
+	"github.com/kudmo/CoolPA/internal/optimizer/ga/constraints"
+	"github.com/kudmo/CoolPA/internal/optimizer/ga/fitness"
+	"github.com/kudmo/CoolPA/internal/optimizer/ga/genome"
 )
 
 // Engine orchestrates the evolutionary loop.
@@ -35,7 +36,7 @@ func (e *Engine) InitPopulation(seed *genome.ReactionGenome) []*genome.ReactionG
 }
 
 // Run executes the GA loop and returns best genome found.
-func (e *Engine) Run(seed *genome.ReactionGenome) (*genome.ReactionGenome, error) {
+func (e *Engine) Run(ctx context.Context, now time.Time, seed *genome.ReactionGenome) (*genome.ReactionGenome, error) {
 	rng := rand.New(rand.NewSource(e.Config.RandomSeed))
 	if e.Config.RandomSeed == 0 {
 		rng = rand.New(rand.NewSource(time.Now().UnixNano()))
@@ -46,7 +47,7 @@ func (e *Engine) Run(seed *genome.ReactionGenome) (*genome.ReactionGenome, error
 	var best *genome.ReactionGenome
 	for gen := 0; gen < e.Config.Generations; gen++ {
 		// Evaluate batch fitness
-		scores := e.Fitness.EvaluateBatch(pop)
+		scores := e.Fitness.EvaluateBatch(ctx, now, pop)
 
 		// keep elite
 		eliteCount := int(float64(len(pop)) * e.Config.EliteRatio)
@@ -101,7 +102,7 @@ func (e *Engine) Run(seed *genome.ReactionGenome) (*genome.ReactionGenome, error
 		}
 
 		// track best
-		scores = e.Fitness.EvaluateBatch(pop)
+		scores = e.Fitness.EvaluateBatch(ctx, now, pop)
 		bestIdxs := TopNIndices(scores, 1)
 		if len(bestIdxs) > 0 {
 			best = pop[bestIdxs[0]].Clone()

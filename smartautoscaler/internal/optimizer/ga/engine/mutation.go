@@ -3,8 +3,8 @@ package engine
 import (
 	"math/rand"
 
-	"github.com/kudmo/CoolPA/decision/ga/constraints"
-	"github.com/kudmo/CoolPA/decision/ga/genome"
+	"github.com/kudmo/CoolPA/internal/optimizer/ga/constraints"
+	"github.com/kudmo/CoolPA/internal/optimizer/ga/genome"
 )
 
 // ApplyMutation delegates to genome.Mutate with provided rates and constraint accessor.
