@@ -10,16 +10,14 @@ import (
 	"syscall"
 	"time"
 
+	applierprovider "github.com/kudmo/CoolPA/internal/applier/providers"
+	"github.com/kudmo/CoolPA/internal/scaler"
 	"github.com/kudmo/CoolPA/logger"
 
 	"github.com/kudmo/CoolPA/collector"
 	"github.com/kudmo/CoolPA/config"
-	"github.com/kudmo/CoolPA/decision"
-	reactionapplier "github.com/kudmo/CoolPA/reaction_applier"
 	"github.com/kudmo/CoolPA/storage"
 )
-
-// Logging is configured via the shared logger package.
 
 func main() {
 	var configPath string
@@ -28,7 +26,7 @@ func main() {
 
 	flag.Parse()
 
-	cfg := &config.ScalerConfig{}
+	cfg := &config.AppConfig{}
 	if err := cfg.LoadFromYAML(configPath); err != nil {
 		logger.Error("main", "failed to load config", "error", err, "path", configPath)
 		os.Exit(1)
@@ -144,11 +142,13 @@ func main() {
 			},
 		},
 	}
-	analyzerConfig := decision.DecisionMakerConfig{
-		Interval: cfg.AnalyzerInterval,
-		Cooldown: cfg.ScalingCooldown,
-		SLO:      float64(cfg.SLO),
-		Lambda:   cfg.Lambda,
+	scalerConfig := scaler.ScalerConfig{
+		Interval:             cfg.AnalyzerInterval,
+		Cooldown:             cfg.ScalingCooldown,
+		SLO:                  float64(cfg.SLO),
+		Lambda:               cfg.Lambda,
+		Namespace:            cfg.ScalingNamespace,
+		AnomalyServicesCount: cfg.AnomalyServicesCount,
 	}
 
 	// Components creating
@@ -164,14 +164,13 @@ func main() {
 		logger.Error("main", "failed to create collector", "error", err)
 	}
 
-	applier, err := reactionapplier.BuildApplier()
+	applier, err := applierprovider.NewK8sApplier()
 	if err != nil {
 		logger.Error("main", "failed to create applier", "error", err)
 	}
 
-	analyzer := decision.NewDecisionMaker(
-		analyzerConfig,
-		store,
+	scaler := scaler.NewScaler(
+		scalerConfig,
 		applier,
 	)
 
@@ -188,7 +187,7 @@ func main() {
 
 	logger.Info("main", "metric collector started")
 
-	if err := analyzer.Start(ctx); err != nil {
+	if err := scaler.Start(ctx); err != nil {
 		logger.Error("main", "failed to start analyzer", "error", err)
 	}
 	logger.Info("main", "analyzer started")
@@ -198,7 +197,7 @@ func main() {
 	<-sigChan
 	logger.Info("main", "shutdown signal received")
 
-	if err := analyzer.Stop(); err != nil {
+	if err := scaler.Stop(); err != nil {
 		logger.Error("main", "error stopping analyzer", "error", err)
 	}
 	logger.Info("main", "analyzer stopped")

@@ -13,7 +13,7 @@ import (
 
 // Storage is a container for resource-level and call-graph (istio) metrics.
 type Storage struct {
-	GlobalConfig    *config.ScalerConfig
+	GlobalConfig    *config.AppConfig
 	Graph           *graph.CallGraph
 	ResourceMetrics *metrics.MetricStore
 	Limits          quotas.QuotasStorage
@@ -22,7 +22,7 @@ type Storage struct {
 }
 
 // NewStorage creates a new storage with given window and step for internal windows.
-func NewStorage(window, step time.Duration, config *config.ScalerConfig) *Storage {
+func NewStorage(window, step time.Duration, config *config.AppConfig) *Storage {
 	s := &Storage{
 		GlobalConfig:    config,
 		Graph:           graph.NewCallGraph(window, step),

@@ -9,8 +9,8 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// ScalerConfig holds configuration parameters for the autoscaler.
-type ScalerConfig struct {
+// AppConfig holds configuration parameters for the autoscaler.
+type AppConfig struct {
 	ScalingNamespace     string              `yaml:"scaling_namespace"`
 	PrometheusURL        string              `yaml:"prometheus_url"`
 	PrometheusInterval   time.Duration       `yaml:"prometheus_interval"`
@@ -22,7 +22,7 @@ type ScalerConfig struct {
 	Logger               logger.LoggerConfig `yaml:"logger"`
 }
 
-func (c *ScalerConfig) Validate() error {
+func (c *AppConfig) Validate() error {
 	if c.ScalingNamespace == "" {
 		return fmt.Errorf("scaling_namespace cannot be empty")
 	}
@@ -57,7 +57,7 @@ func (c *ScalerConfig) Validate() error {
 }
 
 // LoadFromYAML reads configuration from a YAML file.
-func (c *ScalerConfig) LoadFromYAML(filename string) error {
+func (c *AppConfig) LoadFromYAML(filename string) error {
 	data, err := os.ReadFile(filename)
 	if err != nil {
 		return fmt.Errorf("failed to read config file: %w", err)
@@ -76,8 +76,8 @@ func (c *ScalerConfig) LoadFromYAML(filename string) error {
 
 // LoadYAMLConfig is a convenience function that creates a new ScalerConfig
 // and loads it from a YAML file.
-func LoadYAMLConfig(filename string) (*ScalerConfig, error) {
-	config := &ScalerConfig{}
+func LoadYAMLConfig(filename string) (*AppConfig, error) {
+	config := &AppConfig{}
 	err := config.LoadFromYAML(filename)
 	return config, err
 }
