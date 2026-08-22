@@ -18,13 +18,13 @@ import (
 )
 
 type ReactionOptimizer struct {
-	metricsProvider interfaces.MetricsProvider
+	metricsProvider interfaces.MetricsRepository
 	histStore       *statistics.HistStore
 
 	config ReactionOptimizerConfig
 }
 
-func NewReactionOptimizer(metricsProvider interfaces.MetricsProvider, histStore *statistics.HistStore, config ReactionOptimizerConfig) *ReactionOptimizer {
+func NewReactionOptimizer(metricsProvider interfaces.MetricsRepository, histStore *statistics.HistStore, config ReactionOptimizerConfig) *ReactionOptimizer {
 	return &ReactionOptimizer{
 		metricsProvider: metricsProvider,
 		histStore:       histStore,

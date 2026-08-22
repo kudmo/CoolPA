@@ -12,14 +12,14 @@ import (
 )
 
 type Analyzer struct {
-	metricsProvider interfaces.MetricsProvider
+	metricsProvider interfaces.MetricsRepository
 	histStore       *statistics.HistStore
 	config          AnalyzerConfig
 
 	previousStatistics map[string]*welchtest.Stats
 }
 
-func NewAnalyzer(config AnalyzerConfig, metricsProvider interfaces.MetricsProvider, histStore *statistics.HistStore) *Analyzer {
+func NewAnalyzer(config AnalyzerConfig, metricsProvider interfaces.MetricsRepository, histStore *statistics.HistStore) *Analyzer {
 	return &Analyzer{
 		metricsProvider:    metricsProvider,
 		config:             config,

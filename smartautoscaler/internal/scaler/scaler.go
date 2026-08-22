@@ -19,7 +19,7 @@ type Scaler struct {
 	isRunning        bool
 	lastReactionTime time.Time
 
-	metricsProvider interfaces.MetricsProvider
+	metricsProvider interfaces.MetricsRepository
 	histStore       *statistics.HistStore
 
 	analyzer        *analyzer.Analyzer
@@ -27,7 +27,7 @@ type Scaler struct {
 	reactionApplier applier.Applier
 }
 
-func NewScaler(config ScalerConfig, metricsProvider interfaces.MetricsProvider, applier applier.Applier) *Scaler {
+func NewScaler(config ScalerConfig, metricsProvider interfaces.MetricsRepository, applier applier.Applier) *Scaler {
 	histStore := &statistics.HistStore{}
 	return &Scaler{
 		stopChan:        make(chan struct{}),
