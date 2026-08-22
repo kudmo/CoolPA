@@ -24,11 +24,15 @@ type ReactionOptimizer struct {
 	config ReactionOptimizerConfig
 }
 
-func NewReactionOptimizer(metricsProvider interfaces.MetricsRepository, histStore *statistics.HistStore, config ReactionOptimizerConfig) *ReactionOptimizer {
+func NewReactionOptimizer(
+	config ReactionOptimizerConfig,
+	metricsProvider interfaces.MetricsRepository,
+	histStore *statistics.HistStore,
+) *ReactionOptimizer {
 	return &ReactionOptimizer{
+		config:          config,
 		metricsProvider: metricsProvider,
 		histStore:       histStore,
-		config:          config,
 	}
 }
 

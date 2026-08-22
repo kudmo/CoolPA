@@ -46,8 +46,6 @@ func NewScaler(config ScalerConfig, metricsProvider interfaces.MetricsRepository
 			histStore,
 		),
 		optimizer: optimizer.NewReactionOptimizer(
-			metricsProvider,
-			histStore,
 			optimizer.ReactionOptimizerConfig{
 				CpuStep:              100,
 				MemoryStep:           256,
@@ -55,6 +53,8 @@ func NewScaler(config ScalerConfig, metricsProvider interfaces.MetricsRepository
 				TargetCpuUtilization: 0.40,
 				Lambda:               config.Lambda,
 			},
+			metricsProvider,
+			histStore,
 		),
 	}
 }
