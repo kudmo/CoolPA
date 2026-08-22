@@ -39,8 +39,8 @@ func (a *Analyzer) analyzeRPSlowing(ctx context.Context) []underutilizationAnaly
 
 		welch_result := welchtest.WelchTTest(newStats, oldStats)
 		if welch_result.TStatistic < 0 && welch_result.PValue <= a.config.Confidence {
-			service_cpu_limit, _ := a.metricsProvider.GetServiceCpuQuotaValue(ctx, service.Name)
-			service_mem_limit, _ := a.metricsProvider.GetServiceMemoryQuotaValue(ctx, service.Name)
+			service_cpu_limit, _ := a.metricsProvider.GetServiceCpuQuota(ctx, service.Name)
+			service_mem_limit, _ := a.metricsProvider.GetServiceMemoryQuota(ctx, service.Name)
 			replicas, _ := a.metricsProvider.GetServiceReplicasCountValue(ctx, service.Name)
 
 			// Already minimal configuration

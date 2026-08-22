@@ -54,8 +54,8 @@ func (ro *ReactionOptimizer) RunOptimization(ctx context.Context, services []str
 
 	for _, svc := range services {
 		replicas_count, _ := ro.metricsProvider.GetServiceReplicasCountValue(ctx, svc)
-		cpu_pod_quota, _ := ro.metricsProvider.GetServicePodCpuQuotaValue(ctx, svc)
-		mem_pod_quota, _ := ro.metricsProvider.GetServicePodMemoryQuotaValue(ctx, svc)
+		cpu_pod_quota, _ := ro.metricsProvider.GetServicePodCpuQuota(ctx, svc)
+		mem_pod_quota, _ := ro.metricsProvider.GetServicePodMemoryQuota(ctx, svc)
 		cpu_sum += cpu_pod_quota
 		mem_sum += mem_pod_quota
 		replics_sum += int(replicas_count)
@@ -136,8 +136,8 @@ func (ro *ReactionOptimizer) buildConstraints(
 			continue
 		}
 
-		cpu, _ := ro.metricsProvider.GetServiceCpuQuotaValue(ctx, svc)
-		mem, _ := ro.metricsProvider.GetServiceMemoryQuotaValue(ctx, svc)
+		cpu, _ := ro.metricsProvider.GetServiceCpuQuota(ctx, svc)
+		mem, _ := ro.metricsProvider.GetServiceMemoryQuota(ctx, svc)
 
 		policy := constraints.ServicePolicy{
 			AllowedReactions: ro.choosePossibleReactions(svc),
@@ -188,16 +188,16 @@ func (ro *ReactionOptimizer) buildSeedGenome(
 			continue
 		}
 
-		replicas_count, _ := ro.metricsProvider.GetServiceRequestsCountValue(ctx, svc)
+		replicas_count, _ := ro.metricsProvider.GetServiceReplicasCountValue(ctx, svc)
 		if replicas_count == 0 {
 			logger.Warn("optimizer", "no pods found for service", "service", svc)
 			continue
 		}
 
-		cpu_app_quota, _ := ro.metricsProvider.GetServiceCpuQuotaValue(ctx, svc)
-		cpu_pod_quota, _ := ro.metricsProvider.GetServicePodCpuQuotaValue(ctx, svc)
-		mem_app_quota, _ := ro.metricsProvider.GetServiceMemoryQuotaValue(ctx, svc)
-		mem_pod_quota, _ := ro.metricsProvider.GetServicePodMemoryQuotaValue(ctx, svc)
+		cpu_app_quota, _ := ro.metricsProvider.GetServiceCpuQuota(ctx, svc)
+		cpu_pod_quota, _ := ro.metricsProvider.GetServicePodCpuQuota(ctx, svc)
+		mem_app_quota, _ := ro.metricsProvider.GetServiceMemoryQuota(ctx, svc)
+		mem_pod_quota, _ := ro.metricsProvider.GetServicePodMemoryQuota(ctx, svc)
 
 		rt := genome.HPA
 		if len(sp.AllowedReactions) == 1 {

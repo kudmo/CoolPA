@@ -45,10 +45,10 @@ func (f *ResourceOptimizerFitness) calculateR2(ctx context.Context, now time.Tim
 	services, _ := f.metricsProvider.ListServices(ctx)
 	for _, svc := range services {
 		replicas_count, _ := f.metricsProvider.GetServiceReplicasCountValue(ctx, svc.Name)
-		cpu_app_quota, _ := f.metricsProvider.GetServiceCpuQuotaValue(ctx, svc.Name)
-		cpu_pod_quota, _ := f.metricsProvider.GetServicePodCpuQuotaValue(ctx, svc.Name)
-		mem_app_quota, _ := f.metricsProvider.GetServiceMemoryQuotaValue(ctx, svc.Name)
-		mem_pod_quota, _ := f.metricsProvider.GetServicePodMemoryQuotaValue(ctx, svc.Name)
+		cpu_app_quota, _ := f.metricsProvider.GetServiceCpuQuota(ctx, svc.Name)
+		cpu_pod_quota, _ := f.metricsProvider.GetServicePodCpuQuota(ctx, svc.Name)
+		mem_app_quota, _ := f.metricsProvider.GetServiceMemoryQuota(ctx, svc.Name)
+		mem_pod_quota, _ := f.metricsProvider.GetServicePodMemoryQuota(ctx, svc.Name)
 		current = append(current, genome.ServiceState{Name: svc.Name, CurrentReplicas: int(replicas_count), CurrentAppCPU: cpu_app_quota, CurrentPodCPU: cpu_pod_quota, CurrentAppMemory: mem_app_quota, CurrentPodMemory: mem_pod_quota})
 	}
 	res := gen.DecodeAll(current)
