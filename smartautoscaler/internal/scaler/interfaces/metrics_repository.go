@@ -7,7 +7,7 @@ import (
 	"github.com/kudmo/CoolPA/internal/metrics"
 )
 
-type MetricsProvider interface {
+type MetricsRepository interface {
 	ListServices(ctx context.Context) ([]metrics.ServiceInfo, error)
 	GetService(ctx context.Context, serviceName string) (*metrics.ServiceInfo, error)
 

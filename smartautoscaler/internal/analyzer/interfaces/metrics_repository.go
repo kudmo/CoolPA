@@ -7,7 +7,7 @@ import (
 	"github.com/kudmo/CoolPA/internal/metrics"
 )
 
-type MetricsProvider interface {
+type MetricsRepository interface {
 	ListServices(ctx context.Context) ([]metrics.ServiceInfo, error)
 	GetService(ctx context.Context, serviceName string) (*metrics.ServiceInfo, error)
 
@@ -59,10 +59,4 @@ type MetricsProvider interface {
 	GetGlobalTotalMemoryLimit(ctx context.Context) (float64, error)
 	GetGlobalTotalCpuLimit(ctx context.Context) (float64, error)
 	GetGlobalTotalPodsLimit(ctx context.Context) (float64, error)
-
-	GetGlobalServiceMinCpu(ctx context.Context) (float64, error)
-	GetGlobalServiceMaxCpu(ctx context.Context) (float64, error)
-
-	GetGlobalServiceMinMemory(ctx context.Context) (float64, error)
-	GetGlobalServiceMaxMemory(ctx context.Context) (float64, error)
 }

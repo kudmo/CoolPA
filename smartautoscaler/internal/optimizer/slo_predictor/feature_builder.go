@@ -12,7 +12,7 @@ import (
 
 type LatencyDeltaPredictorFeatureBuilder struct {
 	config          FitnessConfig
-	metricsProvider interfaces.MetricsProvider
+	metricsProvider interfaces.MetricsRepository
 }
 
 func (b *LatencyDeltaPredictorFeatureBuilder) Build(ctx context.Context, now time.Time, g *genome.ReactionGenome) [][]float64 {
