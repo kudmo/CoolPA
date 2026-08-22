@@ -1,14 +1,16 @@
-package latencyhist
+package statistics_test
 
 import (
 	"math"
 	"testing"
+
+	"github.com/kudmo/CoolPA/internal/statistics"
 )
 
 func TestNewHistogram(t *testing.T) {
 	bounds := []float64{10, 1, 5}
 
-	h := NewHistogram(bounds)
+	h := statistics.NewHistogram(bounds)
 
 	if len(h.Bins) != 4 { // +Inf бин
 		t.Fatalf("expected 4 bins, got %d", len(h.Bins))
@@ -27,7 +29,7 @@ func TestNewHistogram(t *testing.T) {
 }
 
 func TestObserve(t *testing.T) {
-	h := NewHistogram([]float64{10, 20})
+	h := statistics.NewHistogram([]float64{10, 20})
 
 	h.Observe(5, false)
 	h.Observe(5, true)
@@ -42,27 +44,8 @@ func TestObserve(t *testing.T) {
 	}
 }
 
-func TestRebuildModel_GlobalRate(t *testing.T) {
-	h := NewHistogram([]float64{10})
-
-	h.Observe(5, false)
-	h.Observe(5, true)
-
-	h.RebuildModel()
-
-	cache := h.cache.Load()
-	if cache == nil {
-		t.Fatal("cache not built")
-	}
-
-	expected := 0.5
-	if math.Abs(cache.globalRate-expected) > 1e-6 {
-		t.Fatalf("expected globalRate=%.2f, got %.4f", expected, cache.globalRate)
-	}
-}
-
 func TestRisk_Basic(t *testing.T) {
-	h := NewHistogram([]float64{10, 20})
+	h := statistics.NewHistogram([]float64{10, 20})
 
 	// бин [0-10]
 	for i := 0; i < 100; i++ {
@@ -79,7 +62,7 @@ func TestRisk_Basic(t *testing.T) {
 }
 
 func TestRisk_Interpolation(t *testing.T) {
-	h := NewHistogram([]float64{10, 20})
+	h := statistics.NewHistogram([]float64{10, 20})
 
 	// бин 1: риск ~0
 	for i := 0; i < 100; i++ {
@@ -101,7 +84,7 @@ func TestRisk_Interpolation(t *testing.T) {
 }
 
 func TestRisk_ExtrapolateToZero(t *testing.T) {
-	h := NewHistogram([]float64{2, 10})
+	h := statistics.NewHistogram([]float64{2, 10})
 
 	// только один бин с риском 0.8
 	for i := 0; i < 100; i++ {
@@ -124,7 +107,7 @@ func TestRisk_ExtrapolateToZero(t *testing.T) {
 }
 
 func TestRisk_ExtrapolateToInf(t *testing.T) {
-	h := NewHistogram([]float64{10})
+	h := statistics.NewHistogram([]float64{10})
 
 	// бин с риском 0.2
 	for i := 0; i < 100; i++ {
@@ -147,7 +130,7 @@ func TestRisk_ExtrapolateToInf(t *testing.T) {
 }
 
 func TestRisk_Empty(t *testing.T) {
-	h := NewHistogram([]float64{10})
+	h := statistics.NewHistogram([]float64{10})
 
 	h.RebuildModel()
 
@@ -159,7 +142,7 @@ func TestRisk_Empty(t *testing.T) {
 }
 
 func TestLogBounds(t *testing.T) {
-	b := LogBounds(100)
+	b := statistics.LogBounds(100)
 
 	expectedLast := 100.0
 	if b[len(b)-1] != expectedLast {

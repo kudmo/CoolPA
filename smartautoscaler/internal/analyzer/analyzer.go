@@ -2,24 +2,28 @@ package analyzer
 
 import (
 	"context"
+	"slices"
 	"time"
 
 	"github.com/kudmo/CoolPA/internal/analyzer/interfaces"
+	"github.com/kudmo/CoolPA/internal/statistics"
 
 	"github.com/kudmo/CoolPA/utils/welchtest"
 )
 
 type Analyzer struct {
 	metricsProvider interfaces.MetricsProvider
+	histStore       *statistics.HistStore
 	config          AnalyzerConfig
 
 	previousStatistics map[string]*welchtest.Stats
 }
 
-func NewAnalyzer(config AnalyzerConfig, metricsProvider interfaces.MetricsProvider) *Analyzer {
+func NewAnalyzer(config AnalyzerConfig, metricsProvider interfaces.MetricsProvider, histStore *statistics.HistStore) *Analyzer {
 	return &Analyzer{
 		metricsProvider:    metricsProvider,
 		config:             config,
+		histStore:          histStore,
 		previousStatistics: make(map[string]*welchtest.Stats),
 	}
 }
@@ -36,6 +40,16 @@ func (a *Analyzer) Analyze(ctx context.Context) AnalysisResult {
 	if len(bottlenecks) > 0 {
 		result.Services = bottlenecks
 		result.Scale = 1
+
+		services, _ := a.metricsProvider.ListServices(ctx)
+		for _, svc := range services {
+			if a.histStore.GetHistogram(svc.Name) == nil {
+				bounds := statistics.LogBounds(float64(a.config.SLO))
+				a.histStore.Register(svc.Name, bounds)
+			}
+			lat_95, _ := a.metricsProvider.GetServiceAverageLatency95Value(ctx, svc.Name)
+			a.histStore.GetHistogram(svc.Name).Observe(lat_95, slices.Contains(bottlenecks, svc.Name))
+		}
 	} else {
 		underutilized := a.analyzeUnderutilization(ctx)
 		if len(underutilized) > 0 {

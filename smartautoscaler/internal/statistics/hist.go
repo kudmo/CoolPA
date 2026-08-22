@@ -1,4 +1,4 @@
-package latencyhist
+package statistics
 
 import (
 	"math"
