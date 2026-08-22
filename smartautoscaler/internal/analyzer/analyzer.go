@@ -19,7 +19,11 @@ type Analyzer struct {
 	previousStatistics map[string]*welchtest.Stats
 }
 
-func NewAnalyzer(config AnalyzerConfig, metricsProvider interfaces.MetricsRepository, histStore *statistics.HistStore) *Analyzer {
+func NewAnalyzer(
+	config AnalyzerConfig,
+	metricsProvider interfaces.MetricsRepository,
+	histStore *statistics.HistStore,
+) *Analyzer {
 	return &Analyzer{
 		metricsProvider:    metricsProvider,
 		config:             config,
