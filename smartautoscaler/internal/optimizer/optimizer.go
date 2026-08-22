@@ -14,17 +14,20 @@ import (
 	"github.com/kudmo/CoolPA/internal/optimizer/ga/genome"
 	"github.com/kudmo/CoolPA/internal/optimizer/interfaces"
 	slopredictor "github.com/kudmo/CoolPA/internal/optimizer/slo_predictor"
+	"github.com/kudmo/CoolPA/internal/statistics"
 )
 
 type ReactionOptimizer struct {
 	metricsProvider interfaces.MetricsProvider
+	histStore       *statistics.HistStore
 
 	config ReactionOptimizerConfig
 }
 
-func NewReactionOptimizer(metricsProvider interfaces.MetricsProvider, config ReactionOptimizerConfig) *ReactionOptimizer {
+func NewReactionOptimizer(metricsProvider interfaces.MetricsProvider, histStore *statistics.HistStore, config ReactionOptimizerConfig) *ReactionOptimizer {
 	return &ReactionOptimizer{
 		metricsProvider: metricsProvider,
+		histStore:       histStore,
 		config:          config,
 	}
 }
@@ -73,6 +76,7 @@ func (ro *ReactionOptimizer) RunOptimization(ctx context.Context, services []str
 
 	fit := slopredictor.NewResourceOptimizerFitness(
 		ro.metricsProvider,
+		ro.histStore,
 		slopredictor.FitnessConfig{Lambda: ro.config.Lambda, Window: time.Duration(time.Minute)},
 	)
 	defer fit.Close()

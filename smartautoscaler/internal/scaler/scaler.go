@@ -9,6 +9,7 @@ import (
 	"github.com/kudmo/CoolPA/internal/applier"
 	"github.com/kudmo/CoolPA/internal/optimizer"
 	"github.com/kudmo/CoolPA/internal/scaler/interfaces"
+	"github.com/kudmo/CoolPA/internal/statistics"
 	"github.com/kudmo/CoolPA/logger"
 )
 
@@ -19,12 +20,15 @@ type Scaler struct {
 	lastReactionTime time.Time
 
 	metricsProvider interfaces.MetricsProvider
+	histStore       *statistics.HistStore
+
 	analyzer        *analyzer.Analyzer
 	optimizer       *optimizer.ReactionOptimizer
 	reactionApplier applier.Applier
 }
 
 func NewScaler(config ScalerConfig, metricsProvider interfaces.MetricsProvider, applier applier.Applier) *Scaler {
+	histStore := &statistics.HistStore{}
 	return &Scaler{
 		stopChan:        make(chan struct{}),
 		metricsProvider: metricsProvider,
@@ -38,14 +42,20 @@ func NewScaler(config ScalerConfig, metricsProvider interfaces.MetricsProvider, 
 				WelchNowIntervalBegin: time.Duration(60 * time.Second),
 				AnomalyServicesCount:  config.AnomalyServicesCount,
 			},
-			metricsProvider),
-		optimizer: optimizer.NewReactionOptimizer(metricsProvider, optimizer.ReactionOptimizerConfig{
-			CpuStep:              100,
-			MemoryStep:           256,
-			ReplicasStep:         1,
-			TargetCpuUtilization: 0.40,
-			Lambda:               config.Lambda,
-		}),
+			metricsProvider,
+			histStore,
+		),
+		optimizer: optimizer.NewReactionOptimizer(
+			metricsProvider,
+			histStore,
+			optimizer.ReactionOptimizerConfig{
+				CpuStep:              100,
+				MemoryStep:           256,
+				ReplicasStep:         1,
+				TargetCpuUtilization: 0.40,
+				Lambda:               config.Lambda,
+			},
+		),
 	}
 }
 

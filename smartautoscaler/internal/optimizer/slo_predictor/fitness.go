@@ -7,6 +7,7 @@ import (
 
 	"github.com/kudmo/CoolPA/internal/optimizer/ga/genome"
 	"github.com/kudmo/CoolPA/internal/optimizer/interfaces"
+	"github.com/kudmo/CoolPA/internal/statistics"
 	"github.com/kudmo/CoolPA/logger"
 	"github.com/kudmo/CoolPA/utils"
 )
@@ -14,13 +15,14 @@ import (
 // ResourceOptimizerFitness composes a FeatureBuilder and Predictor.
 type ResourceOptimizerFitness struct {
 	metricsProvider interfaces.MetricsProvider
+	histStore       *statistics.HistStore
 
 	Builder   LatencyDeltaPredictorFeatureBuilder
 	Predictor *LatencyDeltaPredictor
 	config    FitnessConfig
 }
 
-func NewResourceOptimizerFitness(metricsProvider interfaces.MetricsProvider, config FitnessConfig) *ResourceOptimizerFitness {
+func NewResourceOptimizerFitness(metricsProvider interfaces.MetricsProvider, histStore *statistics.HistStore, config FitnessConfig) *ResourceOptimizerFitness {
 	predictor, err := NewSLOPredictor("latency_model.onnx", 11)
 	if err != nil {
 		logger.Error("slo_predictor", "error init predictor", "error", err)
@@ -30,6 +32,7 @@ func NewResourceOptimizerFitness(metricsProvider interfaces.MetricsProvider, con
 		Builder:   LatencyDeltaPredictorFeatureBuilder{metricsProvider: metricsProvider, config: config},
 		Predictor: predictor,
 		config:    config,
+		histStore: histStore,
 	}
 }
 
@@ -83,7 +86,7 @@ func (f *ResourceOptimizerFitness) calculateR1(ctx context.Context, now time.Tim
 		lat_95_new := lat_95_curr_avg * math.Pow(math.E, deltas[i])
 
 		// TODO: Перенести это в отдельное хранилище, используемое
-		risk := f.Store.Hist.GetHistogram(g.ServiceName).Risk(lat_95_new)
+		risk := f.histStore.GetHistogram(g.ServiceName).Risk(lat_95_new)
 		prod *= (1.0 - risk)
 	}
 	return prod
