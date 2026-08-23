@@ -9,7 +9,7 @@ import (
 
 type MetricsRepository interface {
 	ListServices(ctx context.Context) ([]metrics.ServiceInfo, error)
-	GetService(ctx context.Context, serviceName string) (*metrics.ServiceInfo, error)
+	GetService(ctx context.Context, serviceName string) (metrics.ServiceInfo, error)
 
 	GetServiceReplicasCountValue(ctx context.Context, serviceName string) (float64, error)
 
