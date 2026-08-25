@@ -3,12 +3,10 @@ package interfaces
 import (
 	"context"
 	"time"
-
-	"github.com/kudmo/CoolPA/internal/metrics"
 )
 
 type MetricsRepository interface {
-	ListServices(ctx context.Context) ([]metrics.ServiceInfo, error)
+	ListServices(ctx context.Context) ([]string, error)
 
 	GetServiceReplicasCountValue(ctx context.Context, serviceName string) (float64, error)
 

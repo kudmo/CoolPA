@@ -25,17 +25,18 @@ func (a *Analyzer) findAbnormalCalls(ctx context.Context, now time.Time) []call 
 	var anomalous []call
 
 	services, _ := a.metricsProvider.ListServices(ctx)
-	for _, from := range services {
-		for _, to := range from.OuboundCalls {
-			lat95_range, _ := a.metricsProvider.GetGraphLatencyP95Range(ctx, from.Name, to, fromTime, now)
+	for _, from_name := range services {
+		from, _ := a.metricsProvider.GetService(ctx, from_name)
+		for _, to_name := range from.OuboundCalls {
+			lat95_range, _ := a.metricsProvider.GetGraphLatencyP95Range(ctx, from_name, to_name, fromTime, now)
 			lat95 := utils.Avg(lat95_range)
-			lat50_range, _ := a.metricsProvider.GetGraphLatencyP50Range(ctx, from.Name, to, fromTime, now)
+			lat50_range, _ := a.metricsProvider.GetGraphLatencyP50Range(ctx, from_name, to_name, fromTime, now)
 			lat50 := utils.Avg(lat50_range)
 
 			if lat95 > a.config.abnormalParams.SLO*(1-a.config.abnormalParams.Alpha) {
-				anomalous = append(anomalous, call{from.Name, to})
+				anomalous = append(anomalous, call{from_name, to_name})
 			} else if lat95/lat50 > 12 {
-				anomalous = append(anomalous, call{from.Name, to})
+				anomalous = append(anomalous, call{from_name, to_name})
 			}
 		}
 	}
