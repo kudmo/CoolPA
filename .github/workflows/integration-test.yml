@@ -24,7 +24,7 @@ jobs:
         cache: true
         cache-dependency-path: smartautoscaler/go.sum
 
-    - name: Build smartautoscaler
+    - name: Build and test smartautoscaler
       working-directory: smartautoscaler
       run: |
         go build ./...
@@ -35,9 +35,11 @@ jobs:
       uses: docker/setup-buildx-action@v3
 
     - name: Build Docker image
-      working-directory: smartautoscaler
+      working-directory: experiment/benchmarks/OnlineBoutique
       run: |
-        docker build -t smartautoscaler:test -f Dockerfile .
+        make scaler-build AUTOSCALER_IMAGE=smartautoscaler:test
+      env:
+        SCALER_APP_DIR: ../../../../smartautoscaler
 
     - name: Set up Kind cluster
       uses: helm/kind-action@v1.10.0
@@ -70,20 +72,23 @@ jobs:
     - name: Load smartautoscaler image to Kind
       working-directory: experiment/benchmarks/OnlineBoutique
       run: |
-        kind load docker-image smartautoscaler:test --name ms-demo
+        make scaler-kind-load AUTOSCALER_IMAGE=smartautoscaler:test
 
     - name: Deploy smartautoscaler
       working-directory: experiment/benchmarks/OnlineBoutique
       run: |
-        make deploy-scaler
+        make deploy-scaler AUTOSCALER_IMAGE=smartautoscaler:test
+      env:
+        SCALER_APP_DIR: ../../../../smartautoscaler
 
     - name: Wait for smartautoscaler pod
       run: |
         kubectl --context=kind-ms-demo wait --for=condition=ready pod -l app=smartautoscaler -n autoscale-test --timeout=120s
 
     - name: Check smartautoscaler logs
+      working-directory: experiment/benchmarks/OnlineBoutique
       run: |
-        kubectl --context=kind-ms-demo logs -l app=smartautoscaler -n autoscale-test --tail=50
+        make scaler-logs
 
     - name: Test basic functionality
       run: |
@@ -91,8 +96,18 @@ jobs:
         kubectl --context=kind-ms-demo exec $POD_NAME -n autoscale-test -- ls -la /app/
         
         kubectl --context=kind-ms-demo exec $POD_NAME -n autoscale-test -- cat /app/config.yaml
+        
+        kubectl --context=kind-ms-demo exec $POD_NAME -n autoscale-test -- ls -la /app/latency_model.onnx
+
+    - name: Test scaling functionality (optional)
+      working-directory: experiment/benchmarks/OnlineBoutique
+      run: |
+        make hpa-scale SERVICE=frontend REPLICAS=2
+        sleep 10
+        kubectl --context=kind-ms-demo get deployment frontend -n microservices-demo -o jsonpath='{.spec.replicas}'
 
     - name: Cleanup
       if: always()
+      working-directory: experiment/benchmarks/OnlineBoutique
       run: |
-        kind delete cluster --name ms-demo
+        make cluster-down CLUSTER_NAME=ms-demo || true
