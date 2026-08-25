@@ -23,8 +23,6 @@ type MetricsRepository interface {
 	GetServicePodCpuQuota(ctx context.Context, serviceName string) (float64, error)
 	GetServicePodMemoryQuota(ctx context.Context, serviceName string) (float64, error)
 
-	GetServiceReplicasCountRange(ctx context.Context, serviceName string, from, to time.Time) ([]float64, error)
-
 	GetServiceCPUUsageRange(ctx context.Context, serviceName string, from, to time.Time) ([]float64, error)
 	GetServiceMemoryUsageRange(ctx context.Context, serviceName string, from, to time.Time) ([]float64, error)
 	GetServiceFSUsageRange(ctx context.Context, serviceName string, from, to time.Time) ([]float64, error)

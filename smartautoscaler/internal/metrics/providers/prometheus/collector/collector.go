@@ -33,7 +33,6 @@ func NewPrometheusCollector(config PrometheusCollectorConfig) (*PrometheusCollec
 }
 
 func (pc *PrometheusCollector) CollectQuery(ctx context.Context, query MetricQuery) ([]MetricResult, error) {
-
 	promResult, warnings, err := pc.client.Query(ctx, query.Query, time.Now())
 	if err != nil {
 		return nil, err
@@ -44,6 +43,26 @@ func (pc *PrometheusCollector) CollectQuery(ctx context.Context, query MetricQue
 	}
 
 	return extractResults(query, promResult)
+}
+
+func (pc *PrometheusCollector) CollectQueryRange(ctx context.Context, query MetricQueryRange) ([]MetricRangeResult, error) {
+	// Создаем Range запрос
+	r := v1.Range{
+		Start: query.Start,
+		End:   query.End,
+		Step:  time.Minute, // Шаг по умолчанию, можно настроить
+	}
+
+	promResult, warnings, err := pc.client.QueryRange(ctx, query.Query, r)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(warnings) > 0 {
+		logger.Info("collector", "warnings for range query", "query", query.Name, "warnings", warnings)
+	}
+
+	return extractRangeResults(query, promResult)
 }
 
 func extractResults(query MetricQuery, val model.Value) ([]MetricResult, error) {
@@ -103,6 +122,53 @@ func extractResults(query MetricQuery, val model.Value) ([]MetricResult, error) 
 
 	default:
 		return nil, fmt.Errorf("unsupported value type")
+	}
+
+	return results, nil
+}
+
+func extractRangeResults(query MetricQueryRange, val model.Value) ([]MetricRangeResult, error) {
+	var results []MetricRangeResult
+
+	switch val.Type() {
+
+	case model.ValMatrix:
+		matrix := val.(model.Matrix)
+
+		for _, series := range matrix {
+			labels := make(map[string]string)
+			for name, value := range series.Metric {
+				labels[string(name)] = string(value)
+			}
+
+			values := make([]float64, 0, len(series.Values))
+			for _, sample := range series.Values {
+				values = append(values, float64(sample.Value))
+			}
+
+			results = append(results, MetricRangeResult{
+				Labels: labels,
+				Value:  values,
+			})
+		}
+
+	case model.ValVector:
+		vector := val.(model.Vector)
+
+		for _, sample := range vector {
+			labels := make(map[string]string)
+			for name, value := range sample.Metric {
+				labels[string(name)] = string(value)
+			}
+
+			results = append(results, MetricRangeResult{
+				Labels: labels,
+				Value:  []float64{float64(sample.Value)},
+			})
+		}
+
+	default:
+		return nil, fmt.Errorf("unsupported value type for range query: %s", val.Type().String())
 	}
 
 	return results, nil
