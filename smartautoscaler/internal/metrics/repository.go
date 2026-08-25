@@ -6,7 +6,7 @@ import (
 )
 
 type MetricsRepository interface {
-	ListServices(ctx context.Context) ([]ServiceInfo, error)
+	ListServices(ctx context.Context) ([]string, error)
 	GetService(ctx context.Context, serviceName string) (ServiceInfo, error)
 
 	GetServiceReplicasCountValue(ctx context.Context, serviceName string) (float64, error)

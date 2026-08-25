@@ -47,12 +47,12 @@ func (a *Analyzer) Analyze(ctx context.Context) AnalysisResult {
 
 		services, _ := a.metricsProvider.ListServices(ctx)
 		for _, svc := range services {
-			if a.histStore.GetHistogram(svc.Name) == nil {
+			if a.histStore.GetHistogram(svc) == nil {
 				bounds := statistics.LogBounds(float64(a.config.SLO))
-				a.histStore.Register(svc.Name, bounds)
+				a.histStore.Register(svc, bounds)
 			}
-			lat_95, _ := a.metricsProvider.GetServiceAverageLatency95Value(ctx, svc.Name)
-			a.histStore.GetHistogram(svc.Name).Observe(lat_95, slices.Contains(bottlenecks, svc.Name))
+			lat_95, _ := a.metricsProvider.GetServiceAverageLatency95Value(ctx, svc)
+			a.histStore.GetHistogram(svc).Observe(lat_95, slices.Contains(bottlenecks, svc))
 		}
 	} else {
 		underutilized := a.analyzeUnderutilization(ctx)

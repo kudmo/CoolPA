@@ -17,7 +17,7 @@ func (a *Analyzer) analyzeRPSlowing(ctx context.Context) []underutilizationAnaly
 		time_now := time.Now()
 		time_now_begin := time_now.Add(-a.config.WelchNowIntervalBegin)
 
-		new, _ := a.metricsProvider.GetServiceRequestsCountRange(ctx, service.Name, time_now_begin, time_now)
+		new, _ := a.metricsProvider.GetServiceRequestsCountRange(ctx, service, time_now_begin, time_now)
 
 		newStats := welchtest.NewOnlineStats()
 		newStats.N = len(new)
@@ -30,18 +30,18 @@ func (a *Analyzer) analyzeRPSlowing(ctx context.Context) []underutilizationAnaly
 			newStats.M2 += (i - newStats.Mean) * (i - newStats.Mean)
 		}
 		oldStats := welchtest.NewOnlineStats()
-		if _, ok := a.previousStatistics[service.Name]; !ok {
+		if _, ok := a.previousStatistics[service]; !ok {
 			continue
 		}
-		oldStats.N = a.previousStatistics[service.Name].N
-		oldStats.Mean = a.previousStatistics[service.Name].Mean * BETA
-		oldStats.M2 = a.previousStatistics[service.Name].M2 * BETA * BETA
+		oldStats.N = a.previousStatistics[service].N
+		oldStats.Mean = a.previousStatistics[service].Mean * BETA
+		oldStats.M2 = a.previousStatistics[service].M2 * BETA * BETA
 
 		welch_result := welchtest.WelchTTest(newStats, oldStats)
 		if welch_result.TStatistic < 0 && welch_result.PValue <= a.config.Confidence {
-			service_cpu_limit, _ := a.metricsProvider.GetServiceCpuQuota(ctx, service.Name)
-			service_mem_limit, _ := a.metricsProvider.GetServiceMemoryQuota(ctx, service.Name)
-			replicas, _ := a.metricsProvider.GetServiceReplicasCountValue(ctx, service.Name)
+			service_cpu_limit, _ := a.metricsProvider.GetServiceCpuQuota(ctx, service)
+			service_mem_limit, _ := a.metricsProvider.GetServiceMemoryQuota(ctx, service)
+			replicas, _ := a.metricsProvider.GetServiceReplicasCountValue(ctx, service)
 
 			// Already minimal configuration
 			if /*a.store.Limits.ServiceLimits[quotas.ServiceMinCpu] >= int64(service_cpu_limit) &&
@@ -50,20 +50,20 @@ func (a *Analyzer) analyzeRPSlowing(ctx context.Context) []underutilizationAnaly
 				continue
 			}
 
-			service_cpu_utilization_range, _ := a.metricsProvider.GetServiceCpuUsageRange(ctx, service.Name, time_now_begin, time_now)
+			service_cpu_utilization_range, _ := a.metricsProvider.GetServiceCpuUsageRange(ctx, service, time_now_begin, time_now)
 			service_cpu_utilization := utils.Avg(service_cpu_utilization_range)
 			service_cpu_underutilization_total := (service_cpu_limit - service_cpu_utilization) * replicas
 			total_cpu_limit, _ := a.metricsProvider.GetGlobalTotalCpuLimit(ctx)
 			service_cpu_underutilization_total_percent := service_cpu_underutilization_total / total_cpu_limit
 
-			service_mem_utilization_range, _ := a.metricsProvider.GetServiceMemoryUsageRange(ctx, service.Name, time_now_begin, time_now)
+			service_mem_utilization_range, _ := a.metricsProvider.GetServiceMemoryUsageRange(ctx, service, time_now_begin, time_now)
 			service_mem_utilization := utils.Avg(service_mem_utilization_range)
 			service_mem_underutilization_total := (service_mem_limit - service_mem_utilization) * replicas
 			total_mem_limit, _ := a.metricsProvider.GetGlobalTotalMemoryLimit(ctx)
 			service_mem_underutilization_total_percent := service_mem_underutilization_total / total_mem_limit
 
 			// Choose services with maximum underutilization percent
-			anomalys = append(anomalys, underutilizationAnalyzeResult{service.Name, max(service_cpu_underutilization_total_percent, service_mem_underutilization_total_percent)})
+			anomalys = append(anomalys, underutilizationAnalyzeResult{service, max(service_cpu_underutilization_total_percent, service_mem_underutilization_total_percent)})
 		}
 	}
 
