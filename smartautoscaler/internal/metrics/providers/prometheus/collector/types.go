@@ -15,3 +15,15 @@ type MetricResult struct {
 	Timestamp time.Time
 	Error     error
 }
+
+type MetricQueryRange struct {
+	Name  string
+	Query string
+	Start time.Time
+	End   time.Time
+}
+
+type MetricRangeResult struct {
+	Labels map[string]string
+	Value  []float64
+}
