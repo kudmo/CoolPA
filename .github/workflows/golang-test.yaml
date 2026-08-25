@@ -10,7 +10,7 @@ on:
 
 jobs:
   test-and-lint:
-    name: Test, Lint & Security
+    name: Tests & Security
     runs-on: ubuntu-latest
     
     defaults:
