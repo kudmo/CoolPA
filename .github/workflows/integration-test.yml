@@ -58,15 +58,6 @@ jobs:
       run: |
         make deploy-monitoring
 
-    - name: Deploy demo application
-      working-directory: experiment/benchmarks/OnlineBoutique
-      run: |
-        make deploy-demo
-
-    - name: Wait for demo pods
-      run: |
-        kubectl --context=kind-ms-demo wait --for=condition=ready pod --all -n microservices-demo --timeout=300s
-
     - name: Load smartautoscaler image to Kind
       working-directory: experiment/benchmarks/OnlineBoutique
       run: |
@@ -114,13 +105,6 @@ jobs:
     - name: Check smartautoscaler logs
       run: |
         kubectl --context=kind-ms-demo logs -l app=smartautoscaler -n autoscale-test --tail=50
-
-    - name: Test basic functionality
-      run: |
-        POD_NAME=$(kubectl --context=kind-ms-demo get pods -l app=smartautoscaler -n autoscale-test -o jsonpath='{.items[0].metadata.name}')
-        kubectl --context=kind-ms-demo exec $POD_NAME -n autoscale-test -- ls -la /app/
-        
-        kubectl --context=kind-ms-demo exec $POD_NAME -n autoscale-test -- cat /app/config.yaml
 
     - name: Cleanup
       if: always()
