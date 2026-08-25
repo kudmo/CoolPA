@@ -48,9 +48,9 @@ type MetricsRepository interface {
 	GetGlobalTotalCpuLimit(ctx context.Context) (float64, error)
 	GetGlobalTotalPodsLimit(ctx context.Context) (float64, error)
 
-	GetServiceMinCpu(ctx context.Context) (float64, error)
-	GetServiceMaxCpu(ctx context.Context) (float64, error)
+	GetGlobalServiceMinCpu(ctx context.Context) (float64, error)
+	GetGlobalServiceMaxCpu(ctx context.Context) (float64, error)
 
-	GetServiceMinMemory(ctx context.Context) (float64, error)
-	GetServiceMaxMemory(ctx context.Context) (float64, error)
+	GetGlobalServiceMinMemory(ctx context.Context) (float64, error)
+	GetGlobalServiceMaxMemory(ctx context.Context) (float64, error)
 }

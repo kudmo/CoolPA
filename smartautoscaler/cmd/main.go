@@ -9,6 +9,7 @@ import (
 	"syscall"
 
 	applierprovider "github.com/kudmo/CoolPA/internal/applier/providers"
+	"github.com/kudmo/CoolPA/internal/metrics/providers/cache"
 	"github.com/kudmo/CoolPA/internal/metrics/providers/prometheus"
 	"github.com/kudmo/CoolPA/internal/metrics/providers/prometheus/collector"
 	"github.com/kudmo/CoolPA/internal/scaler"
@@ -48,12 +49,19 @@ func main() {
 			PrometheusURL: cfg.PrometheusURL,
 		},
 	}
+
+	cacheConfig := cache.CachedMetricsProviderConfig{
+		TTL: cfg.AnalyzerInterval,
+	}
+
 	// Components creating
 
-	metricsRepository, err := prometheus.NewPrometheusMetricsProvider(prometheusProviderConfig)
+	prometheusRepository, err := prometheus.NewPrometheusMetricsProvider(prometheusProviderConfig)
 	if err != nil {
-		logger.Error("main", "failed to create collector", "error", err)
+		logger.Error("main", "failed to create prometheus collector", "error", err)
 	}
+
+	metricsRepository := cache.NewCachedMetricsRepository(prometheusRepository, cacheConfig)
 
 	applier, err := applierprovider.NewK8sApplier()
 	if err != nil {
