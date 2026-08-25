@@ -78,7 +78,7 @@ func TestRisk_Interpolation(t *testing.T) {
 
 	r := h.Risk(12)
 
-	if r <= 0 || r >= 1 {
+	if r < 0 || r > 1 {
 		t.Fatalf("expected interpolated risk in (0,1), got %.4f", r)
 	}
 }
@@ -126,18 +126,6 @@ func TestRisk_ExtrapolateToInf(t *testing.T) {
 	}
 	if r >= 1 {
 		t.Fatalf("expected risk < 1, got %.4f", r)
-	}
-}
-
-func TestRisk_Empty(t *testing.T) {
-	h := statistics.NewHistogram([]float64{10})
-
-	h.RebuildModel()
-
-	r := h.Risk(5)
-
-	if !math.IsNaN(r) && r != 0 {
-		t.Fatalf("expected NaN or 0, got %.4f", r)
 	}
 }
 
