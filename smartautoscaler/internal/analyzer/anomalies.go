@@ -65,31 +65,31 @@ func (a *Analyzer) buildCorrelationGraphFromCalls(ctx context.Context, now time.
 		weight := 0.0
 
 		cpuUsage, err := a.metricsProvider.GetServiceCpuUsageRange(ctx, c.to, fromTime, now)
-		if err != nil {
+		if err == nil {
 			weight = math.Max(weight, math.Abs(utils.Pearson(latSeries, cpuUsage)))
 		}
 		memUsage, err := a.metricsProvider.GetServiceMemoryUsageRange(ctx, c.to, fromTime, now)
-		if err != nil {
+		if err == nil {
 			weight = math.Max(weight, math.Abs(utils.Pearson(latSeries, memUsage)))
 		}
 		fsUsage, err := a.metricsProvider.GetServiceFSUsageRange(ctx, c.to, fromTime, now)
-		if err != nil {
+		if err == nil {
 			weight = math.Max(weight, math.Abs(utils.Pearson(latSeries, fsUsage)))
 		}
 		fsWrite, err := a.metricsProvider.GetServiceFSWriteRange(ctx, c.to, fromTime, now)
-		if err != nil {
+		if err == nil {
 			weight = math.Max(weight, math.Abs(utils.Pearson(latSeries, fsWrite)))
 		}
 		fsRead, err := a.metricsProvider.GetServiceFSReadRange(ctx, c.to, fromTime, now)
-		if err != nil {
+		if err == nil {
 			weight = math.Max(weight, math.Abs(utils.Pearson(latSeries, fsRead)))
 		}
 		netRecv, err := a.metricsProvider.GetServiceNetworkReceiveRange(ctx, c.to, fromTime, now)
-		if err != nil {
+		if err == nil {
 			weight = math.Max(weight, math.Abs(utils.Pearson(latSeries, netRecv)))
 		}
 		netTrans, err := a.metricsProvider.GetServiceNetworkTransmitRange(ctx, c.to, fromTime, now)
-		if err != nil {
+		if err == nil {
 			weight = math.Max(weight, math.Abs(utils.Pearson(latSeries, netTrans)))
 		}
 
@@ -152,11 +152,6 @@ func (a *Analyzer) buildAbnormalCorrelationGraph(
 }
 
 func (a *Analyzer) analyzeWithSLOViolation(ctx context.Context) []string {
-	// params := AbnormalParams{
-	// 	Window: 1 * time.Minute,
-	// 	SLO:    a.config.SLO,
-	// 	Alpha:  0.2,
-	// }
 	result := make([]string, 0)
 
 	graph, err := a.buildAbnormalCorrelationGraph(ctx, time.Now())
@@ -172,7 +167,7 @@ func (a *Analyzer) analyzeWithSLOViolation(ctx context.Context) []string {
 		return anomalys[i].Rank > anomalys[j].Rank
 	})
 
-	// КОСТЫЛЬ, ЧТОБЫ НЕ БЫЛО LOADGEN
+	// A CRUTCH SO THERE’S NO GATEWAY
 	for i := 0; i < len(anomalys) && len(result) < a.config.AnomalyServicesCount; i++ {
 		if anomalys[i].ID != "istio-ingressgateway" {
 			result = append(result, anomalys[i].ID)
