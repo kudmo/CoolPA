@@ -1,7 +1,7 @@
 
 # CoolPA — Smart Autoscaler Research Project
 
-[![Go Version](https://img.shields.io/badge/Go-1.21+-00ADD8?style=flat&logo=go)](https://golang.org)
+[![Go Version](https://img.shields.io/badge/Go-1.26.6+-00ADD8?style=flat&logo=go)](https://golang.org)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![Status: Research](https://img.shields.io/badge/Status-Research-orange.svg)]()
 [![Release](https://img.shields.io/github/v/release/kudmo/CoolPA?include_prereleases)](https://github.com/kudmo/CoolPA/releases)
