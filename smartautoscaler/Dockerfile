@@ -1,6 +1,5 @@
-FROM golang:1.21-bullseye AS builder
+FROM golang:1.26.6 AS builder
 
-# Удалены ненужные для Go сборки пакеты (build-essential и cmake)
 RUN apt-get update && apt-get install -y \
     libopenblas-dev \
     libprotobuf-dev \
@@ -24,8 +23,6 @@ RUN go mod download
 
 COPY . .
 
-# Удалены отладочные флаги (были -gcflags="all=-N -l" или подобные)
-# Добавлены -s -w для уменьшения размера бинарника (удаляют отладочную информацию)
 RUN CGO_ENABLED=1 \
     go build \
     -ldflags="-s -w -r /usr/local/lib" \
