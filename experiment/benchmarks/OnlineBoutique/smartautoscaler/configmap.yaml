@@ -8,7 +8,6 @@ data:
     slo: 100
     scaling_namespace: "microservices-demo"
     prometheus_url: "http://prometheus.monitoring.svc.cluster.local:9090"
-    prometheus_interval: 5s
     analyzer_interval: 15s
     scaling_cooldown: 150s
     lambda: 0.6

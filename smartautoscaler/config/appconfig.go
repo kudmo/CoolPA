@@ -13,7 +13,6 @@ import (
 type AppConfig struct {
 	ScalingNamespace     string              `yaml:"scaling_namespace"`
 	PrometheusURL        string              `yaml:"prometheus_url"`
-	PrometheusInterval   time.Duration       `yaml:"prometheus_interval"`
 	AnalyzerInterval     time.Duration       `yaml:"analyzer_interval"`
 	SLO                  int                 `yaml:"slo"`
 	ScalingCooldown      time.Duration       `yaml:"scaling_cooldown"`
@@ -31,10 +30,6 @@ func (c *AppConfig) Validate() error {
 		return fmt.Errorf("prometheus_url cannot be empty")
 	}
 
-	if c.PrometheusInterval <= 0 {
-		return fmt.Errorf("prometheus_interval must be greater than 0")
-	}
-
 	if c.AnalyzerInterval <= 0 {
 		return fmt.Errorf("analyzer_interval must be greater than 0")
 	}
@@ -42,11 +37,6 @@ func (c *AppConfig) Validate() error {
 	minCooldown := 1 * time.Minute
 	if c.ScalingCooldown <= minCooldown {
 		return fmt.Errorf("scaling_cooldown must be greater than 1 minute (got: %v)", c.ScalingCooldown)
-	}
-
-	if c.AnalyzerInterval <= c.PrometheusInterval {
-		return fmt.Errorf("analyzer_interval (%v) must be greater than prometheus_interval (%v)",
-			c.AnalyzerInterval, c.PrometheusInterval)
 	}
 
 	if c.Lambda <= 0 || c.Lambda >= 1 {
