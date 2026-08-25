@@ -63,9 +63,7 @@ func (e *Engine) Run(ctx context.Context, now time.Time, seed *genome.ReactionGe
 		// produce next generation
 		newPop := make([]*genome.ReactionGenome, 0, len(pop))
 		// copy elites first
-		for _, el := range elites {
-			newPop = append(newPop, el)
-		}
+		newPop = append(newPop, elites...)
 
 		for len(newPop) < len(pop) {
 			i1 := selector.Select(rng, scores)

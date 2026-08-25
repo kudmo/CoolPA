@@ -33,7 +33,7 @@ func NewScaler(config ScalerConfig, metricsProvider interfaces.MetricsRepository
 		stopChan:        make(chan struct{}),
 		metricsProvider: metricsProvider,
 		config:          config,
-
+		histStore:       histStore,
 		analyzer: analyzer.NewAnalyzer(
 			analyzer.AnalyzerConfig{
 				SLO:                   config.SLO,
@@ -61,7 +61,7 @@ func NewScaler(config ScalerConfig, metricsProvider interfaces.MetricsRepository
 
 func (d *Scaler) Start(ctx context.Context) error {
 	if d.isRunning {
-		return fmt.Errorf("Analyzer is already running")
+		return fmt.Errorf("analyzer is already running")
 	}
 
 	d.isRunning = true
@@ -107,7 +107,7 @@ func (d *Scaler) Start(ctx context.Context) error {
 
 func (d *Scaler) scale(ctx context.Context, state optimizer.OptimizedState) error {
 	if d.reactionApplier == nil {
-		return fmt.Errorf("No reaction applier provided")
+		return fmt.Errorf("no reaction applier provided")
 	}
 
 	for _, s := range state.Services {
@@ -117,7 +117,7 @@ func (d *Scaler) scale(ctx context.Context, state optimizer.OptimizedState) erro
 		case optimizer.VPA:
 			continue
 		default:
-			return fmt.Errorf("Unsupported scaler reaction")
+			return fmt.Errorf("unsupported scaler reaction")
 		}
 	}
 
