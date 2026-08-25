@@ -405,7 +405,7 @@ func (p *PrometheusMetricsProvider) GetServicePodMemoryQuota(ctx context.Context
 	return resultRaw[0].Value, nil
 }
 
-func (p *PrometheusMetricsProvider) GetServiceCPUUsageRange(ctx context.Context, serviceName string, from, to time.Time) ([]float64, error) {
+func (p *PrometheusMetricsProvider) GetServiceCpuUsageRange(ctx context.Context, serviceName string, from, to time.Time) ([]float64, error) {
 	resultRaw, err := p.prometheusCollector.CollectQueryRange(ctx, collector.MetricQueryRange{
 		Name: "service_cpu_usage_range",
 		Query: fmt.Sprintf(`
@@ -574,6 +574,28 @@ func (p *PrometheusMetricsProvider) GetServiceNetworkTransmitRange(ctx context.C
 	return extractRangeValues(resultRaw), nil
 }
 
+func (p *PrometheusMetricsProvider) GetServiceRequestsCountRange(ctx context.Context, serviceName string, from, to time.Time) ([]float64, error) {
+	resultRaw, err := p.prometheusCollector.CollectQueryRange(ctx, collector.MetricQueryRange{
+		Name: "service_requests_count_range",
+		Query: fmt.Sprintf(`
+			sum(
+				rate(istio_requests_total{
+					destination_workload="%s",
+					destination_workload_namespace="%s",
+					destination_workload!="",
+					reporter="destination"
+				}[1m])
+			)`, serviceName, p.config.ScalingNamespace),
+		Start: from,
+		End:   to,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return extractRangeValues(resultRaw), nil
+}
+
 func (p *PrometheusMetricsProvider) GetGraphRequestsCountValue(ctx context.Context, serviceFrom, serviceTo string) (float64, error) {
 	resultRaw, err := p.prometheusCollector.CollectQuery(ctx, collector.MetricQuery{
 		Name: "graph_requests_count",
@@ -639,6 +661,31 @@ func (p *PrometheusMetricsProvider) GetGraphLatencyP50Value(ctx context.Context,
 					}[1m])
 				)
 			)`, serviceFrom, serviceTo, p.config.ScalingNamespace, p.config.ScalingNamespace),
+	})
+	if err != nil {
+		return 0, err
+	}
+
+	if len(resultRaw) == 0 {
+		return 0, nil
+	}
+
+	return resultRaw[0].Value, nil
+}
+
+func (p *PrometheusMetricsProvider) GetServiceAverageLatency95Value(ctx context.Context, serviceName string) (float64, error) {
+	resultRaw, err := p.prometheusCollector.CollectQuery(ctx, collector.MetricQuery{
+		Name: "service_average_latency_p95",
+		Query: fmt.Sprintf(`
+			histogram_quantile(0.95, 
+				sum by (le) (
+					rate(istio_request_duration_milliseconds_bucket{
+						destination_workload="%s",
+						destination_workload_namespace="%s",
+						destination_workload!=""
+					}[1m])
+				)
+			)`, serviceName, p.config.ScalingNamespace),
 	})
 	if err != nil {
 		return 0, err
@@ -722,6 +769,29 @@ func (p *PrometheusMetricsProvider) GetGraphLatencyP50Range(ctx context.Context,
 	return extractRangeValues(resultRaw), nil
 }
 
+func (p *PrometheusMetricsProvider) GetServiceAverageLatency95Range(ctx context.Context, serviceName string, from, to time.Time) ([]float64, error) {
+	resultRaw, err := p.prometheusCollector.CollectQueryRange(ctx, collector.MetricQueryRange{
+		Name: "service_average_latency_p95_range",
+		Query: fmt.Sprintf(`
+			histogram_quantile(0.95, 
+				sum by (le) (
+					rate(istio_request_duration_milliseconds_bucket{
+						destination_workload="%s",
+						destination_workload_namespace="%s",
+						destination_workload!=""
+					}[1m])
+				)
+			)`, serviceName, p.config.ScalingNamespace),
+		Start: from,
+		End:   to,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return extractRangeValues(resultRaw), nil
+}
+
 func (p *PrometheusMetricsProvider) GetGlobalTotalMemoryLimit(ctx context.Context) (float64, error) {
 	resultRaw, err := p.prometheusCollector.CollectQuery(ctx, collector.MetricQuery{
 		Name: "global_total_memory_limit",
@@ -785,7 +855,7 @@ func (p *PrometheusMetricsProvider) GetGlobalTotalPodsLimit(ctx context.Context)
 	return resultRaw[0].Value, nil
 }
 
-func (p *PrometheusMetricsProvider) GetServiceMinCpu(ctx context.Context) (float64, error) {
+func (p *PrometheusMetricsProvider) GetGlobalServiceMinCpu(ctx context.Context) (float64, error) {
 	resultRaw, err := p.prometheusCollector.CollectQuery(ctx, collector.MetricQuery{
 		Name: "service_min_cpu",
 		Query: fmt.Sprintf(`
@@ -806,7 +876,7 @@ func (p *PrometheusMetricsProvider) GetServiceMinCpu(ctx context.Context) (float
 	return resultRaw[0].Value, nil
 }
 
-func (p *PrometheusMetricsProvider) GetServiceMaxCpu(ctx context.Context) (float64, error) {
+func (p *PrometheusMetricsProvider) GetGlobalServiceMaxCpu(ctx context.Context) (float64, error) {
 	resultRaw, err := p.prometheusCollector.CollectQuery(ctx, collector.MetricQuery{
 		Name: "service_max_cpu",
 		Query: fmt.Sprintf(`
@@ -827,7 +897,7 @@ func (p *PrometheusMetricsProvider) GetServiceMaxCpu(ctx context.Context) (float
 	return resultRaw[0].Value, nil
 }
 
-func (p *PrometheusMetricsProvider) GetServiceMinMemory(ctx context.Context) (float64, error) {
+func (p *PrometheusMetricsProvider) GetGlobalServiceMinMemory(ctx context.Context) (float64, error) {
 	resultRaw, err := p.prometheusCollector.CollectQuery(ctx, collector.MetricQuery{
 		Name: "service_min_memory",
 		Query: fmt.Sprintf(`
@@ -848,7 +918,7 @@ func (p *PrometheusMetricsProvider) GetServiceMinMemory(ctx context.Context) (fl
 	return resultRaw[0].Value / (1024 * 1024), nil
 }
 
-func (p *PrometheusMetricsProvider) GetServiceMaxMemory(ctx context.Context) (float64, error) {
+func (p *PrometheusMetricsProvider) GetGlobalServiceMaxMemory(ctx context.Context) (float64, error) {
 	resultRaw, err := p.prometheusCollector.CollectQuery(ctx, collector.MetricQuery{
 		Name: "service_max_memory",
 		Query: fmt.Sprintf(`
