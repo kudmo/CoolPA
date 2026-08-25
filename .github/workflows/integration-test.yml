@@ -78,8 +78,38 @@ jobs:
         make deploy-scaler
 
     - name: Wait for smartautoscaler pod
+      id: wait-pod
+      continue-on-error: true
       run: |
         kubectl --context=kind-ms-demo wait --for=condition=ready pod -l app=smartautoscaler -n autoscale-test --timeout=300s
+
+    - name: Debug smartautoscaler if pod not ready
+      if: steps.wait-pod.outcome == 'failure'
+      working-directory: experiment/benchmarks/OnlineBoutique
+      run: |
+        echo "=== Pod Status ==="
+        kubectl --context=kind-ms-demo get pods -n autoscale-test -l app=smartautoscaler -o wide
+        
+        echo "=== Pod Description ==="
+        kubectl --context=kind-ms-demo describe pod -l app=smartautoscaler -n autoscale-test
+        
+        echo "=== Pod Logs ==="
+        kubectl --context=kind-ms-demo logs -l app=smartautoscaler -n autoscale-test --tail=100 || true
+        
+        echo "=== Previous Container Logs (if crash) ==="
+        kubectl --context=kind-ms-demo logs -l app=smartautoscaler -n autoscale-test --previous --tail=100 || true
+        
+        echo "=== Events ==="
+        kubectl --context=kind-ms-demo get events -n autoscale-test --sort-by='.lastTimestamp' | tail -20
+        
+        echo "=== Deployment Status ==="
+        kubectl --context=kind-ms-demo describe deployment -l app=smartautoscaler -n autoscale-test
+        
+        # Проверяем образ
+        echo "=== Image Details ==="
+        kubectl --context=kind-ms-demo get pods -l app=smartautoscaler -n autoscale-test -o jsonpath='{.items[0].spec.containers[0].image}'
+        
+        exit 1
 
     - name: Check smartautoscaler logs
       run: |
