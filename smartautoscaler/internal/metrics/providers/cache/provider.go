@@ -5,6 +5,8 @@ import (
 	"sync"
 	"time"
 
+	"golang.org/x/sync/singleflight"
+
 	"github.com/kudmo/CoolPA/internal/metrics"
 )
 
@@ -13,6 +15,7 @@ type CachedMetricsProvider struct {
 	config CachedMetricsProviderConfig
 	mu     sync.RWMutex
 	cache  map[string]cacheEntry
+	sf     singleflight.Group
 }
 
 func NewCachedMetricsRepository(repo metrics.MetricsRepository, config CachedMetricsProviderConfig) *CachedMetricsProvider {
@@ -22,7 +25,6 @@ func NewCachedMetricsRepository(repo metrics.MetricsRepository, config CachedMet
 		cache:  make(map[string]cacheEntry),
 	}
 }
-
 func (c *CachedMetricsProvider) get(ctx context.Context, key string, fetch func() (interface{}, error)) (interface{}, error) {
 	c.mu.RLock()
 	entry, exists := c.cache[key]
@@ -32,19 +34,30 @@ func (c *CachedMetricsProvider) get(ctx context.Context, key string, fetch func(
 		return entry.value, nil
 	}
 
-	value, err := fetch()
-	if err != nil {
-		return nil, err
-	}
+	value, err, _ := c.sf.Do(key, func() (interface{}, error) {
+		c.mu.RLock()
+		entry, exists := c.cache[key]
+		c.mu.RUnlock()
+		if exists && time.Now().Before(entry.expiresAt) {
+			return entry.value, nil
+		}
 
-	c.mu.Lock()
-	c.cache[key] = cacheEntry{
-		value:     value,
-		expiresAt: time.Now().Add(c.config.TTL),
-	}
-	c.mu.Unlock()
+		fetched, err := fetch()
+		if err != nil {
+			return nil, err
+		}
 
-	return value, nil
+		c.mu.Lock()
+		c.cache[key] = cacheEntry{
+			value:     fetched,
+			expiresAt: time.Now().Add(c.config.TTL),
+		}
+		c.mu.Unlock()
+
+		return fetched, nil
+	})
+
+	return value, err
 }
 
 func (c *CachedMetricsProvider) ListServices(ctx context.Context) ([]string, error) {
