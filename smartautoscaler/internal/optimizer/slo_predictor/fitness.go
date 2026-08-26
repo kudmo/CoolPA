@@ -3,6 +3,7 @@ package slopredictor
 import (
 	"context"
 	"math"
+	"sync"
 	"time"
 
 	"github.com/kudmo/CoolPA/internal/optimizer/ga/genome"
@@ -94,10 +95,44 @@ func (f *ResourceOptimizerFitness) calculateR1(ctx context.Context, now time.Tim
 
 func (f *ResourceOptimizerFitness) EvaluateBatch(ctx context.Context, now time.Time, pop []*genome.ReactionGenome) []float64 {
 	scores := make([]float64, len(pop))
+	n := len(pop)
+
+	allX := make([][]float64, 0, n)
+	for _, g := range pop {
+		X := f.Builder.Build(ctx, now, g)
+		allX = append(allX, X...)
+	}
+
+	deltas := f.Predictor.PredictBatch(allX)
+
+	r2s := make([]float64, n)
+	var wg sync.WaitGroup
+	wg.Add(n)
 	for i, g := range pop {
-		R1 := f.calculateR1(ctx, now, g)
-		R2 := f.calculateR2(ctx, now, g)
-		scores[i] = f.config.Lambda*R1 + (1-f.config.Lambda)*R2
+		go func(idx int, genome *genome.ReactionGenome) {
+			defer wg.Done()
+			r2s[idx] = f.calculateR2(ctx, now, genome)
+		}(i, g)
+	}
+	wg.Wait()
+
+	r1s := make([]float64, n)
+	idx := 0
+	for i, g := range pop {
+		prod := 1.0
+		fromBegin := now.Add(-f.config.Window)
+		for range g.Genes {
+			lat95curr, _ := f.metricsProvider.GetServiceAverageLatency95Range(ctx, g.Genes[i].ServiceName, fromBegin, now)
+			lat95New := utils.Avg(lat95curr) * math.Pow(math.E, deltas[idx])
+			risk := f.histStore.GetHistogram(g.Genes[i].ServiceName).Risk(lat95New)
+			prod *= (1.0 - risk)
+			idx++
+		}
+		r1s[i] = prod
+	}
+
+	for i := range scores {
+		scores[i] = f.config.Lambda*r1s[i] + (1-f.config.Lambda)*r2s[i]
 	}
 	return scores
 }
