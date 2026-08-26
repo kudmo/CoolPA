@@ -8,7 +8,12 @@ on:
       - 'smartautoscaler/go.mod'
       - 'smartautoscaler/go.sum'
       - 'smartautoscaler/**/*.go'
+      - 'LICENSE'
       - '.github/workflows/*.yml'
+
+permissions:
+  contents: read
+  pull-requests: write
 
 jobs:
   license-check:
@@ -30,33 +35,128 @@ jobs:
       run: |
         go install github.com/google/go-licenses@latest
 
-    - name: Check licenses against Apache 2.0
+    - name: Check project license
+      run: |
+        if [ ! -f LICENSE ]; then
+          echo "LICENSE file not found"
+          exit 1
+        fi
+        
+        echo "Project license:"
+        head -5 LICENSE
+        echo ""
+        
+        if grep -q "Apache" LICENSE; then
+          echo "Project uses Apache 2.0 license"
+        else
+          echo "Project license might not be Apache 2.0"
+        fi
+
+    - name: Check licenses against allowed list
       working-directory: smartautoscaler
       run: |
+        echo "Checking licenses for compatibility with Apache 2.0..."
+        echo "Allowed licenses: Apache-2.0, BSD-2-Clause, BSD-3-Clause, MIT, ISC, MPL-2.0"
+        echo ""
+        
         go-licenses check ./... \
-          --allowed_licenses=Apache-2.0,BSD-2-Clause,BSD-3-Clause,MIT,ISC,MPL-2.0 \
-          --disallowed_licenses=GPL-2.0,GPL-3.0,AGPL-3.0,LGPL-2.1,LGPL-3.0
+          --allowed_licenses=Apache-2.0,BSD-2-Clause,BSD-3-Clause,MIT,ISC,MPL-2.0
 
     - name: Generate license report
+      if: always()
       working-directory: smartautoscaler
       run: |
         mkdir -p license-report
-        go-licenses csv ./... > license-report/licenses.csv
-        go-licenses report ./... > license-report/licenses-report.txt
         
-        cat license-report/licenses-report.txt
+        go-licenses csv ./... > license-report/licenses.csv 2>/dev/null || true
+        
+        go-licenses report ./... > license-report/licenses-report.txt 2>/dev/null || true
+        
+        echo "=== License Report ==="
+        cat license-report/licenses-report.txt 2>/dev/null || echo "No report generated"
+        
+        echo ""
+        echo "=== CSV Report ==="
+        cat license-report/licenses.csv 2>/dev/null || echo "No CSV report generated"
 
-    - name: Upload license report
+    - name: Create custom license check script
+      if: always()
+      working-directory: smartautoscaler
+      run: |
+        cat > check-licenses.sh << 'EOF'
+        #!/bin/bash
+        
+        echo "=== Checking individual licenses ==="
+        echo ""
+        
+        go list -m all | tail -n +2 | while read -r module version; do
+          if [ "$module" != "smartautoscaler" ]; then
+            # Получаем лицензию для модуля
+            license=$(go-licenses csv "$module" 2>/dev/null | tail -n +2 | awk -F',' '{print $3}' | head -1)
+            
+            if [ -n "$license" ]; then
+              case "$license" in
+                *"Apache"*|*"BSD"*|*"MIT"*|*"ISC"*|*"MPL"*)
+                  echo "$module: $license"
+                  ;;
+                *"GPL"*|*"AGPL"*|*"LGPL"*)
+                  echo "$module: $license (NOT COMPATIBLE)"
+                  ;;
+                *)
+                  echo "$module: $license (REVIEW REQUIRED)"
+                  ;;
+              esac
+            else
+              echo "$module: Unknown license"
+            fi
+          fi
+        done
+        EOF
+        
+        chmod +x check-licenses.sh
+        ./check-licenses.sh
+
+    - name: Upload license reports
       if: always()
       uses: actions/upload-artifact@v4
       with:
-        name: license-report
+        name: license-reports
         path: smartautoscaler/license-report/
+        retention-days: 7
 
-    - name: Comment license issues on PR
-      if: failure()
-      run: |
-        echo "License compliance check failed. Please review the license report."
-        echo "Allowed licenses: Apache-2.0, BSD-2-Clause, BSD-3-Clause, MIT, ISC, MPL-2.0"
-        echo "Disallowed licenses: GPL-2.0, GPL-3.0, AGPL-3.0, LGPL-2.1, LGPL-3.0"
-        exit 1
+    - name: Comment on PR with license summary
+      if: always()
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const fs = require('fs');
+          
+          let body = '## License Compliance Report\n\n';
+          body += '**Allowed licenses:** Apache-2.0, BSD-2-Clause, BSD-3-Clause, MIT, ISC, MPL-2.0\n\n';
+          
+          if (fs.existsSync('smartautoscaler/license-report/licenses-report.txt')) {
+            const report = fs.readFileSync('smartautoscaler/license-report/licenses-report.txt', 'utf8');
+            body += '### Detailed Report\n```\n' + report.slice(0, 500) + '\n```\n\n';
+          }
+          
+          if (fs.existsSync('smartautoscaler/license-report/licenses.csv')) {
+            const csv = fs.readFileSync('smartautoscaler/license-report/licenses.csv', 'utf8');
+            const lines = csv.split('\n').slice(0, 20);
+            body += '### Dependencies\n| Module | Version | License |\n|--------|---------|----------|\n';
+            
+            for (const line of lines) {
+              if (line.trim()) {
+                const [module, version, license] = line.split(',');
+                if (module && license) {
+                  body += `| ${module} | ${version || ''} | ${license} |\n`;
+                }
+              }
+            }
+          }
+          
+          github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: body
+          });
