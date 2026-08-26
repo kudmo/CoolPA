@@ -205,7 +205,7 @@ func TestCachedMetricsRepository_BasicCaching(t *testing.T) {
 	mockRepo := new(MockMetricsRepository)
 	mockRepo.On("ListServices", mock.Anything).Return([]string{"service1", "service2"}, nil)
 
-	cachedRepo := cache.NewCachedMetricsRepository(mockRepo, cache.CachedMetricsProviderConfig{TTL: 5 * time.Minute})
+	cachedRepo := cache.NewCachedMetricsRepository(mockRepo, cache.CachedMetricsProviderConfig{MaxCacheSize: 100, TTL: 5 * time.Minute})
 	ctx := context.Background()
 
 	services1, err := cachedRepo.ListServices(ctx)
@@ -229,7 +229,7 @@ func TestCachedMetricsRepository_TTLExpiration(t *testing.T) {
 	mockRepo := new(MockMetricsRepository)
 	mockRepo.On("GetServiceCpuUsageValue", mock.Anything, "test-service").Return(42.5, nil)
 
-	cachedRepo := cache.NewCachedMetricsRepository(mockRepo, cache.CachedMetricsProviderConfig{TTL: 10 * time.Millisecond})
+	cachedRepo := cache.NewCachedMetricsRepository(mockRepo, cache.CachedMetricsProviderConfig{MaxCacheSize: 100, TTL: 10 * time.Millisecond})
 	ctx := context.Background()
 
 	value1, err := cachedRepo.GetServiceCpuUsageValue(ctx, "test-service")
@@ -256,7 +256,7 @@ func TestCachedMetricsRepository_DifferentKeys(t *testing.T) {
 	mockRepo.On("GetServiceCpuUsageValue", mock.Anything, "service1").Return(10.0, nil)
 	mockRepo.On("GetServiceCpuUsageValue", mock.Anything, "service2").Return(10.0, nil)
 
-	cachedRepo := cache.NewCachedMetricsRepository(mockRepo, cache.CachedMetricsProviderConfig{TTL: 5 * time.Minute})
+	cachedRepo := cache.NewCachedMetricsRepository(mockRepo, cache.CachedMetricsProviderConfig{MaxCacheSize: 100, TTL: 5 * time.Minute})
 	ctx := context.Background()
 
 	cachedRepo.GetServiceCpuUsageValue(ctx, "service1")
@@ -270,7 +270,7 @@ func TestCachedMetricsRepository_ErrorHandling(t *testing.T) {
 	mockRepo.On("GetServiceMemoryUsageValue", mock.Anything, "test-service").
 		Return(0.0, errors.New("test error"))
 
-	cachedRepo := cache.NewCachedMetricsRepository(mockRepo, cache.CachedMetricsProviderConfig{TTL: 5 * time.Minute})
+	cachedRepo := cache.NewCachedMetricsRepository(mockRepo, cache.CachedMetricsProviderConfig{MaxCacheSize: 100, TTL: 5 * time.Minute})
 	ctx := context.Background()
 
 	_, err1 := cachedRepo.GetServiceMemoryUsageValue(ctx, "test-service")
@@ -292,7 +292,7 @@ func TestCachedMetricsRepository_RangeValues(t *testing.T) {
 		mock.Anything, "test-service", mock.Anything, mock.Anything).
 		Return([]float64{1.0, 2.0, 3.0}, nil)
 
-	cachedRepo := cache.NewCachedMetricsRepository(mockRepo, cache.CachedMetricsProviderConfig{TTL: 5 * time.Minute})
+	cachedRepo := cache.NewCachedMetricsRepository(mockRepo, cache.CachedMetricsProviderConfig{MaxCacheSize: 100, TTL: 5 * time.Minute})
 	ctx := context.Background()
 
 	from := time.Now().Add(-1 * time.Hour)
@@ -320,7 +320,7 @@ func TestCachedMetricsRepository_ClearCache(t *testing.T) {
 	mockRepo.On("GetGraphRequestsCountValue", mock.Anything, "service1", "service2").
 		Return(100.0, nil)
 
-	cachedRepo := cache.NewCachedMetricsRepository(mockRepo, cache.CachedMetricsProviderConfig{TTL: 5 * time.Minute})
+	cachedRepo := cache.NewCachedMetricsRepository(mockRepo, cache.CachedMetricsProviderConfig{MaxCacheSize: 100, TTL: 5 * time.Minute})
 	ctx := context.Background()
 
 	cachedRepo.GetGraphRequestsCountValue(ctx, "service1", "service2")
@@ -337,7 +337,7 @@ func TestCachedMetricsRepository_ConcurrentAccess(t *testing.T) {
 	mockRepo.On("GetServiceCpuUsageValue", mock.Anything, "test-service").
 		Return(30.0, nil)
 
-	cachedRepo := cache.NewCachedMetricsRepository(mockRepo, cache.CachedMetricsProviderConfig{TTL: 5 * time.Minute})
+	cachedRepo := cache.NewCachedMetricsRepository(mockRepo, cache.CachedMetricsProviderConfig{MaxCacheSize: 100, TTL: 5 * time.Minute})
 	ctx := context.Background()
 
 	done := make(chan bool)
@@ -366,7 +366,7 @@ func TestCachedMetricsRepository_GetCacheSize(t *testing.T) {
 	mockRepo.On("ListServices", mock.Anything).Return([]string{"service1"}, nil)
 	mockRepo.On("GetServiceCpuUsageValue", mock.Anything, "service1").Return(15.0, nil)
 
-	cachedRepo := cache.NewCachedMetricsRepository(mockRepo, cache.CachedMetricsProviderConfig{TTL: 5 * time.Minute})
+	cachedRepo := cache.NewCachedMetricsRepository(mockRepo, cache.CachedMetricsProviderConfig{MaxCacheSize: 100, TTL: 5 * time.Minute})
 	ctx := context.Background()
 
 	if size := cachedRepo.GetCacheSize(); size != 0 {

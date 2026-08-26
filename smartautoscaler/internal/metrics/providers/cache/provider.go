@@ -2,9 +2,9 @@ package cache
 
 import (
 	"context"
-	"sync"
 	"time"
 
+	lru "github.com/hashicorp/golang-lru/v2"
 	"golang.org/x/sync/singleflight"
 
 	"github.com/kudmo/CoolPA/internal/metrics"
@@ -13,31 +13,27 @@ import (
 type CachedMetricsProvider struct {
 	repo   metrics.MetricsRepository
 	config CachedMetricsProviderConfig
-	mu     sync.RWMutex
-	cache  map[string]cacheEntry
+	cache  *lru.Cache[string, cacheEntry]
 	sf     singleflight.Group
 }
 
 func NewCachedMetricsRepository(repo metrics.MetricsRepository, config CachedMetricsProviderConfig) *CachedMetricsProvider {
+	cache, _ := lru.New[string, cacheEntry](config.MaxCacheSize)
 	return &CachedMetricsProvider{
 		repo:   repo,
 		config: config,
-		cache:  make(map[string]cacheEntry),
+		cache:  cache,
 	}
 }
 func (c *CachedMetricsProvider) get(ctx context.Context, key string, fetch func() (interface{}, error)) (interface{}, error) {
-	c.mu.RLock()
-	entry, exists := c.cache[key]
-	c.mu.RUnlock()
+	entry, exists := c.cache.Get(key)
 
 	if exists && time.Now().Before(entry.expiresAt) {
 		return entry.value, nil
 	}
 
 	value, err, _ := c.sf.Do(key, func() (interface{}, error) {
-		c.mu.RLock()
-		entry, exists := c.cache[key]
-		c.mu.RUnlock()
+		entry, exists := c.cache.Get(key)
 		if exists && time.Now().Before(entry.expiresAt) {
 			return entry.value, nil
 		}
@@ -47,12 +43,10 @@ func (c *CachedMetricsProvider) get(ctx context.Context, key string, fetch func(
 			return nil, err
 		}
 
-		c.mu.Lock()
-		c.cache[key] = cacheEntry{
+		c.cache.Add(key, cacheEntry{
 			value:     fetched,
 			expiresAt: time.Now().Add(c.config.TTL),
-		}
-		c.mu.Unlock()
+		})
 
 		return fetched, nil
 	})
@@ -467,13 +461,9 @@ func (c *CachedMetricsProvider) GetGlobalServiceMaxMemory(ctx context.Context) (
 }
 
 func (c *CachedMetricsProvider) ClearCache() {
-	c.mu.Lock()
-	c.cache = make(map[string]cacheEntry)
-	c.mu.Unlock()
+	c.cache.Purge()
 }
 
 func (c *CachedMetricsProvider) GetCacheSize() int {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-	return len(c.cache)
+	return c.cache.Len()
 }
