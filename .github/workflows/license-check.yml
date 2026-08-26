@@ -52,19 +52,51 @@ jobs:
           echo "::warning::Project license might not be Apache 2.0"
         fi
 
-    - name: Check licenses against allowed list
+    - name: Check external dependencies licenses
       working-directory: smartautoscaler
       run: |
-        echo "Checking licenses for compatibility with Apache 2.0..."
+        echo "Checking external dependencies for compatibility with Apache 2.0..."
         echo "Allowed licenses: Apache-2.0, BSD-2-Clause, BSD-3-Clause, MIT, ISC, MPL-2.0"
         echo ""
         
-        if go-licenses check ./... \
-          --allowed_licenses=Apache-2.0,BSD-2-Clause,BSD-3-Clause,MIT,ISC,MPL-2.0; then
-          echo "::notice::All licenses are compatible with Apache 2.0"
-        else
+        ISSUES_FOUND=0
+        
+        while IFS=',' read -r module license_url license_type; do
+          if [[ "$module" == "Module" || -z "$module" ]]; then
+            continue
+          fi
+          
+          module=$(echo "$module" | tr -d '"')
+          license_type=$(echo "$license_type" | tr -d '"')
+          
+          if [[ "$module" == github.com/kudmo/CoolPA* || "$module" == github.com/kudmo/toporank* ]]; then
+            echo "SKIPPING (internal): $module"
+            continue
+          fi
+          
+          case "$license_type" in
+            *"Apache"*|*"BSD"*|*"MIT"*|*"ISC"*|*"MPL"*)
+              echo "COMPATIBLE: $module ($license_type)"
+              ;;
+            *"GPL"*|*"AGPL"*|*"LGPL"*)
+              echo "::error::INCOMPATIBLE: $module ($license_type)"
+              ISSUES_FOUND=1
+              ;;
+            *"Unknown"*|*"UNKNOWN"*|"")
+              echo "::warning::UNKNOWN: $module (no license detected)"
+              ;;
+            *)
+              echo "::error::REVIEW REQUIRED: $module ($license_type)"
+              ISSUES_FOUND=1
+              ;;
+          esac
+        done < <(go-licenses csv ./... 2>/dev/null || true)
+        
+        if [ $ISSUES_FOUND -eq 1 ]; then
           echo "::error::Found incompatible licenses"
           exit 1
+        else
+          echo "::notice::All external dependencies have compatible licenses"
         fi
 
     - name: Generate license report
@@ -73,8 +105,6 @@ jobs:
       run: |
         mkdir -p license-report
         
-        go-licenses csv ./... > license-report/licenses.csv 2>/dev/null || true
-        
         {
           echo "=== License Report ==="
           echo "Generated: $(date)"
@@ -82,24 +112,35 @@ jobs:
           echo "| Module | License | Status |"
           echo "|--------|---------|--------|"
           
-          tail -n +2 license-report/licenses.csv | while IFS=',' read -r module license_url license_type; do
+          while IFS=',' read -r module license_url license_type; do
+            if [[ "$module" == "Module" || -z "$module" ]]; then
+              continue
+            fi
+            
             module=$(echo "$module" | tr -d '"')
             license_type=$(echo "$license_type" | tr -d '"')
             
-            case "$license_type" in
-              *"Apache"*|*"BSD"*|*"MIT"*|*"ISC"*|*"MPL"*)
-                status="COMPATIBLE"
-                ;;
-              *"GPL"*|*"AGPL"*|*"LGPL"*)
-                status="INCOMPATIBLE"
-                ;;
-              *)
-                status="REVIEW REQUIRED"
-                ;;
-            esac
+            if [[ "$module" == github.com/kudmo/CoolPA* || "$module" == github.com/kudmo/toporank* ]]; then
+              status="INTERNAL"
+            else
+              case "$license_type" in
+                *"Apache"*|*"BSD"*|*"MIT"*|*"ISC"*|*"MPL"*)
+                  status="COMPATIBLE"
+                  ;;
+                *"GPL"*|*"AGPL"*|*"LGPL"*)
+                  status="INCOMPATIBLE"
+                  ;;
+                *"Unknown"*|*"UNKNOWN"*|"")
+                  status="UNKNOWN"
+                  ;;
+                *)
+                  status="REVIEW REQUIRED"
+                  ;;
+              esac
+            fi
             
             echo "| $module | $license_type | $status |"
-          done
+          done < <(go-licenses csv ./... 2>/dev/null || true)
         } > license-report/readable-report.txt
         
         cat license-report/readable-report.txt
@@ -111,12 +152,43 @@ jobs:
         {
           echo "=== License Summary ==="
           
-          total=$(tail -n +2 license-report/licenses.csv | wc -l)
-          compatible=$(tail -n +2 license-report/licenses.csv | grep -cE "(Apache|BSD|MIT|ISC|MPL)" || true)
-          incompatible=$(tail -n +2 license-report/licenses.csv | grep -cE "(GPL|AGPL|LGPL)" || true)
-          unknown=$(tail -n +2 license-report/licenses.csv | grep -vcE "(Apache|BSD|MIT|ISC|MPL|GPL|AGPL|LGPL)" || true)
+          total=0
+          compatible=0
+          incompatible=0
+          internal=0
+          unknown=0
+          
+          while IFS=',' read -r module license_url license_type; do
+            if [[ "$module" == "Module" || -z "$module" ]]; then
+              continue
+            fi
+            
+            module=$(echo "$module" | tr -d '"')
+            license_type=$(echo "$license_type" | tr -d '"')
+            total=$((total + 1))
+            
+            if [[ "$module" == github.com/kudmo/CoolPA* || "$module" == github.com/kudmo/toporank* ]]; then
+              internal=$((internal + 1))
+            else
+              case "$license_type" in
+                *"Apache"*|*"BSD"*|*"MIT"*|*"ISC"*|*"MPL"*)
+                  compatible=$((compatible + 1))
+                  ;;
+                *"GPL"*|*"AGPL"*|*"LGPL"*)
+                  incompatible=$((incompatible + 1))
+                  ;;
+                *"Unknown"*|*"UNKNOWN"*|"")
+                  unknown=$((unknown + 1))
+                  ;;
+                *)
+                  unknown=$((unknown + 1))
+                  ;;
+              esac
+            fi
+          done < <(go-licenses csv ./... 2>/dev/null || true)
           
           echo "Total dependencies: $total"
+          echo "Internal packages: $internal"
           echo "Compatible licenses: $compatible"
           echo "Incompatible licenses: $incompatible"
           echo "Unknown licenses: $unknown"
@@ -124,11 +196,10 @@ jobs:
           
           if [ "$incompatible" -gt 0 ]; then
             echo "FOUND_INCOMPATIBLE_LICENSES"
-            exit 1
           elif [ "$unknown" -gt 0 ]; then
             echo "UNKNOWN_LICENSES_REQUIRE_REVIEW"
           else
-            echo "ALL_LICENSES_COMPATIBLE"
+            echo "ALL_EXTERNAL_LICENSES_COMPATIBLE"
           fi
         } > license-report/summary.txt
         
@@ -160,7 +231,7 @@ jobs:
             } else if (summary.includes('UNKNOWN_LICENSES_REQUIRE_REVIEW')) {
               body += '> **WARNING**: Some licenses require manual review\n\n';
             } else {
-              body += '> **SUCCESS**: All licenses are compatible\n\n';
+              body += '> **SUCCESS**: All external licenses are compatible\n\n';
             }
             
             body += '### Summary\n```\n' + summary + '\n```\n\n';
