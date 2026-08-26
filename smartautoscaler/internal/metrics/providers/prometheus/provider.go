@@ -6,6 +6,7 @@ import (
 	"sort"
 	"time"
 
+	contextutil "github.com/kudmo/CoolPA/context"
 	"github.com/kudmo/CoolPA/internal/metrics"
 	"github.com/kudmo/CoolPA/internal/metrics/providers/prometheus/collector"
 )
@@ -405,7 +406,12 @@ func (p *PrometheusMetricsProvider) GetServicePodMemoryQuota(ctx context.Context
 	return resultRaw[0].Value, nil
 }
 
-func (p *PrometheusMetricsProvider) GetServiceCpuUsageRange(ctx context.Context, serviceName string, from, to time.Time) ([]float64, error) {
+func (p *PrometheusMetricsProvider) GetServiceCpuUsageRange(ctx context.Context, serviceName string, rangeWindow time.Duration) ([]float64, error) {
+	from, to, ok := contextutil.GetTimeRange(ctx, rangeWindow)
+	if !ok {
+		return nil, fmt.Errorf("analysis time not set in context")
+	}
+
 	resultRaw, err := p.prometheusCollector.CollectQueryRange(ctx, collector.MetricQueryRange{
 		Name: "service_cpu_usage_range",
 		Query: fmt.Sprintf(`
@@ -430,7 +436,12 @@ func (p *PrometheusMetricsProvider) GetServiceCpuUsageRange(ctx context.Context,
 	return extractRangeValues(resultRaw), nil
 }
 
-func (p *PrometheusMetricsProvider) GetServiceMemoryUsageRange(ctx context.Context, serviceName string, from, to time.Time) ([]float64, error) {
+func (p *PrometheusMetricsProvider) GetServiceMemoryUsageRange(ctx context.Context, serviceName string, rangeWindow time.Duration) ([]float64, error) {
+	from, to, ok := contextutil.GetTimeRange(ctx, rangeWindow)
+	if !ok {
+		return nil, fmt.Errorf("analysis time not set in context")
+	}
+
 	resultRaw, err := p.prometheusCollector.CollectQueryRange(ctx, collector.MetricQueryRange{
 		Name: "service_memory_usage_range",
 		Query: fmt.Sprintf(`
@@ -455,7 +466,12 @@ func (p *PrometheusMetricsProvider) GetServiceMemoryUsageRange(ctx context.Conte
 	return extractRangeValues(resultRaw), nil
 }
 
-func (p *PrometheusMetricsProvider) GetServiceFSUsageRange(ctx context.Context, serviceName string, from, to time.Time) ([]float64, error) {
+func (p *PrometheusMetricsProvider) GetServiceFSUsageRange(ctx context.Context, serviceName string, rangeWindow time.Duration) ([]float64, error) {
+	from, to, ok := contextutil.GetTimeRange(ctx, rangeWindow)
+	if !ok {
+		return nil, fmt.Errorf("analysis time not set in context")
+	}
+
 	resultRaw, err := p.prometheusCollector.CollectQueryRange(ctx, collector.MetricQueryRange{
 		Name: "service_fs_usage_range",
 		Query: fmt.Sprintf(`
@@ -480,7 +496,12 @@ func (p *PrometheusMetricsProvider) GetServiceFSUsageRange(ctx context.Context, 
 	return extractRangeValues(resultRaw), nil
 }
 
-func (p *PrometheusMetricsProvider) GetServiceFSWriteRange(ctx context.Context, serviceName string, from, to time.Time) ([]float64, error) {
+func (p *PrometheusMetricsProvider) GetServiceFSWriteRange(ctx context.Context, serviceName string, rangeWindow time.Duration) ([]float64, error) {
+	from, to, ok := contextutil.GetTimeRange(ctx, rangeWindow)
+	if !ok {
+		return nil, fmt.Errorf("analysis time not set in context")
+	}
+
 	resultRaw, err := p.prometheusCollector.CollectQueryRange(ctx, collector.MetricQueryRange{
 		Name: "service_fs_write_range",
 		Query: fmt.Sprintf(`
@@ -505,7 +526,12 @@ func (p *PrometheusMetricsProvider) GetServiceFSWriteRange(ctx context.Context, 
 	return extractRangeValues(resultRaw), nil
 }
 
-func (p *PrometheusMetricsProvider) GetServiceFSReadRange(ctx context.Context, serviceName string, from, to time.Time) ([]float64, error) {
+func (p *PrometheusMetricsProvider) GetServiceFSReadRange(ctx context.Context, serviceName string, rangeWindow time.Duration) ([]float64, error) {
+	from, to, ok := contextutil.GetTimeRange(ctx, rangeWindow)
+	if !ok {
+		return nil, fmt.Errorf("analysis time not set in context")
+	}
+
 	resultRaw, err := p.prometheusCollector.CollectQueryRange(ctx, collector.MetricQueryRange{
 		Name: "service_fs_read_range",
 		Query: fmt.Sprintf(`
@@ -530,7 +556,12 @@ func (p *PrometheusMetricsProvider) GetServiceFSReadRange(ctx context.Context, s
 	return extractRangeValues(resultRaw), nil
 }
 
-func (p *PrometheusMetricsProvider) GetServiceNetworkReceiveRange(ctx context.Context, serviceName string, from, to time.Time) ([]float64, error) {
+func (p *PrometheusMetricsProvider) GetServiceNetworkReceiveRange(ctx context.Context, serviceName string, rangeWindow time.Duration) ([]float64, error) {
+	from, to, ok := contextutil.GetTimeRange(ctx, rangeWindow)
+	if !ok {
+		return nil, fmt.Errorf("analysis time not set in context")
+	}
+
 	resultRaw, err := p.prometheusCollector.CollectQueryRange(ctx, collector.MetricQueryRange{
 		Name: "service_network_receive_range",
 		Query: fmt.Sprintf(`
@@ -552,7 +583,12 @@ func (p *PrometheusMetricsProvider) GetServiceNetworkReceiveRange(ctx context.Co
 	return extractRangeValues(resultRaw), nil
 }
 
-func (p *PrometheusMetricsProvider) GetServiceNetworkTransmitRange(ctx context.Context, serviceName string, from, to time.Time) ([]float64, error) {
+func (p *PrometheusMetricsProvider) GetServiceNetworkTransmitRange(ctx context.Context, serviceName string, rangeWindow time.Duration) ([]float64, error) {
+	from, to, ok := contextutil.GetTimeRange(ctx, rangeWindow)
+	if !ok {
+		return nil, fmt.Errorf("analysis time not set in context")
+	}
+
 	resultRaw, err := p.prometheusCollector.CollectQueryRange(ctx, collector.MetricQueryRange{
 		Name: "service_network_transmit_range",
 		Query: fmt.Sprintf(`
@@ -574,7 +610,12 @@ func (p *PrometheusMetricsProvider) GetServiceNetworkTransmitRange(ctx context.C
 	return extractRangeValues(resultRaw), nil
 }
 
-func (p *PrometheusMetricsProvider) GetServiceRequestsCountRange(ctx context.Context, serviceName string, from, to time.Time) ([]float64, error) {
+func (p *PrometheusMetricsProvider) GetServiceRequestsCountRange(ctx context.Context, serviceName string, rangeWindow time.Duration) ([]float64, error) {
+	from, to, ok := contextutil.GetTimeRange(ctx, rangeWindow)
+	if !ok {
+		return nil, fmt.Errorf("analysis time not set in context")
+	}
+
 	resultRaw, err := p.prometheusCollector.CollectQueryRange(ctx, collector.MetricQueryRange{
 		Name: "service_requests_count_range",
 		Query: fmt.Sprintf(`
@@ -698,7 +739,12 @@ func (p *PrometheusMetricsProvider) GetServiceAverageLatency95Value(ctx context.
 	return resultRaw[0].Value, nil
 }
 
-func (p *PrometheusMetricsProvider) GetGraphRequestsCountRange(ctx context.Context, serviceFrom, serviceTo string, from, to time.Time) ([]float64, error) {
+func (p *PrometheusMetricsProvider) GetGraphRequestsCountRange(ctx context.Context, serviceFrom, serviceTo string, rangeWindow time.Duration) ([]float64, error) {
+	from, to, ok := contextutil.GetTimeRange(ctx, rangeWindow)
+	if !ok {
+		return nil, fmt.Errorf("analysis time not set in context")
+	}
+
 	resultRaw, err := p.prometheusCollector.CollectQueryRange(ctx, collector.MetricQueryRange{
 		Name: "graph_requests_count_range",
 		Query: fmt.Sprintf(`
@@ -721,7 +767,12 @@ func (p *PrometheusMetricsProvider) GetGraphRequestsCountRange(ctx context.Conte
 	return extractRangeValues(resultRaw), nil
 }
 
-func (p *PrometheusMetricsProvider) GetGraphLatencyP95Range(ctx context.Context, serviceFrom, serviceTo string, from, to time.Time) ([]float64, error) {
+func (p *PrometheusMetricsProvider) GetGraphLatencyP95Range(ctx context.Context, serviceFrom, serviceTo string, rangeWindow time.Duration) ([]float64, error) {
+	from, to, ok := contextutil.GetTimeRange(ctx, rangeWindow)
+	if !ok {
+		return nil, fmt.Errorf("analysis time not set in context")
+	}
+
 	resultRaw, err := p.prometheusCollector.CollectQueryRange(ctx, collector.MetricQueryRange{
 		Name: "graph_latency_p95_range",
 		Query: fmt.Sprintf(`
@@ -745,7 +796,12 @@ func (p *PrometheusMetricsProvider) GetGraphLatencyP95Range(ctx context.Context,
 	return extractRangeValues(resultRaw), nil
 }
 
-func (p *PrometheusMetricsProvider) GetGraphLatencyP50Range(ctx context.Context, serviceFrom, serviceTo string, from, to time.Time) ([]float64, error) {
+func (p *PrometheusMetricsProvider) GetGraphLatencyP50Range(ctx context.Context, serviceFrom, serviceTo string, rangeWindow time.Duration) ([]float64, error) {
+	from, to, ok := contextutil.GetTimeRange(ctx, rangeWindow)
+	if !ok {
+		return nil, fmt.Errorf("analysis time not set in context")
+	}
+
 	resultRaw, err := p.prometheusCollector.CollectQueryRange(ctx, collector.MetricQueryRange{
 		Name: "graph_latency_p50_range",
 		Query: fmt.Sprintf(`
@@ -769,7 +825,12 @@ func (p *PrometheusMetricsProvider) GetGraphLatencyP50Range(ctx context.Context,
 	return extractRangeValues(resultRaw), nil
 }
 
-func (p *PrometheusMetricsProvider) GetServiceAverageLatency95Range(ctx context.Context, serviceName string, from, to time.Time) ([]float64, error) {
+func (p *PrometheusMetricsProvider) GetServiceAverageLatency95Range(ctx context.Context, serviceName string, rangeWindow time.Duration) ([]float64, error) {
+	from, to, ok := contextutil.GetTimeRange(ctx, rangeWindow)
+	if !ok {
+		return nil, fmt.Errorf("analysis time not set in context")
+	}
+
 	resultRaw, err := p.prometheusCollector.CollectQueryRange(ctx, collector.MetricQueryRange{
 		Name: "service_average_latency_p95_range",
 		Query: fmt.Sprintf(`

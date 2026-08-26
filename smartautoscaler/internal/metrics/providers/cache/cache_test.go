@@ -8,6 +8,7 @@ import (
 
 	"github.com/stretchr/testify/mock"
 
+	contextutil "github.com/kudmo/CoolPA/context"
 	"github.com/kudmo/CoolPA/internal/metrics"
 	"github.com/kudmo/CoolPA/internal/metrics/providers/cache"
 )
@@ -91,43 +92,43 @@ func (m *MockMetricsRepository) GetServiceAverageLatency95Value(ctx context.Cont
 	return args.Get(0).(float64), args.Error(1)
 }
 
-func (m *MockMetricsRepository) GetServiceCpuUsageRange(ctx context.Context, serviceName string, from, to time.Time) ([]float64, error) {
-	args := m.Called(ctx, serviceName, from, to)
+func (m *MockMetricsRepository) GetServiceCpuUsageRange(ctx context.Context, serviceName string, rangeWindow time.Duration) ([]float64, error) {
+	args := m.Called(ctx, serviceName, rangeWindow)
 	return args.Get(0).([]float64), args.Error(1)
 }
 
-func (m *MockMetricsRepository) GetServiceMemoryUsageRange(ctx context.Context, serviceName string, from, to time.Time) ([]float64, error) {
-	args := m.Called(ctx, serviceName, from, to)
+func (m *MockMetricsRepository) GetServiceMemoryUsageRange(ctx context.Context, serviceName string, rangeWindow time.Duration) ([]float64, error) {
+	args := m.Called(ctx, serviceName, rangeWindow)
 	return args.Get(0).([]float64), args.Error(1)
 }
 
-func (m *MockMetricsRepository) GetServiceFSUsageRange(ctx context.Context, serviceName string, from, to time.Time) ([]float64, error) {
-	args := m.Called(ctx, serviceName, from, to)
+func (m *MockMetricsRepository) GetServiceFSUsageRange(ctx context.Context, serviceName string, rangeWindow time.Duration) ([]float64, error) {
+	args := m.Called(ctx, serviceName, rangeWindow)
 	return args.Get(0).([]float64), args.Error(1)
 }
 
-func (m *MockMetricsRepository) GetServiceFSWriteRange(ctx context.Context, serviceName string, from, to time.Time) ([]float64, error) {
-	args := m.Called(ctx, serviceName, from, to)
+func (m *MockMetricsRepository) GetServiceFSWriteRange(ctx context.Context, serviceName string, rangeWindow time.Duration) ([]float64, error) {
+	args := m.Called(ctx, serviceName, rangeWindow)
 	return args.Get(0).([]float64), args.Error(1)
 }
 
-func (m *MockMetricsRepository) GetServiceFSReadRange(ctx context.Context, serviceName string, from, to time.Time) ([]float64, error) {
-	args := m.Called(ctx, serviceName, from, to)
+func (m *MockMetricsRepository) GetServiceFSReadRange(ctx context.Context, serviceName string, rangeWindow time.Duration) ([]float64, error) {
+	args := m.Called(ctx, serviceName, rangeWindow)
 	return args.Get(0).([]float64), args.Error(1)
 }
 
-func (m *MockMetricsRepository) GetServiceNetworkReceiveRange(ctx context.Context, serviceName string, from, to time.Time) ([]float64, error) {
-	args := m.Called(ctx, serviceName, from, to)
+func (m *MockMetricsRepository) GetServiceNetworkReceiveRange(ctx context.Context, serviceName string, rangeWindow time.Duration) ([]float64, error) {
+	args := m.Called(ctx, serviceName, rangeWindow)
 	return args.Get(0).([]float64), args.Error(1)
 }
 
-func (m *MockMetricsRepository) GetServiceNetworkTransmitRange(ctx context.Context, serviceName string, from, to time.Time) ([]float64, error) {
-	args := m.Called(ctx, serviceName, from, to)
+func (m *MockMetricsRepository) GetServiceNetworkTransmitRange(ctx context.Context, serviceName string, rangeWindow time.Duration) ([]float64, error) {
+	args := m.Called(ctx, serviceName, rangeWindow)
 	return args.Get(0).([]float64), args.Error(1)
 }
 
-func (m *MockMetricsRepository) GetServiceRequestsCountRange(ctx context.Context, serviceName string, from, to time.Time) ([]float64, error) {
-	args := m.Called(ctx, serviceName, from, to)
+func (m *MockMetricsRepository) GetServiceRequestsCountRange(ctx context.Context, serviceName string, rangeWindow time.Duration) ([]float64, error) {
+	args := m.Called(ctx, serviceName, rangeWindow)
 	return args.Get(0).([]float64), args.Error(1)
 }
 
@@ -146,23 +147,23 @@ func (m *MockMetricsRepository) GetGraphLatencyP50Value(ctx context.Context, ser
 	return args.Get(0).(float64), args.Error(1)
 }
 
-func (m *MockMetricsRepository) GetGraphRequestsCountRange(ctx context.Context, serviceFrom, serviceTo string, from, to time.Time) ([]float64, error) {
-	args := m.Called(ctx, serviceFrom, serviceTo, from, to)
+func (m *MockMetricsRepository) GetGraphRequestsCountRange(ctx context.Context, serviceFrom, serviceTo string, rangeWindow time.Duration) ([]float64, error) {
+	args := m.Called(ctx, serviceFrom, serviceTo, rangeWindow)
 	return args.Get(0).([]float64), args.Error(1)
 }
 
-func (m *MockMetricsRepository) GetGraphLatencyP95Range(ctx context.Context, serviceFrom, serviceTo string, from, to time.Time) ([]float64, error) {
-	args := m.Called(ctx, serviceFrom, serviceTo, from, to)
+func (m *MockMetricsRepository) GetGraphLatencyP95Range(ctx context.Context, serviceFrom, serviceTo string, rangeWindow time.Duration) ([]float64, error) {
+	args := m.Called(ctx, serviceFrom, serviceTo, rangeWindow)
 	return args.Get(0).([]float64), args.Error(1)
 }
 
-func (m *MockMetricsRepository) GetGraphLatencyP50Range(ctx context.Context, serviceFrom, serviceTo string, from, to time.Time) ([]float64, error) {
-	args := m.Called(ctx, serviceFrom, serviceTo, from, to)
+func (m *MockMetricsRepository) GetGraphLatencyP50Range(ctx context.Context, serviceFrom, serviceTo string, rangeWindow time.Duration) ([]float64, error) {
+	args := m.Called(ctx, serviceFrom, serviceTo, rangeWindow)
 	return args.Get(0).([]float64), args.Error(1)
 }
 
-func (m *MockMetricsRepository) GetServiceAverageLatency95Range(ctx context.Context, serviceName string, from, to time.Time) ([]float64, error) {
-	args := m.Called(ctx, serviceName, from, to)
+func (m *MockMetricsRepository) GetServiceAverageLatency95Range(ctx context.Context, serviceName string, rangeWindow time.Duration) ([]float64, error) {
+	args := m.Called(ctx, serviceName, rangeWindow)
 	return args.Get(0).([]float64), args.Error(1)
 }
 
@@ -201,11 +202,16 @@ func (m *MockMetricsRepository) GetGlobalServiceMaxMemory(ctx context.Context) (
 	return args.Get(0).(float64), args.Error(1)
 }
 
+// Вспомогательная функция для создания контекста с временем анализа
+func createAnalysisContext() context.Context {
+	return contextutil.WithAnalysisTime(context.Background(), time.Now())
+}
+
 func TestCachedMetricsRepository_BasicCaching(t *testing.T) {
 	mockRepo := new(MockMetricsRepository)
 	mockRepo.On("ListServices", mock.Anything).Return([]string{"service1", "service2"}, nil)
 
-	cachedRepo := cache.NewCachedMetricsRepository(mockRepo, cache.CachedMetricsProviderConfig{TTL: 5 * time.Minute})
+	cachedRepo := cache.NewCachedMetricsRepository(mockRepo, cache.CachedMetricsProviderConfig{MaxCacheSize: 100, TTL: 5 * time.Minute})
 	ctx := context.Background()
 
 	services1, err := cachedRepo.ListServices(ctx)
@@ -229,7 +235,7 @@ func TestCachedMetricsRepository_TTLExpiration(t *testing.T) {
 	mockRepo := new(MockMetricsRepository)
 	mockRepo.On("GetServiceCpuUsageValue", mock.Anything, "test-service").Return(42.5, nil)
 
-	cachedRepo := cache.NewCachedMetricsRepository(mockRepo, cache.CachedMetricsProviderConfig{TTL: 10 * time.Millisecond})
+	cachedRepo := cache.NewCachedMetricsRepository(mockRepo, cache.CachedMetricsProviderConfig{MaxCacheSize: 100, TTL: 10 * time.Millisecond})
 	ctx := context.Background()
 
 	value1, err := cachedRepo.GetServiceCpuUsageValue(ctx, "test-service")
@@ -254,9 +260,9 @@ func TestCachedMetricsRepository_TTLExpiration(t *testing.T) {
 func TestCachedMetricsRepository_DifferentKeys(t *testing.T) {
 	mockRepo := new(MockMetricsRepository)
 	mockRepo.On("GetServiceCpuUsageValue", mock.Anything, "service1").Return(10.0, nil)
-	mockRepo.On("GetServiceCpuUsageValue", mock.Anything, "service2").Return(10.0, nil)
+	mockRepo.On("GetServiceCpuUsageValue", mock.Anything, "service2").Return(20.0, nil)
 
-	cachedRepo := cache.NewCachedMetricsRepository(mockRepo, cache.CachedMetricsProviderConfig{TTL: 5 * time.Minute})
+	cachedRepo := cache.NewCachedMetricsRepository(mockRepo, cache.CachedMetricsProviderConfig{MaxCacheSize: 100, TTL: 5 * time.Minute})
 	ctx := context.Background()
 
 	cachedRepo.GetServiceCpuUsageValue(ctx, "service1")
@@ -270,7 +276,7 @@ func TestCachedMetricsRepository_ErrorHandling(t *testing.T) {
 	mockRepo.On("GetServiceMemoryUsageValue", mock.Anything, "test-service").
 		Return(0.0, errors.New("test error"))
 
-	cachedRepo := cache.NewCachedMetricsRepository(mockRepo, cache.CachedMetricsProviderConfig{TTL: 5 * time.Minute})
+	cachedRepo := cache.NewCachedMetricsRepository(mockRepo, cache.CachedMetricsProviderConfig{MaxCacheSize: 100, TTL: 5 * time.Minute})
 	ctx := context.Background()
 
 	_, err1 := cachedRepo.GetServiceMemoryUsageValue(ctx, "test-service")
@@ -289,21 +295,20 @@ func TestCachedMetricsRepository_ErrorHandling(t *testing.T) {
 func TestCachedMetricsRepository_RangeValues(t *testing.T) {
 	mockRepo := new(MockMetricsRepository)
 	mockRepo.On("GetServiceCpuUsageRange",
-		mock.Anything, "test-service", mock.Anything, mock.Anything).
+		mock.Anything, "test-service", 5*time.Minute).
 		Return([]float64{1.0, 2.0, 3.0}, nil)
 
-	cachedRepo := cache.NewCachedMetricsRepository(mockRepo, cache.CachedMetricsProviderConfig{TTL: 5 * time.Minute})
-	ctx := context.Background()
+	cachedRepo := cache.NewCachedMetricsRepository(mockRepo, cache.CachedMetricsProviderConfig{MaxCacheSize: 100, TTL: 5 * time.Minute})
+	ctx := createAnalysisContext()
 
-	from := time.Now().Add(-1 * time.Hour)
-	to := time.Now()
+	rangeWindow := 5 * time.Minute
 
-	result1, err := cachedRepo.GetServiceCpuUsageRange(ctx, "test-service", from, to)
+	result1, err := cachedRepo.GetServiceCpuUsageRange(ctx, "test-service", rangeWindow)
 	if err != nil {
 		t.Fatalf("Expected no error, got %v", err)
 	}
 
-	result2, err := cachedRepo.GetServiceCpuUsageRange(ctx, "test-service", from, to)
+	result2, err := cachedRepo.GetServiceCpuUsageRange(ctx, "test-service", rangeWindow)
 	if err != nil {
 		t.Fatalf("Expected no error, got %v", err)
 	}
@@ -315,12 +320,31 @@ func TestCachedMetricsRepository_RangeValues(t *testing.T) {
 	}
 }
 
+func TestCachedMetricsRepository_RangeValuesDifferentWindows(t *testing.T) {
+	mockRepo := new(MockMetricsRepository)
+	mockRepo.On("GetServiceCpuUsageRange",
+		mock.Anything, "test-service", 5*time.Minute).
+		Return([]float64{1.0, 2.0, 3.0}, nil)
+	mockRepo.On("GetServiceCpuUsageRange",
+		mock.Anything, "test-service", 10*time.Minute).
+		Return([]float64{1.0, 2.0, 3.0, 4.0, 5.0}, nil)
+
+	cachedRepo := cache.NewCachedMetricsRepository(mockRepo, cache.CachedMetricsProviderConfig{MaxCacheSize: 100, TTL: 5 * time.Minute})
+	ctx := createAnalysisContext()
+
+	// Разные окна должны создавать разные ключи
+	cachedRepo.GetServiceCpuUsageRange(ctx, "test-service", 5*time.Minute)
+	cachedRepo.GetServiceCpuUsageRange(ctx, "test-service", 10*time.Minute)
+
+	mockRepo.AssertNumberOfCalls(t, "GetServiceCpuUsageRange", 2)
+}
+
 func TestCachedMetricsRepository_ClearCache(t *testing.T) {
 	mockRepo := new(MockMetricsRepository)
 	mockRepo.On("GetGraphRequestsCountValue", mock.Anything, "service1", "service2").
 		Return(100.0, nil)
 
-	cachedRepo := cache.NewCachedMetricsRepository(mockRepo, cache.CachedMetricsProviderConfig{TTL: 5 * time.Minute})
+	cachedRepo := cache.NewCachedMetricsRepository(mockRepo, cache.CachedMetricsProviderConfig{MaxCacheSize: 100, TTL: 5 * time.Minute})
 	ctx := context.Background()
 
 	cachedRepo.GetGraphRequestsCountValue(ctx, "service1", "service2")
@@ -337,7 +361,7 @@ func TestCachedMetricsRepository_ConcurrentAccess(t *testing.T) {
 	mockRepo.On("GetServiceCpuUsageValue", mock.Anything, "test-service").
 		Return(30.0, nil)
 
-	cachedRepo := cache.NewCachedMetricsRepository(mockRepo, cache.CachedMetricsProviderConfig{TTL: 5 * time.Minute})
+	cachedRepo := cache.NewCachedMetricsRepository(mockRepo, cache.CachedMetricsProviderConfig{MaxCacheSize: 100, TTL: 5 * time.Minute})
 	ctx := context.Background()
 
 	done := make(chan bool)
@@ -361,12 +385,42 @@ func TestCachedMetricsRepository_ConcurrentAccess(t *testing.T) {
 	mockRepo.AssertNumberOfCalls(t, "GetServiceCpuUsageValue", 1)
 }
 
+func TestCachedMetricsRepository_ConcurrentRangeAccess(t *testing.T) {
+	mockRepo := new(MockMetricsRepository)
+	mockRepo.On("GetServiceCpuUsageRange",
+		mock.Anything, "test-service", 5*time.Minute).
+		Return([]float64{1.0, 2.0, 3.0}, nil)
+
+	cachedRepo := cache.NewCachedMetricsRepository(mockRepo, cache.CachedMetricsProviderConfig{MaxCacheSize: 100, TTL: 5 * time.Minute})
+	ctx := createAnalysisContext()
+
+	done := make(chan bool)
+	for i := 0; i < 10; i++ {
+		go func() {
+			defer func() { done <- true }()
+			value, err := cachedRepo.GetServiceCpuUsageRange(ctx, "test-service", 5*time.Minute)
+			if err != nil {
+				t.Errorf("Unexpected error: %v", err)
+			}
+			if len(value) != 3 {
+				t.Errorf("Expected 3 values, got %d", len(value))
+			}
+		}()
+	}
+
+	for i := 0; i < 10; i++ {
+		<-done
+	}
+
+	mockRepo.AssertNumberOfCalls(t, "GetServiceCpuUsageRange", 1)
+}
+
 func TestCachedMetricsRepository_GetCacheSize(t *testing.T) {
 	mockRepo := new(MockMetricsRepository)
 	mockRepo.On("ListServices", mock.Anything).Return([]string{"service1"}, nil)
 	mockRepo.On("GetServiceCpuUsageValue", mock.Anything, "service1").Return(15.0, nil)
 
-	cachedRepo := cache.NewCachedMetricsRepository(mockRepo, cache.CachedMetricsProviderConfig{TTL: 5 * time.Minute})
+	cachedRepo := cache.NewCachedMetricsRepository(mockRepo, cache.CachedMetricsProviderConfig{MaxCacheSize: 100, TTL: 5 * time.Minute})
 	ctx := context.Background()
 
 	if size := cachedRepo.GetCacheSize(); size != 0 {

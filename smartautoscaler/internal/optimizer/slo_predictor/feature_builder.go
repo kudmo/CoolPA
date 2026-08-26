@@ -3,7 +3,6 @@ package slopredictor
 import (
 	"context"
 	"math"
-	"time"
 
 	"github.com/kudmo/CoolPA/internal/optimizer/ga/genome"
 	"github.com/kudmo/CoolPA/internal/optimizer/interfaces"
@@ -15,7 +14,7 @@ type LatencyDeltaPredictorFeatureBuilder struct {
 	metricsProvider interfaces.MetricsRepository
 }
 
-func (b *LatencyDeltaPredictorFeatureBuilder) Build(ctx context.Context, now time.Time, g *genome.ReactionGenome) [][]float64 {
+func (b *LatencyDeltaPredictorFeatureBuilder) Build(ctx context.Context, g *genome.ReactionGenome) [][]float64 {
 	if g == nil {
 		return nil
 	}
@@ -37,9 +36,8 @@ func (b *LatencyDeltaPredictorFeatureBuilder) Build(ctx context.Context, now tim
 		containerCpuQuota, _ := b.metricsProvider.GetServiceCpuQuota(ctx, svc)
 		containerMemoryQuota, _ := b.metricsProvider.GetServiceMemoryQuota(ctx, svc)
 
-		now_begin := now.Add(-b.config.Window)
-		cpuUsageRange, _ := b.metricsProvider.GetServiceCpuUsageRange(ctx, svc, now_begin, now)
-		memUsageRange, _ := b.metricsProvider.GetServiceMemoryUsageRange(ctx, svc, now_begin, now)
+		cpuUsageRange, _ := b.metricsProvider.GetServiceCpuUsageRange(ctx, svc, b.config.Window)
+		memUsageRange, _ := b.metricsProvider.GetServiceMemoryUsageRange(ctx, svc, b.config.Window)
 
 		cpu := utils.Avg(cpuUsageRange)
 		memory := utils.Avg(memUsageRange)
@@ -62,9 +60,9 @@ func (b *LatencyDeltaPredictorFeatureBuilder) Build(ctx context.Context, now tim
 		totalCPULimitDelta := (replicas_count+sg.DeltaReplicas)*(cpuLimit+sg.DeltaCPU) - totalCPULimit
 		totalMemLimitDelta := (replicas_count+sg.DeltaReplicas)*(memLimit+sg.DeltaMemory) - totalMemLimit
 
-		netRecv, _ := b.metricsProvider.GetServiceNetworkReceiveRange(ctx, svc, now, now_begin)
+		netRecv, _ := b.metricsProvider.GetServiceNetworkReceiveRange(ctx, svc, b.config.Window)
 		netRecvAvg := utils.Avg(netRecv)
-		netTrans, _ := b.metricsProvider.GetServiceNetworkTransmitRange(ctx, svc, now, now_begin)
+		netTrans, _ := b.metricsProvider.GetServiceNetworkTransmitRange(ctx, svc, b.config.Window)
 		netTransAvg := utils.Avg(netTrans)
 
 		features := make([]float64, 11)

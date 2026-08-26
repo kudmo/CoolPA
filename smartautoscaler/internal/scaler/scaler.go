@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	contextutil "github.com/kudmo/CoolPA/context"
 	"github.com/kudmo/CoolPA/internal/analyzer"
 	"github.com/kudmo/CoolPA/internal/applier"
 	"github.com/kudmo/CoolPA/internal/optimizer"
@@ -36,11 +37,11 @@ func NewScaler(config ScalerConfig, metricsProvider interfaces.MetricsRepository
 		histStore:       histStore,
 		analyzer: analyzer.NewAnalyzer(
 			analyzer.AnalyzerConfig{
-				SLO:                   config.SLO,
-				Confidence:            0.05,
-				WelchOldIntervalBegin: time.Duration(300 * time.Second),
-				WelchNowIntervalBegin: time.Duration(60 * time.Second),
-				AnomalyServicesCount:  config.AnomalyServicesCount,
+				SLO:                  config.SLO,
+				Confidence:           0.05,
+				Window:               time.Duration(60 * time.Second),
+				AnomalyServicesCount: config.AnomalyServicesCount,
+				Alpha:                0.05,
 			},
 			metricsProvider,
 			histStore,
@@ -52,6 +53,7 @@ func NewScaler(config ScalerConfig, metricsProvider interfaces.MetricsRepository
 				ReplicasStep:         1,
 				TargetCpuUtilization: 0.40,
 				Lambda:               config.Lambda,
+				TimeWindow:           time.Duration(60 * time.Second),
 			},
 			metricsProvider,
 			histStore,
@@ -74,13 +76,14 @@ func (d *Scaler) Start(ctx context.Context) error {
 		for {
 			select {
 			case <-ticker.C:
+				analizys_ctx := contextutil.WithAnalysisTime(ctx, time.Now())
 				timeSinceLastReaction := time.Since(d.lastReactionTime)
 				if timeSinceLastReaction < d.config.Cooldown {
 					logger.Info("decision", "in cooldown period",
 						"remaining", d.config.Cooldown-timeSinceLastReaction)
 					continue
 				}
-				result := d.analyzer.Analyze(ctx)
+				result := d.analyzer.Analyze(analizys_ctx)
 
 				if result.Scale != 0 {
 					mode := optimizer.ScaleUpMode
@@ -88,8 +91,8 @@ func (d *Scaler) Start(ctx context.Context) error {
 						mode = optimizer.ScaleDownMode
 					}
 					logger.Info("decision", "proposing scale for services", "services", result.Services)
-					optimizedState, _ := d.optimizer.RunOptimization(ctx, result.Services, mode)
-					d.scale(ctx, optimizedState)
+					optimizedState, _ := d.optimizer.RunOptimization(analizys_ctx, result.Services, mode)
+					d.scale(analizys_ctx, optimizedState)
 				} else {
 					logger.Info("decision", "no scaling action proposed")
 				}

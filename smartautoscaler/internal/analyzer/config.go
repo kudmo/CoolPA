@@ -8,15 +8,8 @@ type AnalyzerConfig struct {
 	SLO        float64
 	Confidence float64
 
-	WelchOldIntervalBegin time.Duration
-	WelchNowIntervalBegin time.Duration
-	AnomalyServicesCount  int
+	Window               time.Duration
+	AnomalyServicesCount int
 
-	abnormalParams AbnormalParams
-}
-
-type AbnormalParams struct {
-	Window time.Duration
-	SLO    float64
-	Alpha  float64
+	Alpha float64
 }

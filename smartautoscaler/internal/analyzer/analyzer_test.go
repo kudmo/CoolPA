@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
+	contextutil "github.com/kudmo/CoolPA/context"
 	"github.com/kudmo/CoolPA/internal/analyzer/interfaces"
 	"github.com/kudmo/CoolPA/internal/metrics"
 	"github.com/kudmo/CoolPA/utils/welchtest"
@@ -94,43 +95,43 @@ func (m *MockMetricsRepository) GetServiceAverageLatency95Value(ctx context.Cont
 	return args.Get(0).(float64), args.Error(1)
 }
 
-func (m *MockMetricsRepository) GetServiceCpuUsageRange(ctx context.Context, serviceName string, from, to time.Time) ([]float64, error) {
-	args := m.Called(ctx, serviceName, from, to)
+func (m *MockMetricsRepository) GetServiceCpuUsageRange(ctx context.Context, serviceName string, rangeWindow time.Duration) ([]float64, error) {
+	args := m.Called(ctx, serviceName, rangeWindow)
 	return args.Get(0).([]float64), args.Error(1)
 }
 
-func (m *MockMetricsRepository) GetServiceMemoryUsageRange(ctx context.Context, serviceName string, from, to time.Time) ([]float64, error) {
-	args := m.Called(ctx, serviceName, from, to)
+func (m *MockMetricsRepository) GetServiceMemoryUsageRange(ctx context.Context, serviceName string, rangeWindow time.Duration) ([]float64, error) {
+	args := m.Called(ctx, serviceName, rangeWindow)
 	return args.Get(0).([]float64), args.Error(1)
 }
 
-func (m *MockMetricsRepository) GetServiceFSUsageRange(ctx context.Context, serviceName string, from, to time.Time) ([]float64, error) {
-	args := m.Called(ctx, serviceName, from, to)
+func (m *MockMetricsRepository) GetServiceFSUsageRange(ctx context.Context, serviceName string, rangeWindow time.Duration) ([]float64, error) {
+	args := m.Called(ctx, serviceName, rangeWindow)
 	return args.Get(0).([]float64), args.Error(1)
 }
 
-func (m *MockMetricsRepository) GetServiceFSWriteRange(ctx context.Context, serviceName string, from, to time.Time) ([]float64, error) {
-	args := m.Called(ctx, serviceName, from, to)
+func (m *MockMetricsRepository) GetServiceFSWriteRange(ctx context.Context, serviceName string, rangeWindow time.Duration) ([]float64, error) {
+	args := m.Called(ctx, serviceName, rangeWindow)
 	return args.Get(0).([]float64), args.Error(1)
 }
 
-func (m *MockMetricsRepository) GetServiceFSReadRange(ctx context.Context, serviceName string, from, to time.Time) ([]float64, error) {
-	args := m.Called(ctx, serviceName, from, to)
+func (m *MockMetricsRepository) GetServiceFSReadRange(ctx context.Context, serviceName string, rangeWindow time.Duration) ([]float64, error) {
+	args := m.Called(ctx, serviceName, rangeWindow)
 	return args.Get(0).([]float64), args.Error(1)
 }
 
-func (m *MockMetricsRepository) GetServiceNetworkReceiveRange(ctx context.Context, serviceName string, from, to time.Time) ([]float64, error) {
-	args := m.Called(ctx, serviceName, from, to)
+func (m *MockMetricsRepository) GetServiceNetworkReceiveRange(ctx context.Context, serviceName string, rangeWindow time.Duration) ([]float64, error) {
+	args := m.Called(ctx, serviceName, rangeWindow)
 	return args.Get(0).([]float64), args.Error(1)
 }
 
-func (m *MockMetricsRepository) GetServiceNetworkTransmitRange(ctx context.Context, serviceName string, from, to time.Time) ([]float64, error) {
-	args := m.Called(ctx, serviceName, from, to)
+func (m *MockMetricsRepository) GetServiceNetworkTransmitRange(ctx context.Context, serviceName string, rangeWindow time.Duration) ([]float64, error) {
+	args := m.Called(ctx, serviceName, rangeWindow)
 	return args.Get(0).([]float64), args.Error(1)
 }
 
-func (m *MockMetricsRepository) GetServiceRequestsCountRange(ctx context.Context, serviceName string, from, to time.Time) ([]float64, error) {
-	args := m.Called(ctx, serviceName, from, to)
+func (m *MockMetricsRepository) GetServiceRequestsCountRange(ctx context.Context, serviceName string, rangeWindow time.Duration) ([]float64, error) {
+	args := m.Called(ctx, serviceName, rangeWindow)
 	return args.Get(0).([]float64), args.Error(1)
 }
 
@@ -149,23 +150,23 @@ func (m *MockMetricsRepository) GetGraphLatencyP50Value(ctx context.Context, ser
 	return args.Get(0).(float64), args.Error(1)
 }
 
-func (m *MockMetricsRepository) GetGraphRequestsCountRange(ctx context.Context, serviceFrom, serviceTo string, from, to time.Time) ([]float64, error) {
-	args := m.Called(ctx, serviceFrom, serviceTo, from, to)
+func (m *MockMetricsRepository) GetGraphRequestsCountRange(ctx context.Context, serviceFrom, serviceTo string, rangeWindow time.Duration) ([]float64, error) {
+	args := m.Called(ctx, serviceFrom, serviceTo, rangeWindow)
 	return args.Get(0).([]float64), args.Error(1)
 }
 
-func (m *MockMetricsRepository) GetGraphLatencyP95Range(ctx context.Context, serviceFrom, serviceTo string, from, to time.Time) ([]float64, error) {
-	args := m.Called(ctx, serviceFrom, serviceTo, from, to)
+func (m *MockMetricsRepository) GetGraphLatencyP95Range(ctx context.Context, serviceFrom, serviceTo string, rangeWindow time.Duration) ([]float64, error) {
+	args := m.Called(ctx, serviceFrom, serviceTo, rangeWindow)
 	return args.Get(0).([]float64), args.Error(1)
 }
 
-func (m *MockMetricsRepository) GetGraphLatencyP50Range(ctx context.Context, serviceFrom, serviceTo string, from, to time.Time) ([]float64, error) {
-	args := m.Called(ctx, serviceFrom, serviceTo, from, to)
+func (m *MockMetricsRepository) GetGraphLatencyP50Range(ctx context.Context, serviceFrom, serviceTo string, rangeWindow time.Duration) ([]float64, error) {
+	args := m.Called(ctx, serviceFrom, serviceTo, rangeWindow)
 	return args.Get(0).([]float64), args.Error(1)
 }
 
-func (m *MockMetricsRepository) GetServiceAverageLatency95Range(ctx context.Context, serviceName string, from, to time.Time) ([]float64, error) {
-	args := m.Called(ctx, serviceName, from, to)
+func (m *MockMetricsRepository) GetServiceAverageLatency95Range(ctx context.Context, serviceName string, rangeWindow time.Duration) ([]float64, error) {
+	args := m.Called(ctx, serviceName, rangeWindow)
 	return args.Get(0).([]float64), args.Error(1)
 }
 
@@ -204,22 +205,25 @@ func (m *MockMetricsRepository) GetGlobalServiceMaxMemory(ctx context.Context) (
 	return args.Get(0).(float64), args.Error(1)
 }
 
+func createTestContext() (context.Context, time.Time) {
+	now := time.Now()
+	ctx := contextutil.WithAnalysisTime(context.Background(), now)
+	return ctx, now
+}
+
 func newTestAnalyzer(mockRepo interfaces.MetricsRepository) *Analyzer {
 	return &Analyzer{
 		metricsProvider: mockRepo,
 		config: AnalyzerConfig{
-			abnormalParams: AbnormalParams{
-				Window: 1 * time.Hour,
-				SLO:    500.0, // milliseconds
-				Alpha:  0.1,
-			},
+			Window: 1 * time.Hour,
+			SLO:    500.0, // milliseconds
+			Alpha:  0.1,
 		},
 	}
 }
 
 func TestFindAbnormalCalls_SLOViolation(t *testing.T) {
-	ctx := context.Background()
-	now := time.Now()
+	ctx, _ := createTestContext()
 
 	mockRepo := new(MockMetricsRepository)
 
@@ -235,13 +239,13 @@ func TestFindAbnormalCalls_SLOViolation(t *testing.T) {
 
 	lat95 := []float64{600.0}
 	lat50 := []float64{100.0}
-	mockRepo.On("GetGraphLatencyP95Range", mock.Anything, svcA, svcB, mock.Anything, mock.Anything).
+	mockRepo.On("GetGraphLatencyP95Range", mock.Anything, svcA, svcB, 1*time.Hour).
 		Return(lat95, nil)
-	mockRepo.On("GetGraphLatencyP50Range", mock.Anything, svcA, svcB, mock.Anything, mock.Anything).
+	mockRepo.On("GetGraphLatencyP50Range", mock.Anything, svcA, svcB, 1*time.Hour).
 		Return(lat50, nil)
 
 	a := newTestAnalyzer(mockRepo)
-	calls := a.findAbnormalCalls(ctx, now)
+	calls := a.findAbnormalCalls(ctx)
 
 	assert.Len(t, calls, 1)
 	assert.Equal(t, svcA, calls[0].from)
@@ -249,8 +253,7 @@ func TestFindAbnormalCalls_SLOViolation(t *testing.T) {
 }
 
 func TestFindAbnormalCalls_RatioViolation(t *testing.T) {
-	ctx := context.Background()
-	now := time.Now()
+	ctx, _ := createTestContext()
 
 	mockRepo := new(MockMetricsRepository)
 
@@ -263,20 +266,19 @@ func TestFindAbnormalCalls_RatioViolation(t *testing.T) {
 
 	lat95 := []float64{130.0}
 	lat50 := []float64{10.0}
-	mockRepo.On("GetGraphLatencyP95Range", mock.Anything, svcA, svcB, mock.Anything, mock.Anything).
+	mockRepo.On("GetGraphLatencyP95Range", mock.Anything, svcA, svcB, 1*time.Hour).
 		Return(lat95, nil)
-	mockRepo.On("GetGraphLatencyP50Range", mock.Anything, svcA, svcB, mock.Anything, mock.Anything).
+	mockRepo.On("GetGraphLatencyP50Range", mock.Anything, svcA, svcB, 1*time.Hour).
 		Return(lat50, nil)
 
 	a := newTestAnalyzer(mockRepo)
-	calls := a.findAbnormalCalls(ctx, now)
+	calls := a.findAbnormalCalls(ctx)
 
 	assert.Len(t, calls, 1)
 }
 
 func TestComputeAnomalyDegree(t *testing.T) {
-	ctx := context.Background()
-	now := time.Now()
+	ctx, _ := createTestContext()
 
 	mockRepo := new(MockMetricsRepository)
 
@@ -291,19 +293,18 @@ func TestComputeAnomalyDegree(t *testing.T) {
 	mockRepo.On("GetService", mock.Anything, svcB).Return(svcBInfo, nil)
 
 	latSeries := []float64{400.0, 600.0}
-	mockRepo.On("GetGraphLatencyP95Range", mock.Anything, svcA, svcB, mock.Anything, mock.Anything).
+	mockRepo.On("GetGraphLatencyP95Range", mock.Anything, svcA, svcB, 1*time.Hour).
 		Return(latSeries, nil)
 
 	a := newTestAnalyzer(mockRepo)
-	anomalyMap := a.computeAnomalyDegree(ctx, now, abnormalCalls)
+	anomalyMap := a.computeAnomalyDegree(ctx, abnormalCalls)
 
 	assert.Equal(t, float64(1), anomalyMap[svcA])
 	assert.Equal(t, float64(0), anomalyMap[svcB])
 }
 
 func TestBuildCorrelationGraphFromCalls(t *testing.T) {
-	ctx := context.Background()
-	now := time.Now()
+	ctx, _ := createTestContext()
 
 	mockRepo := new(MockMetricsRepository)
 
@@ -313,28 +314,28 @@ func TestBuildCorrelationGraphFromCalls(t *testing.T) {
 	serviceAnomaly := map[string]float64{svcA: 1.0, svcB: 2.0}
 
 	latSeries := []float64{1, 2, 3, 4, 5}
-	mockRepo.On("GetGraphLatencyP95Range", mock.Anything, svcA, svcB, mock.Anything, mock.Anything).
+	mockRepo.On("GetGraphLatencyP95Range", mock.Anything, svcA, svcB, 1*time.Hour).
 		Return(latSeries, nil)
 
 	cpuSeries := []float64{2, 4, 6, 8, 10}
-	mockRepo.On("GetServiceCpuUsageRange", mock.Anything, svcB, mock.Anything, mock.Anything).
+	mockRepo.On("GetServiceCpuUsageRange", mock.Anything, svcB, 1*time.Hour).
 		Return(cpuSeries, nil)
 
-	mockRepo.On("GetServiceMemoryUsageRange", mock.Anything, svcB, mock.Anything, mock.Anything).
+	mockRepo.On("GetServiceMemoryUsageRange", mock.Anything, svcB, 1*time.Hour).
 		Return([]float64{}, nil)
-	mockRepo.On("GetServiceFSUsageRange", mock.Anything, svcB, mock.Anything, mock.Anything).
+	mockRepo.On("GetServiceFSUsageRange", mock.Anything, svcB, 1*time.Hour).
 		Return([]float64{}, nil)
-	mockRepo.On("GetServiceFSWriteRange", mock.Anything, svcB, mock.Anything, mock.Anything).
+	mockRepo.On("GetServiceFSWriteRange", mock.Anything, svcB, 1*time.Hour).
 		Return([]float64{}, nil)
-	mockRepo.On("GetServiceFSReadRange", mock.Anything, svcB, mock.Anything, mock.Anything).
+	mockRepo.On("GetServiceFSReadRange", mock.Anything, svcB, 1*time.Hour).
 		Return([]float64{}, nil)
-	mockRepo.On("GetServiceNetworkReceiveRange", mock.Anything, svcB, mock.Anything, mock.Anything).
+	mockRepo.On("GetServiceNetworkReceiveRange", mock.Anything, svcB, 1*time.Hour).
 		Return([]float64{}, nil)
-	mockRepo.On("GetServiceNetworkTransmitRange", mock.Anything, svcB, mock.Anything, mock.Anything).
+	mockRepo.On("GetServiceNetworkTransmitRange", mock.Anything, svcB, 1*time.Hour).
 		Return([]float64{}, nil)
 
 	a := newTestAnalyzer(mockRepo)
-	graph, err := a.buildCorrelationGraphFromCalls(ctx, now, abnormalCalls, serviceAnomaly)
+	graph, err := a.buildCorrelationGraphFromCalls(ctx, abnormalCalls, serviceAnomaly)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, graph)
@@ -359,8 +360,7 @@ func TestBuildCorrelationGraphFromCalls(t *testing.T) {
 }
 
 func TestBuildAbnormalCorrelationGraph_NoAbnormal(t *testing.T) {
-	ctx := context.Background()
-	now := time.Now()
+	ctx, _ := createTestContext()
 
 	mockRepo := new(MockMetricsRepository)
 
@@ -369,14 +369,14 @@ func TestBuildAbnormalCorrelationGraph_NoAbnormal(t *testing.T) {
 	mockRepo.On("GetService", mock.Anything, "svc-a").Return(svcInfo, nil)
 
 	a := newTestAnalyzer(mockRepo)
-	graph, err := a.buildAbnormalCorrelationGraph(ctx, now)
+	graph, err := a.buildAbnormalCorrelationGraph(ctx)
 
 	assert.NoError(t, err)
 	assert.Nil(t, graph)
 }
 
 func TestAnalyzeRPSlowing(t *testing.T) {
-	ctx := context.Background()
+	ctx, _ := createTestContext()
 
 	mockRepo := new(MockMetricsRepository)
 	serviceName := "svc1"
@@ -390,7 +390,7 @@ func TestAnalyzeRPSlowing(t *testing.T) {
 	for i := 50; i < 100; i++ {
 		requests[i] = 60.0
 	}
-	mockRepo.On("GetServiceRequestsCountRange", mock.Anything, serviceName, mock.Anything, mock.Anything).
+	mockRepo.On("GetServiceRequestsCountRange", mock.Anything, serviceName, 1*time.Hour).
 		Return(requests, nil)
 
 	mockRepo.On("GetServiceCpuQuota", mock.Anything, serviceName).Return(2.0, nil)
@@ -398,11 +398,11 @@ func TestAnalyzeRPSlowing(t *testing.T) {
 	mockRepo.On("GetServiceReplicasCountValue", mock.Anything, serviceName).Return(3.0, nil)
 
 	cpuUsage := []float64{0.5, 0.5, 0.5}
-	mockRepo.On("GetServiceCpuUsageRange", mock.Anything, serviceName, mock.Anything, mock.Anything).
+	mockRepo.On("GetServiceCpuUsageRange", mock.Anything, serviceName, 1*time.Hour).
 		Return(cpuUsage, nil)
 
 	memUsage := []float64{100.0, 100.0, 100.0}
-	mockRepo.On("GetServiceMemoryUsageRange", mock.Anything, serviceName, mock.Anything, mock.Anything).
+	mockRepo.On("GetServiceMemoryUsageRange", mock.Anything, serviceName, 1*time.Hour).
 		Return(memUsage, nil)
 
 	mockRepo.On("GetGlobalTotalCpuLimit", mock.Anything).Return(10.0, nil)
@@ -417,9 +417,9 @@ func TestAnalyzeRPSlowing(t *testing.T) {
 	a := &Analyzer{
 		metricsProvider: mockRepo,
 		config: AnalyzerConfig{
-			WelchNowIntervalBegin: time.Hour,
-			Confidence:            0.05,
-			AnomalyServicesCount:  1,
+			Window:               time.Hour,
+			Confidence:           0.05,
+			AnomalyServicesCount: 1,
 		},
 		previousStatistics: map[string]*welchtest.Stats{serviceName: prevStats},
 	}
@@ -434,7 +434,7 @@ func TestAnalyzeRPSlowing(t *testing.T) {
 }
 
 func TestAnalyzeUnderutilization(t *testing.T) {
-	ctx := context.Background()
+	ctx, _ := createTestContext()
 
 	mockRepo := new(MockMetricsRepository)
 	serviceName := "svc1"
@@ -448,7 +448,7 @@ func TestAnalyzeUnderutilization(t *testing.T) {
 	for i := 50; i < 100; i++ {
 		requests[i] = 60.0
 	}
-	mockRepo.On("GetServiceRequestsCountRange", mock.Anything, serviceName, mock.Anything, mock.Anything).
+	mockRepo.On("GetServiceRequestsCountRange", mock.Anything, serviceName, 1*time.Hour).
 		Return(requests, nil)
 
 	mockRepo.On("GetServiceCpuQuota", mock.Anything, serviceName).Return(2.0, nil)
@@ -456,11 +456,11 @@ func TestAnalyzeUnderutilization(t *testing.T) {
 	mockRepo.On("GetServiceReplicasCountValue", mock.Anything, serviceName).Return(3.0, nil)
 
 	cpuUsage := []float64{0.5, 0.5, 0.5}
-	mockRepo.On("GetServiceCpuUsageRange", mock.Anything, serviceName, mock.Anything, mock.Anything).
+	mockRepo.On("GetServiceCpuUsageRange", mock.Anything, serviceName, 1*time.Hour).
 		Return(cpuUsage, nil)
 
 	memUsage := []float64{100.0, 100.0, 100.0}
-	mockRepo.On("GetServiceMemoryUsageRange", mock.Anything, serviceName, mock.Anything, mock.Anything).
+	mockRepo.On("GetServiceMemoryUsageRange", mock.Anything, serviceName, 1*time.Hour).
 		Return(memUsage, nil)
 
 	mockRepo.On("GetGlobalTotalCpuLimit", mock.Anything).Return(10.0, nil)
@@ -475,9 +475,9 @@ func TestAnalyzeUnderutilization(t *testing.T) {
 	a := &Analyzer{
 		metricsProvider: mockRepo,
 		config: AnalyzerConfig{
-			WelchNowIntervalBegin: time.Hour,
-			Confidence:            0.05,
-			AnomalyServicesCount:  1,
+			Window:               time.Hour,
+			Confidence:           0.05,
+			AnomalyServicesCount: 1,
 		},
 		previousStatistics: map[string]*welchtest.Stats{serviceName: prevStats},
 	}

@@ -4,5 +4,5 @@ slo: 100
 scaling_cooldown: 800s
 lambda: 0.6
 logger:
-  level: "info"
+  level: "debug"
   format: "text"

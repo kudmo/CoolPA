@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	applierprovider "github.com/kudmo/CoolPA/internal/applier/providers"
 	"github.com/kudmo/CoolPA/internal/metrics/providers/cache"
@@ -47,11 +48,13 @@ func main() {
 		ScalingNamespace: cfg.ScalingNamespace,
 		PrometheusConfig: collector.PrometheusCollectorConfig{
 			PrometheusURL: cfg.PrometheusURL,
+			RangeStep:     5 * time.Second,
 		},
 	}
 
 	cacheConfig := cache.CachedMetricsProviderConfig{
-		TTL: cfg.AnalyzerInterval,
+		TTL:          cfg.AnalyzerInterval,
+		MaxCacheSize: 100,
 	}
 
 	// Components creating

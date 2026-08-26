@@ -3,7 +3,6 @@ package analyzer
 import (
 	"context"
 	"sort"
-	"time"
 
 	"github.com/kudmo/CoolPA/logger"
 	"github.com/kudmo/CoolPA/utils"
@@ -14,10 +13,7 @@ func (a *Analyzer) analyzeRPSlowing(ctx context.Context) []underutilizationAnaly
 	anomalys := make([]underutilizationAnalyzeResult, 0)
 	services, _ := a.metricsProvider.ListServices(ctx)
 	for _, service := range services {
-		time_now := time.Now()
-		time_now_begin := time_now.Add(-a.config.WelchNowIntervalBegin)
-
-		new, _ := a.metricsProvider.GetServiceRequestsCountRange(ctx, service, time_now_begin, time_now)
+		new, _ := a.metricsProvider.GetServiceRequestsCountRange(ctx, service, a.config.Window)
 
 		newStats := welchtest.NewOnlineStats()
 		newStats.N = len(new)
@@ -50,13 +46,13 @@ func (a *Analyzer) analyzeRPSlowing(ctx context.Context) []underutilizationAnaly
 				continue
 			}
 
-			service_cpu_utilization_range, _ := a.metricsProvider.GetServiceCpuUsageRange(ctx, service, time_now_begin, time_now)
+			service_cpu_utilization_range, _ := a.metricsProvider.GetServiceCpuUsageRange(ctx, service, a.config.Window)
 			service_cpu_utilization := utils.Avg(service_cpu_utilization_range)
 			service_cpu_underutilization_total := (service_cpu_limit - service_cpu_utilization) * replicas
 			total_cpu_limit, _ := a.metricsProvider.GetGlobalTotalCpuLimit(ctx)
 			service_cpu_underutilization_total_percent := service_cpu_underutilization_total / total_cpu_limit
 
-			service_mem_utilization_range, _ := a.metricsProvider.GetServiceMemoryUsageRange(ctx, service, time_now_begin, time_now)
+			service_mem_utilization_range, _ := a.metricsProvider.GetServiceMemoryUsageRange(ctx, service, a.config.Window)
 			service_mem_utilization := utils.Avg(service_mem_utilization_range)
 			service_mem_underutilization_total := (service_mem_limit - service_mem_utilization) * replicas
 			total_mem_limit, _ := a.metricsProvider.GetGlobalTotalMemoryLimit(ctx)
