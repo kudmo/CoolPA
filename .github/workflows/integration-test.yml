@@ -7,7 +7,6 @@ on:
     paths:
       - 'smartautoscaler/**'
       - 'experiments/**'
-      - '.github/workflows/*.yml'
 
 jobs:
   build-and-test:
