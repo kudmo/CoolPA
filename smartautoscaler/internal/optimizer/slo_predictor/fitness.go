@@ -4,7 +4,6 @@ import (
 	"context"
 	"math"
 	"sync"
-	"time"
 
 	"github.com/kudmo/CoolPA/internal/optimizer/ga/genome"
 	"github.com/kudmo/CoolPA/internal/optimizer/interfaces"
@@ -41,7 +40,7 @@ func (f *ResourceOptimizerFitness) Close() {
 	f.Predictor.Close()
 }
 
-func (f *ResourceOptimizerFitness) calculateR2(ctx context.Context, now time.Time, gen *genome.ReactionGenome) float64 {
+func (f *ResourceOptimizerFitness) calculateR2(ctx context.Context, gen *genome.ReactionGenome) float64 {
 	current := make([]genome.ServiceState, 0, len(gen.Genes))
 	services, _ := f.metricsProvider.ListServices(ctx)
 	for _, svc := range services {
@@ -74,12 +73,11 @@ func (f *ResourceOptimizerFitness) calculateR2(ctx context.Context, now time.Tim
 	return 1 - max(cpu_percent, replics_percent, mem_percent)
 }
 
-func (f *ResourceOptimizerFitness) calculateR1(ctx context.Context, now time.Time, g *genome.ReactionGenome, deltas []float64) float64 {
+func (f *ResourceOptimizerFitness) calculateR1(ctx context.Context, g *genome.ReactionGenome, deltas []float64) float64 {
 	prod := 1.0
-	fromBegin := now.Add(-f.config.Window)
 
 	for i, gene := range g.Genes {
-		lat_95_curr, _ := f.metricsProvider.GetServiceAverageLatency95Range(ctx, gene.ServiceName, fromBegin, now)
+		lat_95_curr, _ := f.metricsProvider.GetServiceAverageLatency95Range(ctx, gene.ServiceName, f.config.Window)
 		lat_95_curr_avg := utils.Avg(lat_95_curr)
 		lat_95_new := lat_95_curr_avg * math.Pow(math.E, deltas[i])
 
@@ -89,10 +87,10 @@ func (f *ResourceOptimizerFitness) calculateR1(ctx context.Context, now time.Tim
 	return prod
 }
 
-func (f *ResourceOptimizerFitness) collectFeaturesForBatch(ctx context.Context, now time.Time, pop []*genome.ReactionGenome) [][]float64 {
+func (f *ResourceOptimizerFitness) collectFeaturesForBatch(ctx context.Context, pop []*genome.ReactionGenome) [][]float64 {
 	allX := make([][]float64, 0, len(pop))
 	for _, g := range pop {
-		X := f.Builder.Build(ctx, now, g)
+		X := f.Builder.Build(ctx, g)
 		allX = append(allX, X...)
 	}
 	return allX
@@ -109,11 +107,11 @@ func (f *ResourceOptimizerFitness) splitDeltasByGenome(pop []*genome.ReactionGen
 	return deltasByGenome
 }
 
-func (f *ResourceOptimizerFitness) EvaluateBatch(ctx context.Context, now time.Time, pop []*genome.ReactionGenome) []float64 {
+func (f *ResourceOptimizerFitness) EvaluateBatch(ctx context.Context, pop []*genome.ReactionGenome) []float64 {
 	n := len(pop)
 	scores := make([]float64, n)
 
-	allX := f.collectFeaturesForBatch(ctx, now, pop)
+	allX := f.collectFeaturesForBatch(ctx, pop)
 	flatDeltas := f.Predictor.PredictBatch(allX)
 	deltasByGenome := f.splitDeltasByGenome(pop, flatDeltas)
 
@@ -123,7 +121,7 @@ func (f *ResourceOptimizerFitness) EvaluateBatch(ctx context.Context, now time.T
 	for i, g := range pop {
 		go func(idx int, genome *genome.ReactionGenome) {
 			defer wgR2.Done()
-			r2s[idx] = f.calculateR2(ctx, now, genome)
+			r2s[idx] = f.calculateR2(ctx, genome)
 		}(i, g)
 	}
 	wgR2.Wait()
@@ -136,7 +134,7 @@ func (f *ResourceOptimizerFitness) EvaluateBatch(ctx context.Context, now time.T
 	for i, g := range pop {
 		go func(idx int, genome *genome.ReactionGenome, delta []float64) {
 			defer wg.Done()
-			r1s[idx] = f.calculateR1(ctx, now, genome, delta)
+			r1s[idx] = f.calculateR1(ctx, genome, delta)
 		}(i, g, deltasByGenome[i])
 	}
 

@@ -81,7 +81,7 @@ func (ro *ReactionOptimizer) RunOptimization(ctx context.Context, services []str
 	fit := slopredictor.NewResourceOptimizerFitness(
 		ro.metricsProvider,
 		ro.histStore,
-		slopredictor.FitnessConfig{Lambda: ro.config.Lambda, Window: time.Duration(time.Minute)},
+		slopredictor.FitnessConfig{Lambda: ro.config.Lambda, Window: ro.config.TimeWindow},
 	)
 	defer fit.Close()
 
@@ -93,7 +93,7 @@ func (ro *ReactionOptimizer) RunOptimization(ctx context.Context, services []str
 
 	seedGenome := ro.buildSeedGenome(ctx, services, ce, mode)
 
-	best, err := eng.Run(ctx, time.Now(), seedGenome)
+	best, err := eng.Run(ctx, seedGenome)
 	if err != nil {
 		logger.Error("optimizer", "ga engine run error", "error", err)
 		return OptimizedState{}, err
@@ -148,9 +148,7 @@ func (ro *ReactionOptimizer) buildConstraints(
 		}
 
 		if mode == ScaleUpMode {
-			time_now := time.Now()
-			time_now_begin := time_now.Add(-time.Minute)
-			cpuUsageRange, _ := ro.metricsProvider.GetServiceCpuUsageRange(ctx, svc, time_now_begin, time_now)
+			cpuUsageRange, _ := ro.metricsProvider.GetServiceCpuUsageRange(ctx, svc, ro.config.TimeWindow)
 			cpuU := utils.Avg(cpuUsageRange)
 
 			desiredReplicas := int(math.Ceil(

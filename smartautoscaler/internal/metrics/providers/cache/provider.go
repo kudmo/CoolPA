@@ -218,10 +218,10 @@ func (c *CachedMetricsProvider) GetServiceAverageLatency95Value(ctx context.Cont
 	return value.(float64), nil
 }
 
-func (c *CachedMetricsProvider) GetServiceCpuUsageRange(ctx context.Context, serviceName string, from, to time.Time) ([]float64, error) {
-	key := "cpu_usage_range_" + serviceName + "_" + from.String() + "_" + to.String()
+func (c *CachedMetricsProvider) GetServiceCpuUsageRange(ctx context.Context, serviceName string, rangeWindow time.Duration) ([]float64, error) {
+	key := "cpu_usage_range_" + serviceName + "_" + rangeWindow.String()
 	value, err := c.get(ctx, key, func() (interface{}, error) {
-		return c.repo.GetServiceCpuUsageRange(ctx, serviceName, from, to)
+		return c.repo.GetServiceCpuUsageRange(ctx, serviceName, rangeWindow)
 	})
 	if err != nil {
 		return nil, err
@@ -229,10 +229,10 @@ func (c *CachedMetricsProvider) GetServiceCpuUsageRange(ctx context.Context, ser
 	return value.([]float64), nil
 }
 
-func (c *CachedMetricsProvider) GetServiceMemoryUsageRange(ctx context.Context, serviceName string, from, to time.Time) ([]float64, error) {
-	key := "memory_usage_range_" + serviceName + "_" + from.String() + "_" + to.String()
+func (c *CachedMetricsProvider) GetServiceMemoryUsageRange(ctx context.Context, serviceName string, rangeWindow time.Duration) ([]float64, error) {
+	key := "memory_usage_range_" + serviceName + "_" + rangeWindow.String()
 	value, err := c.get(ctx, key, func() (interface{}, error) {
-		return c.repo.GetServiceMemoryUsageRange(ctx, serviceName, from, to)
+		return c.repo.GetServiceMemoryUsageRange(ctx, serviceName, rangeWindow)
 	})
 	if err != nil {
 		return nil, err
@@ -240,10 +240,10 @@ func (c *CachedMetricsProvider) GetServiceMemoryUsageRange(ctx context.Context, 
 	return value.([]float64), nil
 }
 
-func (c *CachedMetricsProvider) GetServiceFSUsageRange(ctx context.Context, serviceName string, from, to time.Time) ([]float64, error) {
-	key := "fs_usage_range_" + serviceName + "_" + from.String() + "_" + to.String()
+func (c *CachedMetricsProvider) GetServiceFSUsageRange(ctx context.Context, serviceName string, rangeWindow time.Duration) ([]float64, error) {
+	key := "fs_usage_range_" + serviceName + "_" + rangeWindow.String()
 	value, err := c.get(ctx, key, func() (interface{}, error) {
-		return c.repo.GetServiceFSUsageRange(ctx, serviceName, from, to)
+		return c.repo.GetServiceFSUsageRange(ctx, serviceName, rangeWindow)
 	})
 	if err != nil {
 		return nil, err
@@ -251,10 +251,10 @@ func (c *CachedMetricsProvider) GetServiceFSUsageRange(ctx context.Context, serv
 	return value.([]float64), nil
 }
 
-func (c *CachedMetricsProvider) GetServiceFSWriteRange(ctx context.Context, serviceName string, from, to time.Time) ([]float64, error) {
-	key := "fs_write_range_" + serviceName + "_" + from.String() + "_" + to.String()
+func (c *CachedMetricsProvider) GetServiceFSWriteRange(ctx context.Context, serviceName string, rangeWindow time.Duration) ([]float64, error) {
+	key := "fs_write_range_" + serviceName + "_" + rangeWindow.String()
 	value, err := c.get(ctx, key, func() (interface{}, error) {
-		return c.repo.GetServiceFSWriteRange(ctx, serviceName, from, to)
+		return c.repo.GetServiceFSWriteRange(ctx, serviceName, rangeWindow)
 	})
 	if err != nil {
 		return nil, err
@@ -262,10 +262,10 @@ func (c *CachedMetricsProvider) GetServiceFSWriteRange(ctx context.Context, serv
 	return value.([]float64), nil
 }
 
-func (c *CachedMetricsProvider) GetServiceFSReadRange(ctx context.Context, serviceName string, from, to time.Time) ([]float64, error) {
-	key := "fs_read_range_" + serviceName + "_" + from.String() + "_" + to.String()
+func (c *CachedMetricsProvider) GetServiceFSReadRange(ctx context.Context, serviceName string, rangeWindow time.Duration) ([]float64, error) {
+	key := "fs_read_range_" + serviceName + "_" + rangeWindow.String()
 	value, err := c.get(ctx, key, func() (interface{}, error) {
-		return c.repo.GetServiceFSReadRange(ctx, serviceName, from, to)
+		return c.repo.GetServiceFSReadRange(ctx, serviceName, rangeWindow)
 	})
 	if err != nil {
 		return nil, err
@@ -273,10 +273,10 @@ func (c *CachedMetricsProvider) GetServiceFSReadRange(ctx context.Context, servi
 	return value.([]float64), nil
 }
 
-func (c *CachedMetricsProvider) GetServiceNetworkReceiveRange(ctx context.Context, serviceName string, from, to time.Time) ([]float64, error) {
-	key := "network_receive_range_" + serviceName + "_" + from.String() + "_" + to.String()
+func (c *CachedMetricsProvider) GetServiceNetworkReceiveRange(ctx context.Context, serviceName string, rangeWindow time.Duration) ([]float64, error) {
+	key := "network_receive_range_" + serviceName + "_" + rangeWindow.String()
 	value, err := c.get(ctx, key, func() (interface{}, error) {
-		return c.repo.GetServiceNetworkReceiveRange(ctx, serviceName, from, to)
+		return c.repo.GetServiceNetworkReceiveRange(ctx, serviceName, rangeWindow)
 	})
 	if err != nil {
 		return nil, err
@@ -284,10 +284,10 @@ func (c *CachedMetricsProvider) GetServiceNetworkReceiveRange(ctx context.Contex
 	return value.([]float64), nil
 }
 
-func (c *CachedMetricsProvider) GetServiceNetworkTransmitRange(ctx context.Context, serviceName string, from, to time.Time) ([]float64, error) {
-	key := "network_transmit_range_" + serviceName + "_" + from.String() + "_" + to.String()
+func (c *CachedMetricsProvider) GetServiceNetworkTransmitRange(ctx context.Context, serviceName string, rangeWindow time.Duration) ([]float64, error) {
+	key := "network_transmit_range_" + serviceName + "_" + rangeWindow.String()
 	value, err := c.get(ctx, key, func() (interface{}, error) {
-		return c.repo.GetServiceNetworkTransmitRange(ctx, serviceName, from, to)
+		return c.repo.GetServiceNetworkTransmitRange(ctx, serviceName, rangeWindow)
 	})
 	if err != nil {
 		return nil, err
@@ -295,10 +295,10 @@ func (c *CachedMetricsProvider) GetServiceNetworkTransmitRange(ctx context.Conte
 	return value.([]float64), nil
 }
 
-func (c *CachedMetricsProvider) GetServiceRequestsCountRange(ctx context.Context, serviceName string, from, to time.Time) ([]float64, error) {
-	key := "requests_count_range_" + serviceName + "_" + from.String() + "_" + to.String()
+func (c *CachedMetricsProvider) GetServiceRequestsCountRange(ctx context.Context, serviceName string, rangeWindow time.Duration) ([]float64, error) {
+	key := "requests_count_range_" + serviceName + "_" + rangeWindow.String()
 	value, err := c.get(ctx, key, func() (interface{}, error) {
-		return c.repo.GetServiceRequestsCountRange(ctx, serviceName, from, to)
+		return c.repo.GetServiceRequestsCountRange(ctx, serviceName, rangeWindow)
 	})
 	if err != nil {
 		return nil, err
@@ -339,10 +339,10 @@ func (c *CachedMetricsProvider) GetGraphLatencyP50Value(ctx context.Context, ser
 	return value.(float64), nil
 }
 
-func (c *CachedMetricsProvider) GetGraphRequestsCountRange(ctx context.Context, serviceFrom, serviceTo string, from, to time.Time) ([]float64, error) {
-	key := "graph_requests_count_range_" + serviceFrom + "_" + serviceTo + "_" + from.String() + "_" + to.String()
+func (c *CachedMetricsProvider) GetGraphRequestsCountRange(ctx context.Context, serviceFrom, serviceTo string, rangeWindow time.Duration) ([]float64, error) {
+	key := "graph_requests_count_range_" + serviceFrom + "_" + serviceTo + "_" + rangeWindow.String()
 	value, err := c.get(ctx, key, func() (interface{}, error) {
-		return c.repo.GetGraphRequestsCountRange(ctx, serviceFrom, serviceTo, from, to)
+		return c.repo.GetGraphRequestsCountRange(ctx, serviceFrom, serviceTo, rangeWindow)
 	})
 	if err != nil {
 		return nil, err
@@ -350,10 +350,10 @@ func (c *CachedMetricsProvider) GetGraphRequestsCountRange(ctx context.Context, 
 	return value.([]float64), nil
 }
 
-func (c *CachedMetricsProvider) GetGraphLatencyP95Range(ctx context.Context, serviceFrom, serviceTo string, from, to time.Time) ([]float64, error) {
-	key := "graph_latency_p95_range_" + serviceFrom + "_" + serviceTo + "_" + from.String() + "_" + to.String()
+func (c *CachedMetricsProvider) GetGraphLatencyP95Range(ctx context.Context, serviceFrom, serviceTo string, rangeWindow time.Duration) ([]float64, error) {
+	key := "graph_latency_p95_range_" + serviceFrom + "_" + serviceTo + "_" + rangeWindow.String()
 	value, err := c.get(ctx, key, func() (interface{}, error) {
-		return c.repo.GetGraphLatencyP95Range(ctx, serviceFrom, serviceTo, from, to)
+		return c.repo.GetGraphLatencyP95Range(ctx, serviceFrom, serviceTo, rangeWindow)
 	})
 	if err != nil {
 		return nil, err
@@ -361,10 +361,10 @@ func (c *CachedMetricsProvider) GetGraphLatencyP95Range(ctx context.Context, ser
 	return value.([]float64), nil
 }
 
-func (c *CachedMetricsProvider) GetGraphLatencyP50Range(ctx context.Context, serviceFrom, serviceTo string, from, to time.Time) ([]float64, error) {
-	key := "graph_latency_p50_range_" + serviceFrom + "_" + serviceTo + "_" + from.String() + "_" + to.String()
+func (c *CachedMetricsProvider) GetGraphLatencyP50Range(ctx context.Context, serviceFrom, serviceTo string, rangeWindow time.Duration) ([]float64, error) {
+	key := "graph_latency_p50_range_" + serviceFrom + "_" + serviceTo + "_" + rangeWindow.String()
 	value, err := c.get(ctx, key, func() (interface{}, error) {
-		return c.repo.GetGraphLatencyP50Range(ctx, serviceFrom, serviceTo, from, to)
+		return c.repo.GetGraphLatencyP50Range(ctx, serviceFrom, serviceTo, rangeWindow)
 	})
 	if err != nil {
 		return nil, err
@@ -372,10 +372,10 @@ func (c *CachedMetricsProvider) GetGraphLatencyP50Range(ctx context.Context, ser
 	return value.([]float64), nil
 }
 
-func (c *CachedMetricsProvider) GetServiceAverageLatency95Range(ctx context.Context, serviceName string, from, to time.Time) ([]float64, error) {
-	key := "avg_latency_95_range_" + serviceName + "_" + from.String() + "_" + to.String()
+func (c *CachedMetricsProvider) GetServiceAverageLatency95Range(ctx context.Context, serviceName string, rangeWindow time.Duration) ([]float64, error) {
+	key := "avg_latency_95_range_" + serviceName + "_" + rangeWindow.String()
 	value, err := c.get(ctx, key, func() (interface{}, error) {
-		return c.repo.GetServiceAverageLatency95Range(ctx, serviceName, from, to)
+		return c.repo.GetServiceAverageLatency95Range(ctx, serviceName, rangeWindow)
 	})
 	if err != nil {
 		return nil, err

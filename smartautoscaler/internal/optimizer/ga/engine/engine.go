@@ -36,7 +36,7 @@ func (e *Engine) InitPopulation(seed *genome.ReactionGenome) []*genome.ReactionG
 }
 
 // Run executes the GA loop and returns best genome found.
-func (e *Engine) Run(ctx context.Context, now time.Time, seed *genome.ReactionGenome) (*genome.ReactionGenome, error) {
+func (e *Engine) Run(ctx context.Context, seed *genome.ReactionGenome) (*genome.ReactionGenome, error) {
 	rng := rand.New(rand.NewSource(e.Config.RandomSeed))
 	if e.Config.RandomSeed == 0 {
 		rng = rand.New(rand.NewSource(time.Now().UnixNano()))
@@ -47,7 +47,7 @@ func (e *Engine) Run(ctx context.Context, now time.Time, seed *genome.ReactionGe
 	var best *genome.ReactionGenome
 	for gen := 0; gen < e.Config.Generations; gen++ {
 		// Evaluate batch fitness
-		scores := e.Fitness.EvaluateBatch(ctx, now, pop)
+		scores := e.Fitness.EvaluateBatch(ctx, pop)
 
 		// keep elite
 		eliteCount := int(float64(len(pop)) * e.Config.EliteRatio)
@@ -100,7 +100,7 @@ func (e *Engine) Run(ctx context.Context, now time.Time, seed *genome.ReactionGe
 		}
 
 		// track best
-		scores = e.Fitness.EvaluateBatch(ctx, now, pop)
+		scores = e.Fitness.EvaluateBatch(ctx, pop)
 		bestIdxs := TopNIndices(scores, 1)
 		if len(bestIdxs) > 0 {
 			best = pop[bestIdxs[0]].Clone()
