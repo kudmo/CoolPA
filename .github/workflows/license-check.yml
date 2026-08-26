@@ -70,7 +70,6 @@ jobs:
           license_type=$(echo "$license_type" | tr -d '"')
           
           if [[ "$module" == github.com/kudmo/CoolPA* || "$module" == github.com/kudmo/toporank* ]]; then
-            echo "SKIPPING (internal): $module"
             continue
           fi
           
@@ -105,6 +104,42 @@ jobs:
       run: |
         mkdir -p license-report
         
+        INCOMPATIBLE_FILE="license-report/incompatible.txt"
+        REVIEW_FILE="license-report/review.txt"
+        COMPATIBLE_FILE="license-report/compatible.txt"
+        
+        : > "$INCOMPATIBLE_FILE"
+        : > "$REVIEW_FILE"
+        : > "$COMPATIBLE_FILE"
+        
+        while IFS=',' read -r module license_url license_type; do
+          if [[ "$module" == "Module" || -z "$module" ]]; then
+            continue
+          fi
+          
+          module=$(echo "$module" | tr -d '"')
+          license_type=$(echo "$license_type" | tr -d '"')
+          
+          if [[ "$module" == github.com/kudmo/CoolPA* || "$module" == github.com/kudmo/toporank* ]]; then
+            continue
+          fi
+          
+          case "$license_type" in
+            *"Apache"*|*"BSD"*|*"MIT"*|*"ISC"*|*"MPL"*)
+              echo "| $module | $license_type | COMPATIBLE |" >> "$COMPATIBLE_FILE"
+              ;;
+            *"GPL"*|*"AGPL"*|*"LGPL"*)
+              echo "| $module | $license_type | INCOMPATIBLE |" >> "$INCOMPATIBLE_FILE"
+              ;;
+            *"Unknown"*|*"UNKNOWN"*|"")
+              echo "| $module | Unknown | REVIEW REQUIRED |" >> "$REVIEW_FILE"
+              ;;
+            *)
+              echo "| $module | $license_type | REVIEW REQUIRED |" >> "$REVIEW_FILE"
+              ;;
+          esac
+        done < <(go-licenses csv ./... 2>/dev/null || true)
+        
         {
           echo "=== License Report ==="
           echo "Generated: $(date)"
@@ -112,35 +147,17 @@ jobs:
           echo "| Module | License | Status |"
           echo "|--------|---------|--------|"
           
-          while IFS=',' read -r module license_url license_type; do
-            if [[ "$module" == "Module" || -z "$module" ]]; then
-              continue
-            fi
-            
-            module=$(echo "$module" | tr -d '"')
-            license_type=$(echo "$license_type" | tr -d '"')
-            
-            if [[ "$module" == github.com/kudmo/CoolPA* || "$module" == github.com/kudmo/toporank* ]]; then
-              status="INTERNAL"
-            else
-              case "$license_type" in
-                *"Apache"*|*"BSD"*|*"MIT"*|*"ISC"*|*"MPL"*)
-                  status="COMPATIBLE"
-                  ;;
-                *"GPL"*|*"AGPL"*|*"LGPL"*)
-                  status="INCOMPATIBLE"
-                  ;;
-                *"Unknown"*|*"UNKNOWN"*|"")
-                  status="UNKNOWN"
-                  ;;
-                *)
-                  status="REVIEW REQUIRED"
-                  ;;
-              esac
-            fi
-            
-            echo "| $module | $license_type | $status |"
-          done < <(go-licenses csv ./... 2>/dev/null || true)
+          if [ -s "$INCOMPATIBLE_FILE" ]; then
+            cat "$INCOMPATIBLE_FILE"
+          fi
+          
+          if [ -s "$REVIEW_FILE" ]; then
+            cat "$REVIEW_FILE"
+          fi
+          
+          if [ -s "$COMPATIBLE_FILE" ]; then
+            cat "$COMPATIBLE_FILE"
+          fi
         } > license-report/readable-report.txt
         
         cat license-report/readable-report.txt
@@ -155,7 +172,6 @@ jobs:
           total=0
           compatible=0
           incompatible=0
-          internal=0
           unknown=0
           
           while IFS=',' read -r module license_url license_type; do
@@ -165,30 +181,27 @@ jobs:
             
             module=$(echo "$module" | tr -d '"')
             license_type=$(echo "$license_type" | tr -d '"')
-            total=$((total + 1))
             
             if [[ "$module" == github.com/kudmo/CoolPA* || "$module" == github.com/kudmo/toporank* ]]; then
-              internal=$((internal + 1))
-            else
-              case "$license_type" in
-                *"Apache"*|*"BSD"*|*"MIT"*|*"ISC"*|*"MPL"*)
-                  compatible=$((compatible + 1))
-                  ;;
-                *"GPL"*|*"AGPL"*|*"LGPL"*)
-                  incompatible=$((incompatible + 1))
-                  ;;
-                *"Unknown"*|*"UNKNOWN"*|"")
-                  unknown=$((unknown + 1))
-                  ;;
-                *)
-                  unknown=$((unknown + 1))
-                  ;;
-              esac
+              continue
             fi
+            
+            total=$((total + 1))
+            
+            case "$license_type" in
+              *"Apache"*|*"BSD"*|*"MIT"*|*"ISC"*|*"MPL"*)
+                compatible=$((compatible + 1))
+                ;;
+              *"GPL"*|*"AGPL"*|*"LGPL"*)
+                incompatible=$((incompatible + 1))
+                ;;
+              *)
+                unknown=$((unknown + 1))
+                ;;
+            esac
           done < <(go-licenses csv ./... 2>/dev/null || true)
           
-          echo "Total dependencies: $total"
-          echo "Internal packages: $internal"
+          echo "Total external dependencies: $total"
           echo "Compatible licenses: $compatible"
           echo "Incompatible licenses: $incompatible"
           echo "Unknown licenses: $unknown"
