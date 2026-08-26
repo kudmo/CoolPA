@@ -1,0 +1,273 @@
+name: License Compliance Check
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'smartautoscaler/go.mod'
+      - 'smartautoscaler/go.sum'
+      - 'smartautoscaler/**/*.go'
+      - 'LICENSE'
+      - '.github/workflows/*.yml'
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  license-check:
+    name: Check License Compatibility
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.26'
+        cache: true
+        cache-dependency-path: smartautoscaler/go.sum
+
+    - name: Install go-licenses
+      run: |
+        go install github.com/google/go-licenses@latest
+
+    - name: Check project license
+      run: |
+        if [ ! -f LICENSE ]; then
+          echo "::error::LICENSE file not found"
+          exit 1
+        fi
+        
+        echo "Project license:"
+        head -5 LICENSE
+        echo ""
+        
+        if grep -qi "Apache" LICENSE; then
+          echo "::notice::Project uses Apache 2.0 license"
+        else
+          echo "::warning::Project license might not be Apache 2.0"
+        fi
+
+    - name: Check external dependencies licenses
+      working-directory: smartautoscaler
+      run: |
+        echo "Checking external dependencies for compatibility with Apache 2.0..."
+        echo "Allowed licenses: Apache-2.0, BSD-2-Clause, BSD-3-Clause, MIT, ISC, MPL-2.0"
+        echo ""
+        
+        ISSUES_FOUND=0
+        
+        while IFS=',' read -r module license_url license_type; do
+          if [[ "$module" == "Module" || -z "$module" ]]; then
+            continue
+          fi
+          
+          module=$(echo "$module" | tr -d '"')
+          license_type=$(echo "$license_type" | tr -d '"')
+          
+          if [[ "$module" == github.com/kudmo/CoolPA* || "$module" == github.com/kudmo/toporank* ]]; then
+            continue
+          fi
+          
+          case "$license_type" in
+            *"Apache"*|*"BSD"*|*"MIT"*|*"ISC"*|*"MPL"*)
+              echo "COMPATIBLE: $module ($license_type)"
+              ;;
+            *"GPL"*|*"AGPL"*|*"LGPL"*)
+              echo "::error::INCOMPATIBLE: $module ($license_type)"
+              ISSUES_FOUND=1
+              ;;
+            *"Unknown"*|*"UNKNOWN"*|"")
+              echo "::warning::UNKNOWN: $module (no license detected)"
+              ;;
+            *)
+              echo "::error::REVIEW REQUIRED: $module ($license_type)"
+              ISSUES_FOUND=1
+              ;;
+          esac
+        done < <(go-licenses csv ./... 2>/dev/null || true)
+        
+        if [ $ISSUES_FOUND -eq 1 ]; then
+          echo "::error::Found incompatible licenses"
+          exit 1
+        else
+          echo "::notice::All external dependencies have compatible licenses"
+        fi
+
+    - name: Generate license report
+      if: always()
+      working-directory: smartautoscaler
+      run: |
+        mkdir -p license-report
+        
+        INCOMPATIBLE_FILE="license-report/incompatible.txt"
+        REVIEW_FILE="license-report/review.txt"
+        COMPATIBLE_FILE="license-report/compatible.txt"
+        
+        : > "$INCOMPATIBLE_FILE"
+        : > "$REVIEW_FILE"
+        : > "$COMPATIBLE_FILE"
+        
+        while IFS=',' read -r module license_url license_type; do
+          if [[ "$module" == "Module" || -z "$module" ]]; then
+            continue
+          fi
+          
+          module=$(echo "$module" | tr -d '"')
+          license_type=$(echo "$license_type" | tr -d '"')
+          
+          if [[ "$module" == github.com/kudmo/CoolPA* || "$module" == github.com/kudmo/toporank* ]]; then
+            continue
+          fi
+          
+          case "$license_type" in
+            *"Apache"*|*"BSD"*|*"MIT"*|*"ISC"*|*"MPL"*)
+              echo "| $module | $license_type | COMPATIBLE |" >> "$COMPATIBLE_FILE"
+              ;;
+            *"GPL"*|*"AGPL"*|*"LGPL"*)
+              echo "| $module | $license_type | INCOMPATIBLE |" >> "$INCOMPATIBLE_FILE"
+              ;;
+            *"Unknown"*|*"UNKNOWN"*|"")
+              echo "| $module | Unknown | REVIEW REQUIRED |" >> "$REVIEW_FILE"
+              ;;
+            *)
+              echo "| $module | $license_type | REVIEW REQUIRED |" >> "$REVIEW_FILE"
+              ;;
+          esac
+        done < <(go-licenses csv ./... 2>/dev/null || true)
+        
+        {
+          echo "=== License Report ==="
+          echo "Generated: $(date)"
+          echo ""
+          echo "| Module | License | Status |"
+          echo "|--------|---------|--------|"
+          
+          if [ -s "$INCOMPATIBLE_FILE" ]; then
+            cat "$INCOMPATIBLE_FILE"
+          fi
+          
+          if [ -s "$REVIEW_FILE" ]; then
+            cat "$REVIEW_FILE"
+          fi
+          
+          if [ -s "$COMPATIBLE_FILE" ]; then
+            cat "$COMPATIBLE_FILE"
+          fi
+        } > license-report/readable-report.txt
+        
+        cat license-report/readable-report.txt
+
+    - name: Create summary
+      if: always()
+      working-directory: smartautoscaler
+      run: |
+        {
+          echo "=== License Summary ==="
+          
+          total=0
+          compatible=0
+          incompatible=0
+          unknown=0
+          
+          while IFS=',' read -r module license_url license_type; do
+            if [[ "$module" == "Module" || -z "$module" ]]; then
+              continue
+            fi
+            
+            module=$(echo "$module" | tr -d '"')
+            license_type=$(echo "$license_type" | tr -d '"')
+            
+            if [[ "$module" == github.com/kudmo/CoolPA* || "$module" == github.com/kudmo/toporank* ]]; then
+              continue
+            fi
+            
+            total=$((total + 1))
+            
+            case "$license_type" in
+              *"Apache"*|*"BSD"*|*"MIT"*|*"ISC"*|*"MPL"*)
+                compatible=$((compatible + 1))
+                ;;
+              *"GPL"*|*"AGPL"*|*"LGPL"*)
+                incompatible=$((incompatible + 1))
+                ;;
+              *)
+                unknown=$((unknown + 1))
+                ;;
+            esac
+          done < <(go-licenses csv ./... 2>/dev/null || true)
+          
+          echo "Total external dependencies: $total"
+          echo "Compatible licenses: $compatible"
+          echo "Incompatible licenses: $incompatible"
+          echo "Unknown licenses: $unknown"
+          echo ""
+          
+          if [ "$incompatible" -gt 0 ]; then
+            echo "FOUND_INCOMPATIBLE_LICENSES"
+          elif [ "$unknown" -gt 0 ]; then
+            echo "UNKNOWN_LICENSES_REQUIRE_REVIEW"
+          else
+            echo "ALL_EXTERNAL_LICENSES_COMPATIBLE"
+          fi
+        } > license-report/summary.txt
+        
+        cat license-report/summary.txt
+
+    - name: Upload license reports
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: license-reports
+        path: smartautoscaler/license-report/
+        retention-days: 7
+
+    - name: Comment on PR with license summary
+      if: always()
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const fs = require('fs');
+          
+          let body = '## License Compliance Report\n\n';
+          body += '**Allowed licenses:** Apache-2.0, BSD-2-Clause, BSD-3-Clause, MIT, ISC, MPL-2.0\n\n';
+          
+          if (fs.existsSync('smartautoscaler/license-report/summary.txt')) {
+            const summary = fs.readFileSync('smartautoscaler/license-report/summary.txt', 'utf8');
+            
+            if (summary.includes('FOUND_INCOMPATIBLE_LICENSES')) {
+              body += '> **ERROR**: Found incompatible licenses that violate Apache 2.0 terms\n\n';
+            } else if (summary.includes('UNKNOWN_LICENSES_REQUIRE_REVIEW')) {
+              body += '> **WARNING**: Some licenses require manual review\n\n';
+            } else {
+              body += '> **SUCCESS**: All external licenses are compatible\n\n';
+            }
+            
+            body += '### Summary\n```\n' + summary + '\n```\n\n';
+          }
+          
+          if (fs.existsSync('smartautoscaler/license-report/readable-report.txt')) {
+            const report = fs.readFileSync('smartautoscaler/license-report/readable-report.txt', 'utf8');
+            
+            const lines = report.split('\n');
+            const header = lines.slice(0, 3).join('\n');
+            const dependencies = lines.slice(3, 30).join('\n');
+            
+            body += '### Dependencies (first 27)\n';
+            body += header + '\n' + dependencies + '\n\n';
+            
+            if (lines.length > 30) {
+              body += `... and ${lines.length - 30} more dependencies. See full report in artifacts.\n`;
+            }
+          }
+          
+          github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: body
+          });
