@@ -51,7 +51,8 @@ func main() {
 	}
 
 	cacheConfig := cache.CachedMetricsProviderConfig{
-		TTL: cfg.AnalyzerInterval,
+		TTL:          cfg.AnalyzerInterval,
+		MaxCacheSize: 100,
 	}
 
 	// Components creating

@@ -58,6 +58,7 @@ require (
 )
 
 require (
+	github.com/hashicorp/golang-lru/v2 v2.0.7
 	github.com/stretchr/testify v1.12.1
 	github.com/yalue/onnxruntime_go v1.35.0
 	golang.org/x/sync v0.22.0
