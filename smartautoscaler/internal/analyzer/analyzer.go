@@ -3,7 +3,6 @@ package analyzer
 import (
 	"context"
 	"slices"
-	"time"
 
 	"github.com/kudmo/CoolPA/internal/analyzer/interfaces"
 	"github.com/kudmo/CoolPA/internal/statistics"
@@ -69,11 +68,8 @@ func (a *Analyzer) updateStatistics(ctx context.Context, analysisResult Analysis
 		}
 	}
 
-	time_now := time.Now()
-	time_now_begin := time_now.Add(-a.config.WelchNowIntervalBegin)
-
 	for _, s := range analysisResult.Services {
-		new, _ := a.metricsProvider.GetServiceRequestsCountRange(ctx, s, time_now_begin, time_now)
+		new, _ := a.metricsProvider.GetServiceRequestsCountRange(ctx, s, a.config.Window)
 		newStats := welchtest.NewOnlineStats()
 		newStats.N = len(new)
 		for _, i := range new {

@@ -4,7 +4,6 @@ import (
 	"context"
 	"math"
 	"sort"
-	"time"
 
 	"github.com/kudmo/CoolPA/logger"
 	"github.com/kudmo/CoolPA/utils"
@@ -19,21 +18,19 @@ type call struct {
 
 // findAbnormalCalls detects abnormal calls according to parameters and returns
 // the list of abnormal edges along with an anomaly degree per service.
-func (a *Analyzer) findAbnormalCalls(ctx context.Context, now time.Time) []call {
-	fromTime := now.Add(-a.config.abnormalParams.Window)
-
+func (a *Analyzer) findAbnormalCalls(ctx context.Context) []call {
 	var anomalous []call
 
 	services, _ := a.metricsProvider.ListServices(ctx)
 	for _, from_name := range services {
 		from, _ := a.metricsProvider.GetService(ctx, from_name)
 		for _, to_name := range from.OuboundCalls {
-			lat95_range, _ := a.metricsProvider.GetGraphLatencyP95Range(ctx, from_name, to_name, fromTime, now)
+			lat95_range, _ := a.metricsProvider.GetGraphLatencyP95Range(ctx, from_name, to_name, a.config.Window)
 			lat95 := utils.Avg(lat95_range)
-			lat50_range, _ := a.metricsProvider.GetGraphLatencyP50Range(ctx, from_name, to_name, fromTime, now)
+			lat50_range, _ := a.metricsProvider.GetGraphLatencyP50Range(ctx, from_name, to_name, a.config.Window)
 			lat50 := utils.Avg(lat50_range)
 
-			if lat95 > a.config.abnormalParams.SLO*(1-a.config.abnormalParams.Alpha) {
+			if lat95 > a.config.SLO*(1-a.config.Alpha) {
 				anomalous = append(anomalous, call{from_name, to_name})
 			} else if lat95/lat50 > 12 {
 				anomalous = append(anomalous, call{from_name, to_name})
@@ -45,12 +42,10 @@ func (a *Analyzer) findAbnormalCalls(ctx context.Context, now time.Time) []call 
 
 // buildCorrelationGraphFromCalls builds a correlation graph from provided abnormal
 // calls and service anomaly degrees.
-func (a *Analyzer) buildCorrelationGraphFromCalls(ctx context.Context, now time.Time, abnormalCalls []call, serviceAnomaly map[string]float64) (*types.CorrelationGraph, error) {
+func (a *Analyzer) buildCorrelationGraphFromCalls(ctx context.Context, abnormalCalls []call, serviceAnomaly map[string]float64) (*types.CorrelationGraph, error) {
 	if len(abnormalCalls) == 0 {
 		return nil, nil
 	}
-
-	fromTime := now.Add(-a.config.abnormalParams.Window)
 
 	cg := types.NewCorrelationGraph()
 	for svc, degree := range serviceAnomaly {
@@ -61,34 +56,34 @@ func (a *Analyzer) buildCorrelationGraphFromCalls(ctx context.Context, now time.
 
 	for _, c := range abnormalCalls {
 
-		latSeries, _ := a.metricsProvider.GetGraphLatencyP95Range(ctx, c.from, c.to, fromTime, now)
+		latSeries, _ := a.metricsProvider.GetGraphLatencyP95Range(ctx, c.from, c.to, a.config.Window)
 		weight := 0.0
 
-		cpuUsage, err := a.metricsProvider.GetServiceCpuUsageRange(ctx, c.to, fromTime, now)
+		cpuUsage, err := a.metricsProvider.GetServiceCpuUsageRange(ctx, c.to, a.config.Window)
 		if err == nil {
 			weight = math.Max(weight, math.Abs(utils.Pearson(latSeries, cpuUsage)))
 		}
-		memUsage, err := a.metricsProvider.GetServiceMemoryUsageRange(ctx, c.to, fromTime, now)
+		memUsage, err := a.metricsProvider.GetServiceMemoryUsageRange(ctx, c.to, a.config.Window)
 		if err == nil {
 			weight = math.Max(weight, math.Abs(utils.Pearson(latSeries, memUsage)))
 		}
-		fsUsage, err := a.metricsProvider.GetServiceFSUsageRange(ctx, c.to, fromTime, now)
+		fsUsage, err := a.metricsProvider.GetServiceFSUsageRange(ctx, c.to, a.config.Window)
 		if err == nil {
 			weight = math.Max(weight, math.Abs(utils.Pearson(latSeries, fsUsage)))
 		}
-		fsWrite, err := a.metricsProvider.GetServiceFSWriteRange(ctx, c.to, fromTime, now)
+		fsWrite, err := a.metricsProvider.GetServiceFSWriteRange(ctx, c.to, a.config.Window)
 		if err == nil {
 			weight = math.Max(weight, math.Abs(utils.Pearson(latSeries, fsWrite)))
 		}
-		fsRead, err := a.metricsProvider.GetServiceFSReadRange(ctx, c.to, fromTime, now)
+		fsRead, err := a.metricsProvider.GetServiceFSReadRange(ctx, c.to, a.config.Window)
 		if err == nil {
 			weight = math.Max(weight, math.Abs(utils.Pearson(latSeries, fsRead)))
 		}
-		netRecv, err := a.metricsProvider.GetServiceNetworkReceiveRange(ctx, c.to, fromTime, now)
+		netRecv, err := a.metricsProvider.GetServiceNetworkReceiveRange(ctx, c.to, a.config.Window)
 		if err == nil {
 			weight = math.Max(weight, math.Abs(utils.Pearson(latSeries, netRecv)))
 		}
-		netTrans, err := a.metricsProvider.GetServiceNetworkTransmitRange(ctx, c.to, fromTime, now)
+		netTrans, err := a.metricsProvider.GetServiceNetworkTransmitRange(ctx, c.to, a.config.Window)
 		if err == nil {
 			weight = math.Max(weight, math.Abs(utils.Pearson(latSeries, netTrans)))
 		}
@@ -101,8 +96,7 @@ func (a *Analyzer) buildCorrelationGraphFromCalls(ctx context.Context, now time.
 	return cg, nil
 }
 
-func (a *Analyzer) computeAnomalyDegree(ctx context.Context, now time.Time, abnormalCalls []call) map[string]float64 {
-	fromTime := now.Add(-a.config.abnormalParams.Window)
+func (a *Analyzer) computeAnomalyDegree(ctx context.Context, abnormalCalls []call) map[string]float64 {
 	serviceAnomaly := make(map[string]float64)
 
 	affectedServices := make(map[string]bool)
@@ -120,9 +114,9 @@ func (a *Analyzer) computeAnomalyDegree(ctx context.Context, now time.Time, abno
 		exceedCount := 0
 
 		for _, to := range node.InboundCalls {
-			latencySeries, _ := a.metricsProvider.GetGraphLatencyP95Range(ctx, node.Name, to, fromTime, now)
+			latencySeries, _ := a.metricsProvider.GetGraphLatencyP95Range(ctx, node.Name, to, a.config.Window)
 			for _, lat := range latencySeries {
-				if lat > a.config.abnormalParams.SLO {
+				if lat > a.config.SLO {
 					exceedCount++
 				}
 			}
@@ -137,15 +131,14 @@ func (a *Analyzer) computeAnomalyDegree(ctx context.Context, now time.Time, abno
 
 func (a *Analyzer) buildAbnormalCorrelationGraph(
 	ctx context.Context,
-	now time.Time,
 ) (*types.CorrelationGraph, error) {
-	abnormalCalls := a.findAbnormalCalls(ctx, now)
+	abnormalCalls := a.findAbnormalCalls(ctx)
 	logger.Info("slo_violation", "found abnormal calls", "count", len(abnormalCalls))
-	serviceAnomaly := a.computeAnomalyDegree(ctx, now, abnormalCalls)
+	serviceAnomaly := a.computeAnomalyDegree(ctx, abnormalCalls)
 	logger.Info("slo_violation", "calculated anomaly degrees", "services", serviceAnomaly)
 	for _, anomaly := range serviceAnomaly {
 		if anomaly != 0 {
-			return a.buildCorrelationGraphFromCalls(ctx, now, abnormalCalls, serviceAnomaly)
+			return a.buildCorrelationGraphFromCalls(ctx, abnormalCalls, serviceAnomaly)
 		}
 	}
 	return nil, nil
@@ -154,7 +147,7 @@ func (a *Analyzer) buildAbnormalCorrelationGraph(
 func (a *Analyzer) analyzeWithSLOViolation(ctx context.Context) []string {
 	result := make([]string, 0)
 
-	graph, err := a.buildAbnormalCorrelationGraph(ctx, time.Now())
+	graph, err := a.buildAbnormalCorrelationGraph(ctx)
 	if err != nil {
 		logger.Error("analyzer", "failed to build abnormal correlation graph", "error", err)
 	} else {

@@ -46,11 +46,10 @@ func (pc *PrometheusCollector) CollectQuery(ctx context.Context, query MetricQue
 }
 
 func (pc *PrometheusCollector) CollectQueryRange(ctx context.Context, query MetricQueryRange) ([]MetricRangeResult, error) {
-	// Создаем Range запрос
 	r := v1.Range{
 		Start: query.Start,
 		End:   query.End,
-		Step:  time.Minute, // Шаг по умолчанию, можно настроить
+		Step:  time.Minute,
 	}
 
 	promResult, warnings, err := pc.client.QueryRange(ctx, query.Query, r)
