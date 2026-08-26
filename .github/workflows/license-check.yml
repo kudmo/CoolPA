@@ -2,7 +2,8 @@ name: License Compliance Check
 
 on:
   pull_request:
-    branches: [ main ]
+    branches:
+      - main
     paths:
       - 'smartautoscaler/go.mod'
       - 'smartautoscaler/go.sum'

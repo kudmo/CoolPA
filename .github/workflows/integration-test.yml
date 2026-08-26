@@ -96,7 +96,6 @@ jobs:
         echo "=== Deployment Status ==="
         kubectl --context=kind-ms-demo describe deployment -l app=smartautoscaler -n autoscale-test
         
-        # Проверяем образ
         echo "=== Image Details ==="
         kubectl --context=kind-ms-demo get pods -l app=smartautoscaler -n autoscale-test -o jsonpath='{.items[0].spec.containers[0].image}'
         
