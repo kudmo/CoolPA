@@ -38,7 +38,7 @@ jobs:
     - name: Check project license
       run: |
         if [ ! -f LICENSE ]; then
-          echo "LICENSE file not found"
+          echo "::error::LICENSE file not found"
           exit 1
         fi
         
@@ -46,10 +46,10 @@ jobs:
         head -5 LICENSE
         echo ""
         
-        if grep -q "Apache" LICENSE; then
-          echo "Project uses Apache 2.0 license"
+        if grep -qi "Apache" LICENSE; then
+          echo "::notice::Project uses Apache 2.0 license"
         else
-          echo "Project license might not be Apache 2.0"
+          echo "::warning::Project license might not be Apache 2.0"
         fi
 
     - name: Check licenses against allowed list
@@ -59,8 +59,13 @@ jobs:
         echo "Allowed licenses: Apache-2.0, BSD-2-Clause, BSD-3-Clause, MIT, ISC, MPL-2.0"
         echo ""
         
-        go-licenses check ./... \
-          --allowed_licenses=Apache-2.0,BSD-2-Clause,BSD-3-Clause,MIT,ISC,MPL-2.0
+        if go-licenses check ./... \
+          --allowed_licenses=Apache-2.0,BSD-2-Clause,BSD-3-Clause,MIT,ISC,MPL-2.0; then
+          echo "::notice::All licenses are compatible with Apache 2.0"
+        else
+          echo "::error::Found incompatible licenses"
+          exit 1
+        fi
 
     - name: Generate license report
       if: always()
@@ -70,51 +75,64 @@ jobs:
         
         go-licenses csv ./... > license-report/licenses.csv 2>/dev/null || true
         
-        go-licenses report ./... > license-report/licenses-report.txt 2>/dev/null || true
+        {
+          echo "=== License Report ==="
+          echo "Generated: $(date)"
+          echo ""
+          echo "| Module | License | Status |"
+          echo "|--------|---------|--------|"
+          
+          tail -n +2 license-report/licenses.csv | while IFS=',' read -r module license_url license_type; do
+            module=$(echo "$module" | tr -d '"')
+            license_type=$(echo "$license_type" | tr -d '"')
+            
+            case "$license_type" in
+              *"Apache"*|*"BSD"*|*"MIT"*|*"ISC"*|*"MPL"*)
+                status="COMPATIBLE"
+                ;;
+              *"GPL"*|*"AGPL"*|*"LGPL"*)
+                status="INCOMPATIBLE"
+                ;;
+              *)
+                status="REVIEW REQUIRED"
+                ;;
+            esac
+            
+            echo "| $module | $license_type | $status |"
+          done
+        } > license-report/readable-report.txt
         
-        echo "=== License Report ==="
-        cat license-report/licenses-report.txt 2>/dev/null || echo "No report generated"
-        
-        echo ""
-        echo "=== CSV Report ==="
-        cat license-report/licenses.csv 2>/dev/null || echo "No CSV report generated"
+        cat license-report/readable-report.txt
 
-    - name: Create custom license check script
+    - name: Create summary
       if: always()
       working-directory: smartautoscaler
       run: |
-        cat > check-licenses.sh << 'EOF'
-        #!/bin/bash
-        
-        echo "=== Checking individual licenses ==="
-        echo ""
-        
-        go list -m all | tail -n +2 | while read -r module version; do
-          if [ "$module" != "smartautoscaler" ]; then
-            # Получаем лицензию для модуля
-            license=$(go-licenses csv "$module" 2>/dev/null | tail -n +2 | awk -F',' '{print $3}' | head -1)
-            
-            if [ -n "$license" ]; then
-              case "$license" in
-                *"Apache"*|*"BSD"*|*"MIT"*|*"ISC"*|*"MPL"*)
-                  echo "$module: $license"
-                  ;;
-                *"GPL"*|*"AGPL"*|*"LGPL"*)
-                  echo "$module: $license (NOT COMPATIBLE)"
-                  ;;
-                *)
-                  echo "$module: $license (REVIEW REQUIRED)"
-                  ;;
-              esac
-            else
-              echo "$module: Unknown license"
-            fi
+        {
+          echo "=== License Summary ==="
+          
+          total=$(tail -n +2 license-report/licenses.csv | wc -l)
+          compatible=$(tail -n +2 license-report/licenses.csv | grep -cE "(Apache|BSD|MIT|ISC|MPL)" || true)
+          incompatible=$(tail -n +2 license-report/licenses.csv | grep -cE "(GPL|AGPL|LGPL)" || true)
+          unknown=$(tail -n +2 license-report/licenses.csv | grep -vcE "(Apache|BSD|MIT|ISC|MPL|GPL|AGPL|LGPL)" || true)
+          
+          echo "Total dependencies: $total"
+          echo "Compatible licenses: $compatible"
+          echo "Incompatible licenses: $incompatible"
+          echo "Unknown licenses: $unknown"
+          echo ""
+          
+          if [ "$incompatible" -gt 0 ]; then
+            echo "FOUND_INCOMPATIBLE_LICENSES"
+            exit 1
+          elif [ "$unknown" -gt 0 ]; then
+            echo "UNKNOWN_LICENSES_REQUIRE_REVIEW"
+          else
+            echo "ALL_LICENSES_COMPATIBLE"
           fi
-        done
-        EOF
+        } > license-report/summary.txt
         
-        chmod +x check-licenses.sh
-        ./check-licenses.sh
+        cat license-report/summary.txt
 
     - name: Upload license reports
       if: always()
@@ -134,23 +152,32 @@ jobs:
           let body = '## License Compliance Report\n\n';
           body += '**Allowed licenses:** Apache-2.0, BSD-2-Clause, BSD-3-Clause, MIT, ISC, MPL-2.0\n\n';
           
-          if (fs.existsSync('smartautoscaler/license-report/licenses-report.txt')) {
-            const report = fs.readFileSync('smartautoscaler/license-report/licenses-report.txt', 'utf8');
-            body += '### Detailed Report\n```\n' + report.slice(0, 500) + '\n```\n\n';
+          if (fs.existsSync('smartautoscaler/license-report/summary.txt')) {
+            const summary = fs.readFileSync('smartautoscaler/license-report/summary.txt', 'utf8');
+            
+            if (summary.includes('FOUND_INCOMPATIBLE_LICENSES')) {
+              body += '> **ERROR**: Found incompatible licenses that violate Apache 2.0 terms\n\n';
+            } else if (summary.includes('UNKNOWN_LICENSES_REQUIRE_REVIEW')) {
+              body += '> **WARNING**: Some licenses require manual review\n\n';
+            } else {
+              body += '> **SUCCESS**: All licenses are compatible\n\n';
+            }
+            
+            body += '### Summary\n```\n' + summary + '\n```\n\n';
           }
           
-          if (fs.existsSync('smartautoscaler/license-report/licenses.csv')) {
-            const csv = fs.readFileSync('smartautoscaler/license-report/licenses.csv', 'utf8');
-            const lines = csv.split('\n').slice(0, 20);
-            body += '### Dependencies\n| Module | Version | License |\n|--------|---------|----------|\n';
+          if (fs.existsSync('smartautoscaler/license-report/readable-report.txt')) {
+            const report = fs.readFileSync('smartautoscaler/license-report/readable-report.txt', 'utf8');
             
-            for (const line of lines) {
-              if (line.trim()) {
-                const [module, version, license] = line.split(',');
-                if (module && license) {
-                  body += `| ${module} | ${version || ''} | ${license} |\n`;
-                }
-              }
+            const lines = report.split('\n');
+            const header = lines.slice(0, 3).join('\n');
+            const dependencies = lines.slice(3, 30).join('\n');
+            
+            body += '### Dependencies (first 27)\n';
+            body += header + '\n' + dependencies + '\n\n';
+            
+            if (lines.length > 30) {
+              body += `... and ${lines.length - 30} more dependencies. See full report in artifacts.\n`;
             }
           }
           
