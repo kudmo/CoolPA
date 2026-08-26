@@ -49,7 +49,7 @@ func (pc *PrometheusCollector) CollectQueryRange(ctx context.Context, query Metr
 	r := v1.Range{
 		Start: query.Start,
 		End:   query.End,
-		Step:  time.Minute,
+		Step:  pc.config.RangeStep,
 	}
 
 	promResult, warnings, err := pc.client.QueryRange(ctx, query.Query, r)
