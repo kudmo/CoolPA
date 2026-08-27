@@ -1,4 +1,4 @@
-FROM golang:1.26.6 AS builder
+FROM golang:1.26.6-bookworm AS builder
 
 RUN apt-get update && apt-get install -y \
     libopenblas-dev \
@@ -7,14 +7,15 @@ RUN apt-get update && apt-get install -y \
     wget \
     && rm -rf /var/lib/apt/lists/*
 
-RUN wget -q https://github.com/microsoft/onnxruntime/releases/download/v1.24.3/onnxruntime-linux-x64-1.24.3.tgz \
-    && tar -xzf onnxruntime-linux-x64-1.24.3.tgz \
-    && cp -r onnxruntime-linux-x64-1.24.3/include/* /usr/local/include/ \
-    && cp -r onnxruntime-linux-x64-1.24.3/lib/* /usr/local/lib/ \
-    && ln -sf /usr/local/lib/libonnxruntime.so.1.24.3 /usr/local/lib/libonnxruntime.so \
+ENV ONNX_VERSION=1.29.0
+RUN wget -q https://github.com/microsoft/onnxruntime/releases/download/v${ONNX_VERSION}/onnxruntime-linux-x64-${ONNX_VERSION}.tgz \
+    && tar -xzf onnxruntime-linux-x64-${ONNX_VERSION}.tgz \
+    && cp -r onnxruntime-linux-x64-${ONNX_VERSION}/include/* /usr/local/include/ \
+    && cp -r onnxruntime-linux-x64-${ONNX_VERSION}/lib/* /usr/local/lib/ \
+    && ln -sf /usr/local/lib/libonnxruntime.so.${ONNX_VERSION} /usr/local/lib/libonnxruntime.so \
     && ldconfig \
-    && rm onnxruntime-linux-x64-1.24.3.tgz \
-    && rm -rf onnxruntime-linux-x64-1.24.3
+    && rm onnxruntime-linux-x64-${ONNX_VERSION}.tgz \
+    && rm -rf onnxruntime-linux-x64-${ONNX_VERSION}
 
 WORKDIR /app
 
@@ -24,15 +25,17 @@ RUN go mod download
 COPY . .
 
 RUN CGO_ENABLED=1 \
+    GOOS=linux \
+    GOARCH=amd64 \
     go build \
-    -ldflags="-s -w -r /usr/local/lib" \
+    -ldflags="-s -w" \
     -o smartautoscaler \
     ./cmd/main.go
 
-FROM debian:bullseye-slim
+FROM debian:bookworm-slim
 
 RUN apt-get update && apt-get install -y \
-    libopenblas-base \
+    libopenblas0-pthread \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
@@ -40,8 +43,7 @@ COPY --from=builder /usr/local/lib/libonnxruntime.so* /usr/local/lib/
 COPY --from=builder /app/latency_model.onnx /app/
 COPY --from=builder /app/smartautoscaler /app/
 
-RUN ln -sf /usr/local/lib/libonnxruntime.so.1.24.3 /usr/local/lib/libonnxruntime.so \
-    && ldconfig
+RUN ldconfig
 
 WORKDIR /app
 

@@ -1,0 +1,22 @@
+{
+    "name": "CoolPA experiments Dev Container",
+    "build": {
+        "dockerfile": "Dockerfile"
+    },
+    "features": {
+        "ghcr.io/devcontainers/features/docker-in-docker:4.1.0": {
+            "moby": false
+        },
+        "ghcr.io/devcontainers/features/common-utils:2": {}
+    },
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "golang.Go",
+                "ms-kubernetes-tools.vscode-kubernetes-tools",
+                "ms-vscode.makefile-tools"
+            ]
+        }
+    },
+    "remoteUser": "vscode"
+}
