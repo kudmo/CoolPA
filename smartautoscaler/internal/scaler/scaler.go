@@ -35,6 +35,7 @@ func NewScaler(config ScalerConfig, metricsProvider interfaces.MetricsRepository
 		metricsProvider: metricsProvider,
 		config:          config,
 		histStore:       histStore,
+		reactionApplier: applier,
 		analyzer: analyzer.NewAnalyzer(
 			analyzer.AnalyzerConfig{
 				SLO:                  config.SLO,
@@ -90,11 +91,16 @@ func (d *Scaler) Start(ctx context.Context) error {
 					if result.Scale < 0 {
 						mode = optimizer.ScaleDownMode
 					}
-					logger.Info("decision", "proposing scale for services", "services", result.Services)
-					optimizedState, _ := d.optimizer.RunOptimization(analizys_ctx, result.Services, mode)
-					d.scale(analizys_ctx, optimizedState)
+					logger.Info("scaler", "proposing scale for services", "services", result.Services)
+					optimizedState, err := d.optimizer.RunOptimization(analizys_ctx, result.Services, mode)
+					logger.Info("scaler", "proposed state", "services", optimizedState, "error", err)
+					err = d.scale(analizys_ctx, optimizedState)
+					if err != nil {
+						logger.Error("scaler", "error while scaling", "error", err.Error())
+					}
+					d.lastReactionTime = time.Now()
 				} else {
-					logger.Info("decision", "no scaling action proposed")
+					logger.Info("scaler", "no scaling action proposed")
 				}
 			case <-d.stopChan:
 				return
