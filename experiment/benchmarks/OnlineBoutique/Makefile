@@ -122,6 +122,10 @@ deploy-scaler: scaler-build scaler-kind-load
 	$(KUBECTL) create namespace $(SCALER_NS) || true
 	$(KUBECTL) apply -f $(SCALER_DIR)/
 
+.PHONY: remove-scaler
+remove-scaler: 
+	$(KUBECTL) -n $(SCALER_NS) delete deployment smartautoscaler
+
 .PHONY: scaler-logs
 scaler-logs:
 	$(KUBECTL) -n $(SCALER_NS) logs -l app=smartautoscaler --tail=200
