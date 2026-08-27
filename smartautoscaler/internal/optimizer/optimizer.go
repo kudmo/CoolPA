@@ -103,7 +103,7 @@ func (ro *ReactionOptimizer) RunOptimization(ctx context.Context, services []str
 
 	cand := best.Decode()
 
-	state := OptimizedState{Services: make([]OptimizedServiceState, len(cand.Services))}
+	state := OptimizedState{Services: make([]OptimizedServiceState, 0)}
 
 	for _, service := range cand.Services {
 		state.Services = append(state.Services,
