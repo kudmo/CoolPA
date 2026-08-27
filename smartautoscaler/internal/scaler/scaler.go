@@ -92,8 +92,8 @@ func (d *Scaler) Start(ctx context.Context) error {
 						mode = optimizer.ScaleDownMode
 					}
 					logger.Info("scaler", "proposing scale for services", "services", result.Services)
-					optimizedState, err := d.optimizer.RunOptimization(analizys_ctx, result.Services, mode)
-					err = d.scale(analizys_ctx, optimizedState)
+					optimizedState, _ := d.optimizer.RunOptimization(analizys_ctx, result.Services, mode)
+					err := d.scale(analizys_ctx, optimizedState)
 					if err != nil {
 						logger.Error("scaler", "error while scaling", "error", err.Error())
 					}
