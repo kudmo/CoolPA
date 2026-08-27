@@ -52,12 +52,12 @@ func (p *PrometheusMetricsProvider) GetService(ctx context.Context, serviceName 
 	inboundRaw, err := p.prometheusCollector.CollectQuery(ctx, collector.MetricQuery{
 		Name: "inbound_calls",
 		Query: fmt.Sprintf(`
-			group by (source_service_name) (
+			group by (source_workload) (
 				istio_requests_total{
-					destination_namespace="%s",
-					destination_service_name="%s",
-					source_service_name!="unknown",
-					source_service_name!=""
+					destination_workload_namespace="%s",
+					destination_workload="%s",
+					source_workload!="unknown",
+					source_workload!=""
 				}
 			)`, p.config.ScalingNamespace, serviceName),
 	})
@@ -66,7 +66,7 @@ func (p *PrometheusMetricsProvider) GetService(ctx context.Context, serviceName 
 	}
 
 	for _, call := range inboundRaw {
-		if sourceService, ok := call.Labels["source_service_name"]; ok && sourceService != "" {
+		if sourceService, ok := call.Labels["source_workload"]; ok && sourceService != "" {
 			serviceInfo.InboundCalls = append(serviceInfo.InboundCalls, sourceService)
 		}
 	}
@@ -74,21 +74,20 @@ func (p *PrometheusMetricsProvider) GetService(ctx context.Context, serviceName 
 	outboundRaw, err := p.prometheusCollector.CollectQuery(ctx, collector.MetricQuery{
 		Name: "outbound_calls",
 		Query: fmt.Sprintf(`
-			group by (destination_service_name) (
+			group by (destination_workload) (
 				istio_requests_total{
-					source_namespace="%s",
-					source_service_name="%s",
-					destination_service_name!="unknown",
-					destination_service_name!=""
+					source_workload="%s",
+					destination_workload!="unknown",
+					destination_workload!=""
 				}
-			)`, p.config.ScalingNamespace, serviceName),
+			)`, serviceName),
 	})
 	if err != nil {
 		return serviceInfo, fmt.Errorf("failed to get outbound calls: %w", err)
 	}
 
 	for _, call := range outboundRaw {
-		if destService, ok := call.Labels["destination_service_name"]; ok && destService != "" {
+		if destService, ok := call.Labels["destination_workload"]; ok && destService != "" {
 			serviceInfo.OuboundCalls = append(serviceInfo.OuboundCalls, destService)
 		}
 	}
@@ -645,11 +644,10 @@ func (p *PrometheusMetricsProvider) GetGraphRequestsCountValue(ctx context.Conte
 				rate(istio_requests_total{
 					source_workload="%s",
 					destination_workload="%s",
-					source_workload_namespace="%s",
 					destination_workload_namespace="%s",
 					reporter="destination"
 				}[1m])
-			)`, serviceFrom, serviceTo, p.config.ScalingNamespace, p.config.ScalingNamespace),
+			)`, serviceFrom, serviceTo, p.config.ScalingNamespace),
 	})
 	if err != nil {
 		return 0, err
@@ -671,11 +669,10 @@ func (p *PrometheusMetricsProvider) GetGraphLatencyP95Value(ctx context.Context,
 					rate(istio_request_duration_milliseconds_bucket{
 						source_workload="%s",
 						destination_workload="%s",
-						source_workload_namespace="%s",
 						destination_workload_namespace="%s"
 					}[1m])
 				)
-			)`, serviceFrom, serviceTo, p.config.ScalingNamespace, p.config.ScalingNamespace),
+			)`, serviceFrom, serviceTo, p.config.ScalingNamespace),
 	})
 	if err != nil {
 		return 0, err
@@ -697,11 +694,10 @@ func (p *PrometheusMetricsProvider) GetGraphLatencyP50Value(ctx context.Context,
 					rate(istio_request_duration_milliseconds_bucket{
 						source_workload="%s",
 						destination_workload="%s",
-						source_workload_namespace="%s",
 						destination_workload_namespace="%s"
 					}[1m])
 				)
-			)`, serviceFrom, serviceTo, p.config.ScalingNamespace, p.config.ScalingNamespace),
+			)`, serviceFrom, serviceTo, p.config.ScalingNamespace),
 	})
 	if err != nil {
 		return 0, err
@@ -752,11 +748,10 @@ func (p *PrometheusMetricsProvider) GetGraphRequestsCountRange(ctx context.Conte
 				rate(istio_requests_total{
 					source_workload="%s",
 					destination_workload="%s",
-					source_workload_namespace="%s",
 					destination_workload_namespace="%s",
 					reporter="destination"
 				}[1m])
-			)`, serviceFrom, serviceTo, p.config.ScalingNamespace, p.config.ScalingNamespace),
+			)`, serviceFrom, serviceTo, p.config.ScalingNamespace),
 		Start: from,
 		End:   to,
 	})
@@ -781,11 +776,10 @@ func (p *PrometheusMetricsProvider) GetGraphLatencyP95Range(ctx context.Context,
 					rate(istio_request_duration_milliseconds_bucket{
 						source_workload="%s",
 						destination_workload="%s",
-						source_workload_namespace="%s",
 						destination_workload_namespace="%s"
 					}[1m])
 				)
-			)`, serviceFrom, serviceTo, p.config.ScalingNamespace, p.config.ScalingNamespace),
+			)`, serviceFrom, serviceTo, p.config.ScalingNamespace),
 		Start: from,
 		End:   to,
 	})
@@ -810,11 +804,10 @@ func (p *PrometheusMetricsProvider) GetGraphLatencyP50Range(ctx context.Context,
 					rate(istio_request_duration_milliseconds_bucket{
 						source_workload="%s",
 						destination_workload="%s",
-						source_workload_namespace="%s",
 						destination_workload_namespace="%s"
 					}[1m])
 				)
-			)`, serviceFrom, serviceTo, p.config.ScalingNamespace, p.config.ScalingNamespace),
+			)`, serviceFrom, serviceTo, p.config.ScalingNamespace),
 		Start: from,
 		End:   to,
 	})

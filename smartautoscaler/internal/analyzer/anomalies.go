@@ -113,8 +113,8 @@ func (a *Analyzer) computeAnomalyDegree(ctx context.Context, abnormalCalls []cal
 
 		exceedCount := 0
 
-		for _, to := range node.InboundCalls {
-			latencySeries, _ := a.metricsProvider.GetGraphLatencyP95Range(ctx, node.Name, to, a.config.Window)
+		for _, from := range node.InboundCalls {
+			latencySeries, _ := a.metricsProvider.GetGraphLatencyP95Range(ctx, from, node.Name, a.config.Window)
 			for _, lat := range latencySeries {
 				if lat > a.config.SLO {
 					exceedCount++

@@ -29,10 +29,11 @@ func NewResourceOptimizerFitness(metricsProvider interfaces.MetricsRepository, h
 	}
 
 	return &ResourceOptimizerFitness{
-		Builder:   LatencyDeltaPredictorFeatureBuilder{metricsProvider: metricsProvider, config: config},
-		Predictor: predictor,
-		config:    config,
-		histStore: histStore,
+		Builder:         LatencyDeltaPredictorFeatureBuilder{metricsProvider: metricsProvider, config: config},
+		Predictor:       predictor,
+		config:          config,
+		metricsProvider: metricsProvider,
+		histStore:       histStore,
 	}
 }
 
