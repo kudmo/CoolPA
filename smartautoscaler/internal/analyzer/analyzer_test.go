@@ -284,7 +284,7 @@ func TestComputeAnomalyDegree(t *testing.T) {
 
 	svcA := "svc-a"
 	svcB := "svc-b"
-	abnormalCalls := []call{{from: svcA, to: svcB}}
+	abnormalCalls := []call{{from: svcB, to: svcA}}
 
 	svcAInfo := metrics.ServiceInfo{Name: svcA, InboundCalls: []string{svcB}}
 	mockRepo.On("GetService", mock.Anything, svcA).Return(svcAInfo, nil)
@@ -293,7 +293,7 @@ func TestComputeAnomalyDegree(t *testing.T) {
 	mockRepo.On("GetService", mock.Anything, svcB).Return(svcBInfo, nil)
 
 	latSeries := []float64{400.0, 600.0}
-	mockRepo.On("GetGraphLatencyP95Range", mock.Anything, svcA, svcB, 1*time.Hour).
+	mockRepo.On("GetGraphLatencyP95Range", ctx, svcB, svcA, 1*time.Hour).
 		Return(latSeries, nil)
 
 	a := newTestAnalyzer(mockRepo)
