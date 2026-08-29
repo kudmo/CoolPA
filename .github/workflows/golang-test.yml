@@ -7,6 +7,7 @@ on:
       - dev
     paths:
       - 'smartautoscaler/**'
+      - '.github/workflows/*.yml'
 
 permissions:
   issues: write
