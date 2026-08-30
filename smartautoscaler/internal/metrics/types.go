@@ -14,7 +14,7 @@ type ServiceInfo struct {
 	// These are incoming dependencies.
 	InboundCalls []string `json:"inbound_calls"`
 
-	// OuboundCalls lists the names of services that this service calls.
+	// OutboundCalls lists the names of services that this service calls.
 	// These are outgoing dependencies.
-	OuboundCalls []string `json:"outbond_calls"`
+	OutboundCalls []string `json:"outbond_calls"`
 }

@@ -24,7 +24,7 @@ func (a *Analyzer) findAbnormalCalls(ctx context.Context) []call {
 	services, _ := a.metricsProvider.ListServices(ctx)
 	for _, from_name := range services {
 		from, _ := a.metricsProvider.GetService(ctx, from_name)
-		for _, to_name := range from.OuboundCalls {
+		for _, to_name := range from.OutboundCalls {
 			lat95_range, _ := a.metricsProvider.GetGraphLatencyP95Range(ctx, from_name, to_name, a.config.Window)
 			lat95 := utils.Avg(lat95_range)
 			lat50_range, _ := a.metricsProvider.GetGraphLatencyP50Range(ctx, from_name, to_name, a.config.Window)
