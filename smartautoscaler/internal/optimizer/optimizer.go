@@ -8,17 +8,17 @@ import (
 	"github.com/kudmo/CoolPA/logger"
 	"github.com/kudmo/CoolPA/utils"
 
+	"github.com/kudmo/CoolPA/internal/metrics"
 	gaconfig "github.com/kudmo/CoolPA/internal/optimizer/ga/config"
 	"github.com/kudmo/CoolPA/internal/optimizer/ga/constraints"
 	"github.com/kudmo/CoolPA/internal/optimizer/ga/engine"
 	"github.com/kudmo/CoolPA/internal/optimizer/ga/genome"
-	"github.com/kudmo/CoolPA/internal/optimizer/interfaces"
 	slopredictor "github.com/kudmo/CoolPA/internal/optimizer/slo_predictor"
 	"github.com/kudmo/CoolPA/internal/statistics"
 )
 
 type ReactionOptimizer struct {
-	metricsProvider interfaces.MetricsRepository
+	metricsProvider metrics.MetricsRepository
 	histStore       *statistics.HistStore
 
 	config ReactionOptimizerConfig
@@ -26,7 +26,7 @@ type ReactionOptimizer struct {
 
 func NewReactionOptimizer(
 	config ReactionOptimizerConfig,
-	metricsProvider interfaces.MetricsRepository,
+	metricsProvider metrics.MetricsRepository,
 	histStore *statistics.HistStore,
 ) *ReactionOptimizer {
 	return &ReactionOptimizer{

@@ -4,14 +4,14 @@ import (
 	"context"
 	"slices"
 
-	"github.com/kudmo/CoolPA/internal/analyzer/interfaces"
+	"github.com/kudmo/CoolPA/internal/metrics"
 	"github.com/kudmo/CoolPA/internal/statistics"
 
 	"github.com/kudmo/CoolPA/utils/welchtest"
 )
 
 type Analyzer struct {
-	metricsProvider interfaces.MetricsRepository
+	metricsProvider metrics.MetricsRepository
 	histStore       *statistics.HistStore
 	config          AnalyzerConfig
 
@@ -20,7 +20,7 @@ type Analyzer struct {
 
 func NewAnalyzer(
 	config AnalyzerConfig,
-	metricsProvider interfaces.MetricsRepository,
+	metricsProvider metrics.MetricsRepository,
 	histStore *statistics.HistStore,
 ) *Analyzer {
 	return &Analyzer{

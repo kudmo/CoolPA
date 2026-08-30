@@ -10,7 +10,6 @@ import (
 	"github.com/stretchr/testify/mock"
 
 	contextutil "github.com/kudmo/CoolPA/context"
-	"github.com/kudmo/CoolPA/internal/analyzer/interfaces"
 	"github.com/kudmo/CoolPA/internal/metrics"
 	"github.com/kudmo/CoolPA/utils/welchtest"
 	"github.com/kudmo/toporank/types"
@@ -211,7 +210,7 @@ func createTestContext() (context.Context, time.Time) {
 	return ctx, now
 }
 
-func newTestAnalyzer(mockRepo interfaces.MetricsRepository) *Analyzer {
+func newTestAnalyzer(mockRepo metrics.MetricsRepository) *Analyzer {
 	return &Analyzer{
 		metricsProvider: mockRepo,
 		config: AnalyzerConfig{

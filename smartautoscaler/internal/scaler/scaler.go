@@ -8,8 +8,8 @@ import (
 	contextutil "github.com/kudmo/CoolPA/context"
 	"github.com/kudmo/CoolPA/internal/analyzer"
 	"github.com/kudmo/CoolPA/internal/applier"
+	"github.com/kudmo/CoolPA/internal/metrics"
 	"github.com/kudmo/CoolPA/internal/optimizer"
-	"github.com/kudmo/CoolPA/internal/scaler/interfaces"
 	"github.com/kudmo/CoolPA/internal/statistics"
 	"github.com/kudmo/CoolPA/logger"
 )
@@ -20,7 +20,7 @@ type Scaler struct {
 	isRunning        bool
 	lastReactionTime time.Time
 
-	metricsProvider interfaces.MetricsRepository
+	metricsProvider metrics.MetricsRepository
 	histStore       *statistics.HistStore
 
 	analyzer        *analyzer.Analyzer
@@ -28,7 +28,7 @@ type Scaler struct {
 	reactionApplier applier.Applier
 }
 
-func NewScaler(config ScalerConfig, metricsProvider interfaces.MetricsRepository, applier applier.Applier) *Scaler {
+func NewScaler(config ScalerConfig, metricsProvider metrics.MetricsRepository, applier applier.Applier) *Scaler {
 	histStore := &statistics.HistStore{}
 	return &Scaler{
 		stopChan:        make(chan struct{}),
