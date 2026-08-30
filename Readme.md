@@ -38,17 +38,20 @@ For details on the OnlineBoutique benchmark and how to run it, see the benchmark
 
 ## How it works
 
-The autoscaler is designed for Kubernetes microservices where Service Level Objectives (SLO) matter more than raw CPU or memory metrics. It operates as a standalone component inside the cluster and follows a closed control loop composed of three main modules:
+The autoscaler is designed for microservices where Service Level Objectives (SLOs) are more important than raw CPU or memory usage metrics. It works as a separate component within the cluster and represents a closed control loop consisting of four main modules:
 
-- **Collector** – Periodically fetches metrics (Prometheus) and request traces (Istio).
-- **Analyzer** – Detects SLO violations and resource over‑provisioning, then identifies bottleneck services using a modified **TopoRank** algorithm that propagates anomalies along the service call graph.
-- **Decision** – Uses the bottleneck list and resource usage data to find an optimal scaling strategy. A **genetic algorithm** searches the space of possible actions (horizontal/vertical scaling) while a lightweight **ONNX model** predicts the probability of SLO violation for each candidate action. The final strategy minimises a weighted linear combination of SLO risk and resource cost.
-
-Once the best strategy is found, the autoscaler applies it by patching the corresponding Kubernetes Deployments (replicas, CPU/memory limits). The whole loop repeats every 15–30 seconds, allowing fast reaction to load changes while avoiding unnecessary oscillations.
+- **MetricsRepository** — provides the required metrics. The project includes an implementation using Prometheus and Istio.
+- **Analyzer**: identifies SLO violations using a modified **TopoRank** algorithm, which disseminates information about anomalies across the service call graph. It also identifies services with excess resources.
+- **Optimizer**: finds the optimal scaling strategy for the identified problematic services using a **Genetic Algorithm** with an **ONNX model** to predict the likelihood of SLO violations for the selected scaling strategy.
+- **Applier**: applies the chosen scaling strategy in the cluster. The project includes an implementation for k8s.
 
 ## Quick start
+At present, the project has a ready‑made implementation for scaling using k8s, Prometheus, and Istio.
+The functionality can be tested using test applications and benchmarks provided in [experiment/benchmarks](experiment/benchmarks).
 
-Prerequisites: `kind`, `kubectl`, `docker`, `istioctl` (optional), `helm`.
+Prerequisites: `kind`, `kubectl`, `docker`, `istioctl`, `helm`.
+
+Alternative: You can also run the entire experiment in the provided devcontainer, which comes pre‑configured with all necessary tools and dependencies. This is the recommended way for quick experimentation without manual setup.
 
 1) Start the benchmark stack (creates KinD cluster, installs Istio and monitoring):
 

@@ -11,20 +11,23 @@ import (
 	"github.com/kudmo/toporank/types"
 )
 
+// call represents a directed edge between two services.
 type call struct {
 	from string
 	to   string
 }
 
-// findAbnormalCalls detects abnormal calls according to parameters and returns
-// the list of abnormal edges along with an anomaly degree per service.
+// findAbnormalCalls identifies service calls that are abnormal based on
+// latency thresholds. A call is abnormal if its average P95 latency exceeds
+// the SLO adjusted by Alpha, or if the ratio of P95 to P50 latency is high
+// (indicating tail latency issues). Returns the list of abnormal calls.
 func (a *Analyzer) findAbnormalCalls(ctx context.Context) []call {
 	var anomalous []call
 
 	services, _ := a.metricsProvider.ListServices(ctx)
 	for _, from_name := range services {
 		from, _ := a.metricsProvider.GetService(ctx, from_name)
-		for _, to_name := range from.OuboundCalls {
+		for _, to_name := range from.OutboundCalls {
 			lat95_range, _ := a.metricsProvider.GetGraphLatencyP95Range(ctx, from_name, to_name, a.config.Window)
 			lat95 := utils.Avg(lat95_range)
 			lat50_range, _ := a.metricsProvider.GetGraphLatencyP50Range(ctx, from_name, to_name, a.config.Window)
@@ -40,8 +43,10 @@ func (a *Analyzer) findAbnormalCalls(ctx context.Context) []call {
 	return anomalous
 }
 
-// buildCorrelationGraphFromCalls builds a correlation graph from provided abnormal
-// calls and service anomaly degrees.
+// buildCorrelationGraphFromCalls constructs a correlation graph from abnormal
+// calls and per‑service anomaly degrees. Edge weights are computed as the
+// maximum absolute Pearson correlation between the destination service’s
+// latency and various resource usage metrics. Returns nil if no abnormal calls.
 func (a *Analyzer) buildCorrelationGraphFromCalls(ctx context.Context, abnormalCalls []call, serviceAnomaly map[string]float64) (*types.CorrelationGraph, error) {
 	if len(abnormalCalls) == 0 {
 		return nil, nil
@@ -55,10 +60,10 @@ func (a *Analyzer) buildCorrelationGraphFromCalls(ctx context.Context, abnormalC
 	}
 
 	for _, c := range abnormalCalls {
-
 		latSeries, _ := a.metricsProvider.GetGraphLatencyP95Range(ctx, c.from, c.to, a.config.Window)
 		weight := 0.0
 
+		// Compute max correlation across several resource metrics.
 		cpuUsage, err := a.metricsProvider.GetServiceCpuUsageRange(ctx, c.to, a.config.Window)
 		if err == nil {
 			weight = math.Max(weight, math.Abs(utils.Pearson(latSeries, cpuUsage)))
@@ -96,6 +101,10 @@ func (a *Analyzer) buildCorrelationGraphFromCalls(ctx context.Context, abnormalC
 	return cg, nil
 }
 
+// computeAnomalyDegree calculates a simple anomaly score for each service
+// involved in abnormal calls. The score is the total number of latency
+// samples (from inbound calls) that exceed the SLO. Only services that
+// participate in abnormal calls (as source or destination) are considered.
 func (a *Analyzer) computeAnomalyDegree(ctx context.Context, abnormalCalls []call) map[string]float64 {
 	serviceAnomaly := make(map[string]float64)
 
@@ -112,7 +121,6 @@ func (a *Analyzer) computeAnomalyDegree(ctx context.Context, abnormalCalls []cal
 		}
 
 		exceedCount := 0
-
 		for _, from := range node.InboundCalls {
 			latencySeries, _ := a.metricsProvider.GetGraphLatencyP95Range(ctx, from, node.Name, a.config.Window)
 			for _, lat := range latencySeries {
@@ -120,22 +128,22 @@ func (a *Analyzer) computeAnomalyDegree(ctx context.Context, abnormalCalls []cal
 					exceedCount++
 				}
 			}
-
 		}
-
 		serviceAnomaly[svc] = float64(exceedCount)
 	}
 
 	return serviceAnomaly
 }
 
-func (a *Analyzer) buildAbnormalCorrelationGraph(
-	ctx context.Context,
-) (*types.CorrelationGraph, error) {
+// buildAbnormalCorrelationGraph orchestrates the detection of abnormal calls,
+// computation of anomaly degrees, and construction of the correlation graph.
+// It returns nil if no anomaly degree is greater than zero.
+func (a *Analyzer) buildAbnormalCorrelationGraph(ctx context.Context) (*types.CorrelationGraph, error) {
 	abnormalCalls := a.findAbnormalCalls(ctx)
 	logger.Info("slo_violation", "found abnormal calls", "count", len(abnormalCalls))
 	serviceAnomaly := a.computeAnomalyDegree(ctx, abnormalCalls)
 	logger.Info("slo_violation", "calculated anomaly degrees", "services", serviceAnomaly)
+
 	for _, anomaly := range serviceAnomaly {
 		if anomaly != 0 {
 			return a.buildCorrelationGraphFromCalls(ctx, abnormalCalls, serviceAnomaly)
@@ -144,6 +152,10 @@ func (a *Analyzer) buildAbnormalCorrelationGraph(
 	return nil, nil
 }
 
+// analyzeWithSLOViolation detects services that violate their SLO using a
+// correlation graph and the TopoRank algorithm. It returns the names of the
+// top anomalous services (up to AnomalyServicesCount), excluding the
+// istio-ingressgateway if present. Returns an empty slice if no anomalies are found.
 func (a *Analyzer) analyzeWithSLOViolation(ctx context.Context) []string {
 	result := make([]string, 0)
 
@@ -160,7 +172,7 @@ func (a *Analyzer) analyzeWithSLOViolation(ctx context.Context) []string {
 		return anomalys[i].Rank > anomalys[j].Rank
 	})
 
-	// A CRUTCH SO THERE’S NO GATEWAY
+	// Exclude the ingress gateway from scaling recommendations.
 	for i := 0; i < len(anomalys) && len(result) < a.config.AnomalyServicesCount; i++ {
 		if anomalys[i].ID != "istio-ingressgateway" {
 			result = append(result, anomalys[i].ID)

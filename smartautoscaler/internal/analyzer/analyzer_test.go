@@ -10,7 +10,6 @@ import (
 	"github.com/stretchr/testify/mock"
 
 	contextutil "github.com/kudmo/CoolPA/context"
-	"github.com/kudmo/CoolPA/internal/analyzer/interfaces"
 	"github.com/kudmo/CoolPA/internal/metrics"
 	"github.com/kudmo/CoolPA/utils/welchtest"
 	"github.com/kudmo/toporank/types"
@@ -211,7 +210,7 @@ func createTestContext() (context.Context, time.Time) {
 	return ctx, now
 }
 
-func newTestAnalyzer(mockRepo interfaces.MetricsRepository) *Analyzer {
+func newTestAnalyzer(mockRepo metrics.MetricsRepository) *Analyzer {
 	return &Analyzer{
 		metricsProvider: mockRepo,
 		config: AnalyzerConfig{
@@ -232,8 +231,8 @@ func TestFindAbnormalCalls_SLOViolation(t *testing.T) {
 	mockRepo.On("ListServices", mock.Anything).Return([]string{svcA}, nil)
 
 	svcAInfo := metrics.ServiceInfo{
-		Name:         svcA,
-		OuboundCalls: []string{svcB},
+		Name:          svcA,
+		OutboundCalls: []string{svcB},
 	}
 	mockRepo.On("GetService", mock.Anything, svcA).Return(svcAInfo, nil)
 
@@ -261,7 +260,7 @@ func TestFindAbnormalCalls_RatioViolation(t *testing.T) {
 	svcB := "svc-b"
 	mockRepo.On("ListServices", mock.Anything).Return([]string{svcA}, nil)
 
-	svcAInfo := metrics.ServiceInfo{Name: svcA, OuboundCalls: []string{svcB}}
+	svcAInfo := metrics.ServiceInfo{Name: svcA, OutboundCalls: []string{svcB}}
 	mockRepo.On("GetService", mock.Anything, svcA).Return(svcAInfo, nil)
 
 	lat95 := []float64{130.0}
@@ -365,7 +364,7 @@ func TestBuildAbnormalCorrelationGraph_NoAbnormal(t *testing.T) {
 	mockRepo := new(MockMetricsRepository)
 
 	mockRepo.On("ListServices", mock.Anything).Return([]string{"svc-a"}, nil)
-	svcInfo := metrics.ServiceInfo{Name: "svc-a", OuboundCalls: []string{}}
+	svcInfo := metrics.ServiceInfo{Name: "svc-a", OutboundCalls: []string{}}
 	mockRepo.On("GetService", mock.Anything, "svc-a").Return(svcInfo, nil)
 
 	a := newTestAnalyzer(mockRepo)
