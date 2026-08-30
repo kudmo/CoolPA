@@ -7,21 +7,18 @@ import "time"
 // than 1 account for expected gradual decrease in traffic over time.
 const BETA = 0.8
 
-// AnalyzerConfig holds parameters that control the behavior of the
-// Analyzer, including thresholds for anomaly detection and the
-// maximum number of services to recommend for scaling.
+// AnalyzerConfig holds parameters that control the behavior of the Analyzer
 type AnalyzerConfig struct {
-	// SLO is the target 95th percentile latency in milliseconds.
+	// The target 95th percentile latency in milliseconds.
 	// Calls exceeding this threshold are considered SLO violations.
 	SLO float64
 
-	// Confidence is the statistical significance level (e.g., 0.05)
+	// The statistical significance level (e.g., 0.05)
 	// used in Welch's t-test to decide whether an RPS decrease is
 	// significant.
 	Confidence float64
 
-	// Window is the time duration used to query metric ranges for
-	// analysis.
+	// Time duration used to query metric ranges for analysis.
 	Window time.Duration
 
 	// AnomalyServicesCount limits the number of anomalous services

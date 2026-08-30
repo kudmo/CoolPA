@@ -10,49 +10,43 @@ import (
 )
 
 // AppConfig holds configuration parameters for the autoscaler.
-//
-// The configuration is typically loaded from a YAML file using
-// LoadFromYAML or LoadYAMLConfig. All fields are validated
-// by the Validate method to ensure the autoscaler operates
-// with safe and correct parameters.
 type AppConfig struct {
-	// ScalingNamespace specifies the Kubernetes namespace
-	// where the autoscaler will monitor and scale deployments.
+	// The namespace where the autoscaler will monitor and scale deployments.
 	// This field is required and cannot be empty.
 	ScalingNamespace string `yaml:"scaling_namespace"`
 
-	// PrometheusURL is the base URL of the Prometheus server
+	// The base URL of the Prometheus server
 	// used for collecting metrics that drive scaling decisions.
 	// This field is required and cannot be empty.
 	PrometheusURL string `yaml:"prometheus_url"`
 
-	// AnalyzerInterval defines how frequently the autoscaler
+	// How frequently the autoscaler
 	// analyzes metrics and evaluates scaling decisions.
 	// Must be greater than zero.
 	AnalyzerInterval time.Duration `yaml:"analyzer_interval"`
 
-	// SLO (Service Level Objective) defines the target service
-	// level that the autoscaler aims to maintain, expressed
+	// The target service level
+	// that the autoscaler aims to maintain, expressed
 	// as a 95th percentile of latency, in milliseconds.
 	SLO int `yaml:"slo"`
 
-	// ScalingCooldown specifies the minimum time between
+	// The minimum time between
 	// consecutive scaling operations to prevent rapid
 	// oscillations. Must be greater than 1 minute.
 	ScalingCooldown time.Duration `yaml:"scaling_cooldown"`
 
-	// Lambda is the smoothing factor used in exponential
-	// moving average calculations for metric analysis.
-	// Must be between 0 and 1 (exclusive).
+	// The value balances SLO compliance against resource savings.
+	// Range: 0..1.
+	//   0 — ignore SLO risk entirely (maximize savings)
+	//   1 — prioritize SLO compliance (use more resources)
 	Lambda float64 `yaml:"lambda"`
 
-	// AnomalyServicesCount specifies the number of services
+	// The number of services
 	// that will be considered anomalous,
 	// i.e., the maximum number of services that will be scaled up at once.
 	AnomalyServicesCount int `yaml:"anomaly_services_count"`
 
-	// Logger contains configuration settings for the
-	// application logger.
+	// Configuration settings for the application logger.
 	Logger logger.LoggerConfig `yaml:"logger"`
 }
 

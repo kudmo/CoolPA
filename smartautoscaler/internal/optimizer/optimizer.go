@@ -17,6 +17,9 @@ import (
 	"github.com/kudmo/CoolPA/internal/statistics"
 )
 
+// ReactionOptimizer uses a genetic algorithm to find optimal scaling
+// configurations for a set of services while respecting resource
+// constraints and SLO risk.
 type ReactionOptimizer struct {
 	metricsProvider metrics.MetricsRepository
 	histStore       *statistics.HistStore
@@ -24,6 +27,8 @@ type ReactionOptimizer struct {
 	config ReactionOptimizerConfig
 }
 
+// NewReactionOptimizer creates a ReactionOptimizer with the given
+// configuration and dependencies.
 func NewReactionOptimizer(
 	config ReactionOptimizerConfig,
 	metricsProvider metrics.MetricsRepository,
@@ -36,6 +41,9 @@ func NewReactionOptimizer(
 	}
 }
 
+// RunOptimization executes the genetic algorithm to compute target
+// states for the given services. Returns the optimized state or an
+// error if the engine fails.
 func (ro *ReactionOptimizer) RunOptimization(ctx context.Context, services []string, mode ScaleMode) (OptimizedState, error) {
 	seed := int64(time.Now().Unix())
 
@@ -121,10 +129,13 @@ func (ro *ReactionOptimizer) RunOptimization(ctx context.Context, services []str
 	return state, nil
 }
 
+// choosePossibleReactions returns the allowed reaction types for a service.
 func (ro *ReactionOptimizer) choosePossibleReactions(service string) []genome.ReactionType {
-	return []genome.ReactionType{genome.HPA /*, genome.VPA*/}
+	return []genome.ReactionType{genome.HPA, genome.VPA}
 }
 
+// buildConstraints creates per-service scaling policies based on the
+// current mode (scale up or down) and current resource usage.
 func (ro *ReactionOptimizer) buildConstraints(
 	ctx context.Context,
 	services []string,
@@ -175,6 +186,8 @@ func (ro *ReactionOptimizer) buildConstraints(
 	return result
 }
 
+// buildSeedGenome constructs the initial genome for the genetic
+// algorithm based on current service states and the scaling mode.
 func (ro *ReactionOptimizer) buildSeedGenome(
 	ctx context.Context,
 	services []string,
@@ -238,6 +251,7 @@ func (ro *ReactionOptimizer) buildSeedGenome(
 	return seed
 }
 
+// logGenome writes debug information about the best genome found.
 func (ro *ReactionOptimizer) logGenome(g *genome.ReactionGenome) {
 	for _, gene := range g.Genes {
 		logger.Debug("optimizer", "best genome",
