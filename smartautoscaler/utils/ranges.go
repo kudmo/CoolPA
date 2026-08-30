@@ -2,6 +2,7 @@ package utils
 
 import "math"
 
+// Avg returns the arithmetic mean of data. Returns 0 for empty slice.
 func Avg(data []float64) float64 {
 	if len(data) == 0 {
 		return 0
@@ -13,19 +14,19 @@ func Avg(data []float64) float64 {
 	return sum / float64(len(data))
 }
 
+// StdDev returns the population standard deviation of data.
+// Returns 0 for slices with fewer than 2 elements.
 func StdDev(data []float64) float64 {
 	if len(data) < 2 {
 		return 0
 	}
 
-	// Вычисляем среднее
 	sum := 0.0
 	for _, v := range data {
 		sum += v
 	}
 	mean := sum / float64(len(data))
 
-	// Вычисляем дисперсию
 	variance := 0.0
 	for _, v := range data {
 		diff := v - mean

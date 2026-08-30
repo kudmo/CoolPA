@@ -2,6 +2,9 @@ package utils
 
 import "math"
 
+// Pearson calculates the Pearson correlation coefficient between
+// two slices of equal length. Returns 0 if slices are empty,
+// have different lengths, or have zero variance.
 func Pearson(x, y []float64) float64 {
 	n := len(x)
 	if n == 0 || len(y) != n {
@@ -9,7 +12,7 @@ func Pearson(x, y []float64) float64 {
 	}
 
 	var sumX, sumY float64
-	for i := 0; i < n; i++ {
+	for i := range n {
 		sumX += x[i]
 		sumY += y[i]
 	}
@@ -18,7 +21,7 @@ func Pearson(x, y []float64) float64 {
 	meanY := sumY / float64(n)
 
 	var num, denX, denY float64
-	for i := 0; i < n; i++ {
+	for i := range n {
 		dx := x[i] - meanX
 		dy := y[i] - meanY
 		num += dx * dy
