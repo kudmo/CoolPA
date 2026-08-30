@@ -47,8 +47,11 @@ The autoscaler is designed for microservices where Service Level Objectives (SLO
 
 ## Quick start
 At present, the project has a ready‑made implementation for scaling using k8s, Prometheus, and Istio.
+The functionality can be tested using test applications and benchmarks provided in [experiment/benchmarks](experiment/benchmarks).
 
-Prerequisites: `kind`, `kubectl`, `docker`, `istioctl` (optional), `helm`.
+Prerequisites: `kind`, `kubectl`, `docker`, `istioctl`, `helm`.
+
+Alternative: You can also run the entire experiment in the provided devcontainer, which comes pre‑configured with all necessary tools and dependencies. This is the recommended way for quick experimentation without manual setup.
 
 1) Start the benchmark stack (creates KinD cluster, installs Istio and monitoring):
 
