@@ -201,6 +201,15 @@ type HistStore struct {
 	services sync.Map // map[string]*Histogram
 }
 
+func (s *HistStore) RebuildModel() {
+	s.services.Range(func(_, value any) bool {
+		if h, ok := value.(*Histogram); ok {
+			h.RebuildModel()
+		}
+		return true
+	})
+}
+
 func (s *HistStore) Register(service string, bounds []float64) *Histogram {
 	h := NewHistogram(bounds)
 
