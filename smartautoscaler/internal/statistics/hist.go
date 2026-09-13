@@ -26,23 +26,13 @@ func (b *Bin) Risk() float64 {
 	return float64(b.violations.Load()) / float64(total)
 }
 
-type modelCache struct {
-	cumTotal      []float64
-	cumViolations []float64
-	bounds        []float64
-
-	globalRate float64
-}
-
 type Histogram struct {
-	Bins  []Bin
-	cache atomic.Pointer[modelCache]
+	Bins []Bin
 }
 
 func NewHistogram(bounds []float64) *Histogram {
 	sort.Float64s(bounds)
 
-	// добавляем overflow бин
 	bins := make([]Bin, len(bounds)+1)
 
 	for i, b := range bounds {
@@ -54,42 +44,6 @@ func NewHistogram(bounds []float64) *Histogram {
 	}
 
 	return &Histogram{Bins: bins}
-}
-
-func (h *Histogram) RebuildModel() {
-	n := len(h.Bins)
-
-	cumT := make([]float64, n)
-	cumV := make([]float64, n)
-	bounds := make([]float64, n)
-
-	var sumT, sumV float64
-
-	for i := 0; i < n; i++ {
-		t := float64(h.Bins[i].total.Load())
-		v := float64(h.Bins[i].violations.Load())
-
-		sumT += t
-		sumV += v
-
-		cumT[i] = sumT
-		cumV[i] = sumV
-		bounds[i] = h.Bins[i].UpperBound
-	}
-
-	globalRate := 0.0
-	if sumT > 0 {
-		globalRate = sumV / sumT
-	}
-
-	cache := &modelCache{
-		cumTotal:      cumT,
-		cumViolations: cumV,
-		bounds:        bounds,
-		globalRate:    globalRate,
-	}
-
-	h.cache.Store(cache)
 }
 
 func (h *Histogram) findBin(latency float64) int {
@@ -110,24 +64,19 @@ func (h *Histogram) Observe(latency float64, violation bool) {
 }
 
 func (h *Histogram) Risk(x float64) float64 {
-	cache := h.cache.Load()
-	if cache == nil {
-		return math.NaN()
-	}
-
 	if x <= 0 {
 		return 0
 	}
 
-	i := sort.Search(len(cache.bounds), func(i int) bool {
-		return x <= cache.bounds[i]
+	n := len(h.Bins)
+	i := sort.Search(n, func(i int) bool {
+		return x <= h.Bins[i].UpperBound
 	})
 
-	n := len(cache.bounds)
-
+	// Find nearest non-empty bins to the left and right.
 	leftIdx := -1
 	for j := i; j >= 0; j-- {
-		if windowTotal(cache, j, j) > 0 {
+		if h.Bins[j].total.Load() > 0 {
 			leftIdx = j
 			break
 		}
@@ -135,7 +84,7 @@ func (h *Histogram) Risk(x float64) float64 {
 
 	rightIdx := -1
 	for j := i; j < n; j++ {
-		if windowTotal(cache, j, j) > 0 {
+		if h.Bins[j].total.Load() > 0 {
 			rightIdx = j
 			break
 		}
@@ -149,7 +98,7 @@ func (h *Histogram) Risk(x float64) float64 {
 		ly = 0
 	} else {
 		li = float64(leftIdx)
-		ly = safeBinRisk(cache, leftIdx)
+		ly = h.Bins[leftIdx].Risk() // total > 0, so no NaN
 	}
 
 	if rightIdx == -1 {
@@ -157,7 +106,7 @@ func (h *Histogram) Risk(x float64) float64 {
 		ry = 1
 	} else {
 		ri = float64(rightIdx)
-		ry = safeBinRisk(cache, rightIdx)
+		ry = h.Bins[rightIdx].Risk()
 	}
 
 	xi := float64(i)
@@ -175,39 +124,8 @@ func (h *Histogram) Risk(x float64) float64 {
 	return ly + t*(ry-ly)
 }
 
-func safeBinRisk(c *modelCache, i int) float64 {
-	total := windowTotal(c, i, i)
-	if total == 0 {
-		return c.globalRate
-	}
-	return windowViolations(c, i, i) / total
-}
-
-func windowTotal(c *modelCache, l, r int) float64 {
-	if l == 0 {
-		return c.cumTotal[r]
-	}
-	return c.cumTotal[r] - c.cumTotal[l-1]
-}
-
-func windowViolations(c *modelCache, l, r int) float64 {
-	if l == 0 {
-		return c.cumViolations[r]
-	}
-	return c.cumViolations[r] - c.cumViolations[l-1]
-}
-
 type HistStore struct {
 	services sync.Map // map[string]*Histogram
-}
-
-func (s *HistStore) RebuildModel() {
-	s.services.Range(func(_, value any) bool {
-		if h, ok := value.(*Histogram); ok {
-			h.RebuildModel()
-		}
-		return true
-	})
 }
 
 func (s *HistStore) Register(service string, bounds []float64) *Histogram {

@@ -85,7 +85,6 @@ func (d *Scaler) Start(ctx context.Context) error {
 					continue
 				}
 				result := d.analyzer.Analyze(analizys_ctx)
-				d.histStore.RebuildModel()
 
 				if result.Scale != 0 {
 					mode := optimizer.ScaleUpMode
