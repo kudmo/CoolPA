@@ -2,6 +2,7 @@ package scaler
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -120,9 +121,7 @@ func (d *Scaler) scale(ctx context.Context, state optimizer.OptimizedState) erro
 
 	for _, s := range state.Services {
 		switch s.Reaction {
-		case optimizer.HPA:
-			continue
-		case optimizer.VPA:
+		case optimizer.HPA, optimizer.VPA:
 			continue
 		default:
 			return fmt.Errorf("unsupported scaler reaction")
@@ -130,6 +129,7 @@ func (d *Scaler) scale(ctx context.Context, state optimizer.OptimizedState) erro
 	}
 
 	// TODO make transaction
+	var errs []error
 	for _, s := range state.Services {
 		logger.Info("scaler", "applying candidate",
 			"service", s.ServiceName,
@@ -139,17 +139,27 @@ func (d *Scaler) scale(ctx context.Context, state optimizer.OptimizedState) erro
 			"memory", s.AppMemory,
 		)
 
+		var err error
 		switch s.Reaction {
 		case optimizer.HPA:
-			return d.reactionApplier.ApplyHPS(ctx, d.config.Namespace, s.ServiceName, int32(s.Replicas))
+			err = d.reactionApplier.ApplyHPS(ctx, d.config.Namespace, s.ServiceName, int32(s.Replicas))
 		case optimizer.VPA:
 			cpuStr := fmt.Sprintf("%dm", int(s.AppCPU))
 			memStr := fmt.Sprintf("%dMi", int(s.AppMemory))
-			return d.reactionApplier.ApplyVPS(ctx, d.config.Namespace, s.ServiceName, cpuStr, memStr)
+			err = d.reactionApplier.ApplyVPS(ctx, d.config.Namespace, s.ServiceName, cpuStr, memStr)
+		}
+
+		if err != nil {
+			logger.Error("scaler", "failed to apply reaction",
+				"service", s.ServiceName,
+				"reaction", s.Reaction,
+				"error", err,
+			)
+			errs = append(errs, fmt.Errorf("apply reaction for service %q: %w", s.ServiceName, err))
 		}
 	}
 
-	return nil
+	return errors.Join(errs...)
 }
 
 func (d *Scaler) Stop() error {
