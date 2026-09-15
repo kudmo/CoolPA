@@ -37,20 +37,8 @@ func (b *Bin) Risk() float64 {
 	return float64(b.violations.Load()) / float64(total)
 }
 
-// modelCache holds precomputed cumulative sums for fast risk lookups.
-type modelCache struct {
-	cumTotal      []float64
-	cumViolations []float64
-	bounds        []float64
-
-	globalRate float64
-}
-
-// Histogram represents a distribution of latencies divided into bins.
-// It maintains a cached model for O(log n) risk interpolation.
 type Histogram struct {
-	Bins  []Bin
-	cache atomic.Pointer[modelCache]
+	Bins []Bin
 }
 
 // NewHistogram creates a histogram from the given bin boundaries.
@@ -68,45 +56,6 @@ func NewHistogram(bounds []float64) *Histogram {
 	return &Histogram{Bins: bins}
 }
 
-// RebuildModel recomputes cumulative totals and the global violation
-// rate, then atomically stores them in the cache for subsequent
-// Risk queries.
-func (h *Histogram) RebuildModel() {
-	n := len(h.Bins)
-
-	cumT := make([]float64, n)
-	cumV := make([]float64, n)
-	bounds := make([]float64, n)
-
-	var sumT, sumV float64
-	for i := 0; i < n; i++ {
-		t := float64(h.Bins[i].total.Load())
-		v := float64(h.Bins[i].violations.Load())
-
-		sumT += t
-		sumV += v
-
-		cumT[i] = sumT
-		cumV[i] = sumV
-		bounds[i] = h.Bins[i].UpperBound
-	}
-
-	globalRate := 0.0
-	if sumT > 0 {
-		globalRate = sumV / sumT
-	}
-
-	cache := &modelCache{
-		cumTotal:      cumT,
-		cumViolations: cumV,
-		bounds:        bounds,
-		globalRate:    globalRate,
-	}
-	h.cache.Store(cache)
-}
-
-// findBin returns the index of the bin whose upper bound is the
-// smallest value >= latency.
 func (h *Histogram) findBin(latency float64) int {
 	return sort.Search(len(h.Bins), func(i int) bool {
 		return latency <= h.Bins[i].UpperBound
@@ -129,32 +78,26 @@ func (h *Histogram) Observe(latency float64, violation bool) {
 // latency x. It uses the cached model for efficiency. If no model
 // has been built, it returns NaN.
 func (h *Histogram) Risk(x float64) float64 {
-	cache := h.cache.Load()
-	if cache == nil {
-		return math.NaN()
-	}
-
 	if x <= 0 {
 		return 0
 	}
 
-	i := sort.Search(len(cache.bounds), func(i int) bool {
-		return x <= cache.bounds[i]
+	n := len(h.Bins)
+	i := sort.Search(n, func(i int) bool {
+		return x <= h.Bins[i].UpperBound
 	})
 
-	n := len(cache.bounds)
-
-	// Find nearest non-empty bins to the left and right for interpolation.
+	// Find nearest non-empty bins to the left and right.
 	leftIdx := -1
 	for j := i; j >= 0; j-- {
-		if windowTotal(cache, j, j) > 0 {
+		if h.Bins[j].total.Load() > 0 {
 			leftIdx = j
 			break
 		}
 	}
 	rightIdx := -1
 	for j := i; j < n; j++ {
-		if windowTotal(cache, j, j) > 0 {
+		if h.Bins[j].total.Load() > 0 {
 			rightIdx = j
 			break
 		}
@@ -168,7 +111,7 @@ func (h *Histogram) Risk(x float64) float64 {
 		ly = 0
 	} else {
 		li = float64(leftIdx)
-		ly = safeBinRisk(cache, leftIdx)
+		ly = h.Bins[leftIdx].Risk() // total > 0, so no NaN
 	}
 
 	if rightIdx == -1 {
@@ -176,7 +119,7 @@ func (h *Histogram) Risk(x float64) float64 {
 		ry = 1
 	} else {
 		ri = float64(rightIdx)
-		ry = safeBinRisk(cache, rightIdx)
+		ry = h.Bins[rightIdx].Risk()
 	}
 
 	xi := float64(i)
@@ -192,34 +135,6 @@ func (h *Histogram) Risk(x float64) float64 {
 	return ly + t*(ry-ly)
 }
 
-// safeBinRisk returns the violation ratio for a single bin, or the
-// global rate if the bin is empty.
-func safeBinRisk(c *modelCache, i int) float64 {
-	total := windowTotal(c, i, i)
-	if total == 0 {
-		return c.globalRate
-	}
-	return windowViolations(c, i, i) / total
-}
-
-// windowTotal returns the total observations in the inclusive range [l,r].
-func windowTotal(c *modelCache, l, r int) float64 {
-	if l == 0 {
-		return c.cumTotal[r]
-	}
-	return c.cumTotal[r] - c.cumTotal[l-1]
-}
-
-// windowViolations returns the total violations in the inclusive range [l,r].
-func windowViolations(c *modelCache, l, r int) float64 {
-	if l == 0 {
-		return c.cumViolations[r]
-	}
-	return c.cumViolations[r] - c.cumViolations[l-1]
-}
-
-// HistStore provides a thread-safe mapping of service names to their
-// Histogram instances.
 type HistStore struct {
 	services sync.Map // map[string]*Histogram
 }
