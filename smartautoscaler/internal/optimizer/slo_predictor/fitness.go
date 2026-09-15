@@ -5,8 +5,8 @@ import (
 	"math"
 	"sync"
 
+	"github.com/kudmo/CoolPA/internal/metrics"
 	"github.com/kudmo/CoolPA/internal/optimizer/ga/genome"
-	"github.com/kudmo/CoolPA/internal/optimizer/interfaces"
 	"github.com/kudmo/CoolPA/internal/statistics"
 	"github.com/kudmo/CoolPA/logger"
 	"github.com/kudmo/CoolPA/utils"
@@ -14,7 +14,7 @@ import (
 
 // ResourceOptimizerFitness composes a FeatureBuilder and Predictor.
 type ResourceOptimizerFitness struct {
-	metricsProvider interfaces.MetricsRepository
+	metricsProvider metrics.MetricsRepository
 	histStore       *statistics.HistStore
 
 	Builder   LatencyDeltaPredictorFeatureBuilder
@@ -22,7 +22,7 @@ type ResourceOptimizerFitness struct {
 	config    FitnessConfig
 }
 
-func NewResourceOptimizerFitness(metricsProvider interfaces.MetricsRepository, histStore *statistics.HistStore, config FitnessConfig) *ResourceOptimizerFitness {
+func NewResourceOptimizerFitness(metricsProvider metrics.MetricsRepository, histStore *statistics.HistStore, config FitnessConfig) *ResourceOptimizerFitness {
 	predictor, err := NewSLOPredictor("latency_model.onnx", 11)
 	if err != nil {
 		logger.Error("slo_predictor", "error init predictor", "error", err)

@@ -7,6 +7,7 @@ on:
       - dev
     paths:
       - 'smartautoscaler/**'
+      - '.github/workflows/*.yml'
 
 permissions:
   issues: write
@@ -14,14 +15,12 @@ permissions:
   contents: read
 
 jobs:
-  test-and-lint:
-    name: Tests & Security
+  format-and-lint:
+    name: Format & Lint
     runs-on: ubuntu-latest
-    
     defaults:
       run:
         working-directory: ./smartautoscaler
-    
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -47,6 +46,31 @@ jobs:
           fi
         shell: bash
 
+      - name: Run staticcheck
+        run: |
+          go install honnef.co/go/tools/cmd/staticcheck@latest
+          staticcheck ./...
+
+  security:
+    name: Security Checks
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./smartautoscaler
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+          cache: true
+          cache-dependency-path: smartautoscaler/go.sum
+
+      - name: Download dependencies
+        run: go mod download
+
       - name: Install govulncheck
         run: go install golang.org/x/vuln/cmd/govulncheck@latest
 
@@ -63,48 +87,65 @@ jobs:
           exit-code: '1'
           severity: 'CRITICAL,HIGH'
 
+  tests-and-coverage:
+    name: Tests & Coverage
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./smartautoscaler
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+          cache: true
+          cache-dependency-path: smartautoscaler/go.sum
+
+      - name: Download dependencies
+        run: go mod download
+
       - name: Run tests with coverage
         run: |
-            go test -v -race -coverprofile=coverage.out -covermode=atomic ./...
-            go tool cover -func=coverage.out
+          go test -v -race -coverprofile=coverage.out -covermode=atomic ./...
+          go tool cover -func=coverage.out
 
       - name: Check coverage threshold (warning only)
         id: coverage_check
         run: |
-            COVERAGE=$(go tool cover -func=coverage.out | grep total | awk '{print $3}' | sed 's/%//')
-            THRESHOLD=70
-            echo "coverage=$COVERAGE" >> $GITHUB_OUTPUT
-            if (( $(echo "$COVERAGE < $THRESHOLD" | bc -l) )); then
+          COVERAGE=$(go tool cover -func=coverage.out | grep total | awk '{print $3}' | sed 's/%//')
+          THRESHOLD=70
+          echo "coverage=$COVERAGE" >> $GITHUB_OUTPUT
+          if (( $(echo "$COVERAGE < $THRESHOLD" | bc -l) )); then
             echo "::warning file=./smartautoscaler,line=1,title=Coverage threshold not met::Coverage ${COVERAGE}% is below threshold ${THRESHOLD}%"
             echo "Coverage ${COVERAGE}% is below threshold ${THRESHOLD}%"
             echo "warning=true" >> $GITHUB_OUTPUT
-            else
+          else
             echo "Coverage ${COVERAGE}% is above threshold ${THRESHOLD}%"
             echo "warning=false" >> $GITHUB_OUTPUT
-            fi
+          fi
 
       - name: Add coverage comment to PR
         if: steps.coverage_check.outputs.warning == 'true'
         uses: actions/github-script@v7
         with:
-            script: |
-                const coverage = '${{ steps.coverage_check.outputs.coverage }}';
-                const threshold = 70;
-                github.rest.issues.createComment({
-                    issue_number: context.issue.number,
-                    owner: context.repo.owner,
-                    repo: context.repo.repo,
-                    body: `## Coverage Warning\n\nCode coverage is ${coverage}% which is below the recommended threshold of ${threshold}%.\n\nPlease consider adding more tests to improve coverage.`
-                });
+          script: |
+            const coverage = '${{ steps.coverage_check.outputs.coverage }}';
+            const threshold = 70;
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `## Coverage Warning\n\nCode coverage is ${coverage}% which is below the recommended threshold of ${threshold}%.\n\nPlease consider adding more tests to improve coverage.`
+            });
 
       - name: Upload coverage report
         uses: actions/upload-artifact@v4
         if: always()
         with:
-            name: coverage-report
-            path: smartautoscaler/coverage.out
-
-      - name: Run staticcheck
-        run: |
-            go install honnef.co/go/tools/cmd/staticcheck@latest
-            staticcheck ./...
+          name: coverage-report
+          path: smartautoscaler/coverage.out

@@ -10,7 +10,6 @@ on:
       - 'smartautoscaler/go.sum'
       - 'smartautoscaler/**/*.go'
       - 'LICENSE'
-      - '.github/workflows/*.yml'
 
 permissions:
   contents: read

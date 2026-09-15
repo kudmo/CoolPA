@@ -44,9 +44,9 @@ func (p *PrometheusMetricsProvider) ListServices(ctx context.Context) ([]string,
 
 func (p *PrometheusMetricsProvider) GetService(ctx context.Context, serviceName string) (metrics.ServiceInfo, error) {
 	serviceInfo := metrics.ServiceInfo{
-		Name:         serviceName,
-		InboundCalls: []string{},
-		OuboundCalls: []string{},
+		Name:          serviceName,
+		InboundCalls:  []string{},
+		OutboundCalls: []string{},
 	}
 
 	inboundRaw, err := p.prometheusCollector.CollectQuery(ctx, collector.MetricQuery{
@@ -88,12 +88,12 @@ func (p *PrometheusMetricsProvider) GetService(ctx context.Context, serviceName 
 
 	for _, call := range outboundRaw {
 		if destService, ok := call.Labels["destination_workload"]; ok && destService != "" {
-			serviceInfo.OuboundCalls = append(serviceInfo.OuboundCalls, destService)
+			serviceInfo.OutboundCalls = append(serviceInfo.OutboundCalls, destService)
 		}
 	}
 
 	sort.Strings(serviceInfo.InboundCalls)
-	sort.Strings(serviceInfo.OuboundCalls)
+	sort.Strings(serviceInfo.OutboundCalls)
 
 	return serviceInfo, nil
 }

@@ -4,14 +4,14 @@ import (
 	"context"
 	"math"
 
+	"github.com/kudmo/CoolPA/internal/metrics"
 	"github.com/kudmo/CoolPA/internal/optimizer/ga/genome"
-	"github.com/kudmo/CoolPA/internal/optimizer/interfaces"
 	"github.com/kudmo/CoolPA/utils"
 )
 
 type LatencyDeltaPredictorFeatureBuilder struct {
 	config          FitnessConfig
-	metricsProvider interfaces.MetricsRepository
+	metricsProvider metrics.MetricsRepository
 }
 
 func (b *LatencyDeltaPredictorFeatureBuilder) Build(ctx context.Context, g *genome.ReactionGenome) [][]float64 {

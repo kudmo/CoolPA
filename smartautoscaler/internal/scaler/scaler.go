@@ -1,3 +1,7 @@
+// Package scaler implements the main autoscaling loop. It periodically
+// analyzes service metrics, detects anomalies or underutilization,
+// runs an optimizer to determine target resource states, and applies
+// the recommended scaling actions.
 package scaler
 
 import (
@@ -9,19 +13,22 @@ import (
 	contextutil "github.com/kudmo/CoolPA/context"
 	"github.com/kudmo/CoolPA/internal/analyzer"
 	"github.com/kudmo/CoolPA/internal/applier"
+	"github.com/kudmo/CoolPA/internal/metrics"
 	"github.com/kudmo/CoolPA/internal/optimizer"
-	"github.com/kudmo/CoolPA/internal/scaler/interfaces"
 	"github.com/kudmo/CoolPA/internal/statistics"
 	"github.com/kudmo/CoolPA/logger"
 )
 
+// Scaler orchestrates the autoscaling loop. It uses an Analyzer to
+// detect services requiring scaling, an Optimizer to compute target
+// states, and an Applier to execute scaling actions.
 type Scaler struct {
 	stopChan         chan struct{}
 	config           ScalerConfig
 	isRunning        bool
 	lastReactionTime time.Time
 
-	metricsProvider interfaces.MetricsRepository
+	metricsProvider metrics.MetricsRepository
 	histStore       *statistics.HistStore
 
 	analyzer        *analyzer.Analyzer
@@ -29,7 +36,10 @@ type Scaler struct {
 	reactionApplier applier.Applier
 }
 
-func NewScaler(config ScalerConfig, metricsProvider interfaces.MetricsRepository, applier applier.Applier) *Scaler {
+// NewScaler creates a Scaler with the given configuration, metrics
+// provider, and reaction applier. It initializes the analyzer and
+// optimizer components with default parameters.
+func NewScaler(config ScalerConfig, metricsProvider metrics.MetricsRepository, applier applier.Applier) *Scaler {
 	histStore := &statistics.HistStore{}
 	return &Scaler{
 		stopChan:        make(chan struct{}),
@@ -41,7 +51,7 @@ func NewScaler(config ScalerConfig, metricsProvider interfaces.MetricsRepository
 			analyzer.AnalyzerConfig{
 				SLO:                  config.SLO,
 				Confidence:           0.05,
-				Window:               time.Duration(60 * time.Second),
+				Window:               60 * time.Second,
 				AnomalyServicesCount: config.AnomalyServicesCount,
 				Alpha:                0.05,
 			},
@@ -55,7 +65,7 @@ func NewScaler(config ScalerConfig, metricsProvider interfaces.MetricsRepository
 				ReplicasStep:         1,
 				TargetCpuUtilization: 0.40,
 				Lambda:               config.Lambda,
-				TimeWindow:           time.Duration(60 * time.Second),
+				TimeWindow:           60 * time.Second,
 			},
 			metricsProvider,
 			histStore,
@@ -63,6 +73,10 @@ func NewScaler(config ScalerConfig, metricsProvider interfaces.MetricsRepository
 	}
 }
 
+// Start launches the autoscaling loop in a separate goroutine. It runs
+// analysis at the configured interval, respects the cooldown period
+// between scaling actions, and stops when the context is cancelled or
+// Stop is called. Returns an error if the scaler is already running.
 func (d *Scaler) Start(ctx context.Context) error {
 	if d.isRunning {
 		return fmt.Errorf("analyzer is already running")
@@ -78,33 +92,37 @@ func (d *Scaler) Start(ctx context.Context) error {
 		for {
 			select {
 			case <-ticker.C:
-				analizys_ctx := contextutil.WithAnalysisTime(ctx, time.Now())
+				analysisCtx := contextutil.WithAnalysisTime(ctx, time.Now())
+
+				// Skip if still in cooldown period.
 				timeSinceLastReaction := time.Since(d.lastReactionTime)
 				if timeSinceLastReaction < d.config.Cooldown {
 					logger.Info("decision", "in cooldown period",
 						"remaining", d.config.Cooldown-timeSinceLastReaction)
 					continue
 				}
-				result := d.analyzer.Analyze(analizys_ctx)
+
+				// Run analysis to detect services requiring scaling.
+				result := d.analyzer.Analyze(analysisCtx)
 
 				if result.Scale != 0 {
 					mode := optimizer.ScaleUpMode
 					if result.Scale < 0 {
 						mode = optimizer.ScaleDownMode
 					}
+
 					logger.Info("scaler", "proposing scale for services", "services", result.Services)
-					optimizedState, _ := d.optimizer.RunOptimization(analizys_ctx, result.Services, mode)
-					err := d.scale(analizys_ctx, optimizedState)
-					if err != nil {
+					optimizedState, _ := d.optimizer.RunOptimization(analysisCtx, result.Services, mode)
+					if err := d.scale(analysisCtx, optimizedState); err != nil {
 						logger.Error("scaler", "error while scaling", "error", err.Error())
 					}
 					d.lastReactionTime = time.Now()
 				} else {
 					logger.Info("scaler", "no scaling action proposed")
 				}
+
 			case <-d.stopChan:
 				return
-
 			case <-ctx.Done():
 				return
 			}
@@ -114,15 +132,21 @@ func (d *Scaler) Start(ctx context.Context) error {
 	return nil
 }
 
+// scale applies the optimized state by invoking the appropriate
+// reaction applier for each service. It currently supports HPA
+// (horizontal scaling) and VPA (vertical scaling) reactions.
+// Returns an error if no applier is set or an unsupported reaction
+// is encountered.
 func (d *Scaler) scale(ctx context.Context, state optimizer.OptimizedState) error {
 	if d.reactionApplier == nil {
 		return fmt.Errorf("no reaction applier provided")
 	}
 
+	// Validate all reactions before applying any.
 	for _, s := range state.Services {
 		switch s.Reaction {
 		case optimizer.HPA, optimizer.VPA:
-			continue
+			continue // supported
 		default:
 			return fmt.Errorf("unsupported scaler reaction")
 		}
@@ -162,6 +186,8 @@ func (d *Scaler) scale(ctx context.Context, state optimizer.OptimizedState) erro
 	return errors.Join(errs...)
 }
 
+// Stop gracefully stops the autoscaling loop. It is safe to call
+// multiple times. If the scaler is not running, it does nothing.
 func (d *Scaler) Stop() error {
 	if !d.isRunning {
 		return nil
