@@ -6,7 +6,6 @@ package scaler
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"time"
 
@@ -152,8 +151,7 @@ func (d *Scaler) scale(ctx context.Context, state optimizer.OptimizedState) erro
 		}
 	}
 
-	// TODO make transaction
-	var errs []error
+	// Apply scaling actions (not transactional yet).
 	for _, s := range state.Services {
 		logger.Info("scaler", "applying candidate",
 			"service", s.ServiceName,
@@ -163,27 +161,17 @@ func (d *Scaler) scale(ctx context.Context, state optimizer.OptimizedState) erro
 			"memory", s.AppMemory,
 		)
 
-		var err error
 		switch s.Reaction {
 		case optimizer.HPA:
-			err = d.reactionApplier.ApplyHPS(ctx, d.config.Namespace, s.ServiceName, int32(s.Replicas))
+			return d.reactionApplier.ApplyHPS(ctx, d.config.Namespace, s.ServiceName, int32(s.Replicas))
 		case optimizer.VPA:
 			cpuStr := fmt.Sprintf("%dm", int(s.AppCPU))
 			memStr := fmt.Sprintf("%dMi", int(s.AppMemory))
-			err = d.reactionApplier.ApplyVPS(ctx, d.config.Namespace, s.ServiceName, cpuStr, memStr)
-		}
-
-		if err != nil {
-			logger.Error("scaler", "failed to apply reaction",
-				"service", s.ServiceName,
-				"reaction", s.Reaction,
-				"error", err,
-			)
-			errs = append(errs, fmt.Errorf("apply reaction for service %q: %w", s.ServiceName, err))
+			return d.reactionApplier.ApplyVPS(ctx, d.config.Namespace, s.ServiceName, cpuStr, memStr)
 		}
 	}
 
-	return errors.Join(errs...)
+	return nil
 }
 
 // Stop gracefully stops the autoscaling loop. It is safe to call
