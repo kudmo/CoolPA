@@ -12,11 +12,10 @@ func TestNewHistogram(t *testing.T) {
 
 	h := statistics.NewHistogram(bounds)
 
-	if len(h.Bins) != 4 { // +Inf бин
+	if len(h.Bins) != 4 {
 		t.Fatalf("expected 4 bins, got %d", len(h.Bins))
 	}
 
-	// проверяем сортировку
 	if h.Bins[0].UpperBound != 1 ||
 		h.Bins[1].UpperBound != 5 ||
 		h.Bins[2].UpperBound != 10 {
@@ -47,12 +46,9 @@ func TestObserve(t *testing.T) {
 func TestRisk_Basic(t *testing.T) {
 	h := statistics.NewHistogram([]float64{10, 20})
 
-	// бин [0-10]
-	for i := 0; i < 100; i++ {
-		h.Observe(5, i%2 == 0) // ~0.5
+	for i := range 100 {
+		h.Observe(5, i%2 == 0)
 	}
-
-	h.RebuildModel()
 
 	r := h.Risk(5)
 
@@ -64,17 +60,13 @@ func TestRisk_Basic(t *testing.T) {
 func TestRisk_Interpolation(t *testing.T) {
 	h := statistics.NewHistogram([]float64{10, 20})
 
-	// бин 1: риск ~0
-	for i := 0; i < 100; i++ {
+	for range 100 {
 		h.Observe(5, false)
 	}
 
-	// бин 2: риск ~1
-	for i := 0; i < 100; i++ {
+	for range 100 {
 		h.Observe(15, true)
 	}
-
-	h.RebuildModel()
 
 	r := h.Risk(12)
 
@@ -86,15 +78,12 @@ func TestRisk_Interpolation(t *testing.T) {
 func TestRisk_ExtrapolateToZero(t *testing.T) {
 	h := statistics.NewHistogram([]float64{2, 10})
 
-	// только один бин с риском 0.8
-	for i := 0; i < 100; i++ {
+	for range 100 {
 		h.Observe(5, true)
 	}
-	for i := 0; i < 25; i++ {
+	for range 25 {
 		h.Observe(5, false)
 	}
-
-	h.RebuildModel()
 
 	r := h.Risk(1)
 
@@ -109,15 +98,12 @@ func TestRisk_ExtrapolateToZero(t *testing.T) {
 func TestRisk_ExtrapolateToInf(t *testing.T) {
 	h := statistics.NewHistogram([]float64{10})
 
-	// бин с риском 0.2
-	for i := 0; i < 100; i++ {
+	for range 100 {
 		h.Observe(5, false)
 	}
-	for i := 0; i < 25; i++ {
+	for range 25 {
 		h.Observe(5, true)
 	}
-
-	h.RebuildModel()
 
 	r := h.Risk(1000)
 
