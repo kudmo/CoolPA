@@ -1,4 +1,4 @@
-package analyzer
+package analyzerprovider
 
 import (
 	"context"
@@ -9,12 +9,25 @@ import (
 	"github.com/kudmo/CoolPA/utils/welchtest"
 )
 
+// underutilizationAnalyzeResult holds the result of an internal
+// analysis step for a single service, indicating how underutilized
+// the service is (Rate) to support scaling down decisions.
+type underutilizationAnalyzeResult struct {
+	// Service is the name of the service that was analyzed.
+	Service string
+
+	// Rate represents the degree of underutilization as a fraction
+	// of current allocated resources (e.g., CPU or memory).
+	// Values closer to 1 mean severe underutilization.
+	Rate float64
+}
+
 // analyzeRPSlowing detects services whose request rate (RPS) has
 // significantly decreased compared to the previous analysis window,
 // using Welch's t-test. For each underutilized service, it calculates
 // the percentage of unused CPU or memory relative to the cluster total
 // and returns a list of candidates sorted by that percentage.
-func (a *Analyzer) analyzeRPSlowing(ctx context.Context) []underutilizationAnalyzeResult {
+func (a *TopoRankAnalyzer) analyzeRPSlowing(ctx context.Context) []underutilizationAnalyzeResult {
 	anomalys := make([]underutilizationAnalyzeResult, 0)
 	services, _ := a.metricsProvider.ListServices(ctx)
 	for _, service := range services {
@@ -81,7 +94,7 @@ func (a *Analyzer) analyzeRPSlowing(ctx context.Context) []underutilizationAnaly
 // services. It calls analyzeRPSlowing, sorts the results by descending
 // underutilization rate, and returns up to AnomalyServicesCount service
 // names recommended for scaling down.
-func (a *Analyzer) analyzeUnderutilization(ctx context.Context) []string {
+func (a *TopoRankAnalyzer) analyzeUnderutilization(ctx context.Context) []string {
 	result := make([]string, 0)
 
 	anomalys := a.analyzeRPSlowing(ctx)

@@ -1,4 +1,4 @@
-package analyzer
+package analyzerprovider
 
 import (
 	"context"
@@ -210,10 +210,10 @@ func createTestContext() (context.Context, time.Time) {
 	return ctx, now
 }
 
-func newTestAnalyzer(mockRepo metrics.MetricsRepository) *Analyzer {
-	return &Analyzer{
+func newTestAnalyzer(mockRepo metrics.MetricsRepository) *TopoRankAnalyzer {
+	return &TopoRankAnalyzer{
 		metricsProvider: mockRepo,
-		config: AnalyzerConfig{
+		config: TopoRankAnalyzerConfig{
 			Window: 1 * time.Hour,
 			SLO:    500.0, // milliseconds
 			Alpha:  0.1,
@@ -413,9 +413,9 @@ func TestAnalyzeRPSlowing(t *testing.T) {
 		M2:   10000 / (BETA * BETA),
 	}
 
-	a := &Analyzer{
+	a := &TopoRankAnalyzer{
 		metricsProvider: mockRepo,
-		config: AnalyzerConfig{
+		config: TopoRankAnalyzerConfig{
 			Window:               time.Hour,
 			Confidence:           0.05,
 			AnomalyServicesCount: 1,
@@ -471,9 +471,9 @@ func TestAnalyzeUnderutilization(t *testing.T) {
 		M2:   10000 / (BETA * BETA),
 	}
 
-	a := &Analyzer{
+	a := &TopoRankAnalyzer{
 		metricsProvider: mockRepo,
-		config: AnalyzerConfig{
+		config: TopoRankAnalyzerConfig{
 			Window:               time.Hour,
 			Confidence:           0.05,
 			AnomalyServicesCount: 1,

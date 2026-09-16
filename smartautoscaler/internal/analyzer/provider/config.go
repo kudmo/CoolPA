@@ -1,4 +1,4 @@
-package analyzer
+package analyzerprovider
 
 import "time"
 
@@ -7,8 +7,8 @@ import "time"
 // than 1 account for expected gradual decrease in traffic over time.
 const BETA = 0.8
 
-// AnalyzerConfig holds parameters that control the behavior of the Analyzer
-type AnalyzerConfig struct {
+// TopoRankAnalyzerConfig holds parameters that control the behavior of the TopoRankAnalyzer
+type TopoRankAnalyzerConfig struct {
 	// The target 95th percentile latency in milliseconds.
 	// Calls exceeding this threshold are considered SLO violations.
 	SLO float64

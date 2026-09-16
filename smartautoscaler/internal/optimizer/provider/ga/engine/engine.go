@@ -5,10 +5,10 @@ import (
 	"math/rand"
 	"time"
 
-	"github.com/kudmo/CoolPA/internal/optimizer/ga/config"
-	"github.com/kudmo/CoolPA/internal/optimizer/ga/constraints"
-	"github.com/kudmo/CoolPA/internal/optimizer/ga/fitness"
-	"github.com/kudmo/CoolPA/internal/optimizer/ga/genome"
+	"github.com/kudmo/CoolPA/internal/optimizer/provider/ga/config"
+	"github.com/kudmo/CoolPA/internal/optimizer/provider/ga/constraints"
+	"github.com/kudmo/CoolPA/internal/optimizer/provider/ga/fitness"
+	"github.com/kudmo/CoolPA/internal/optimizer/provider/ga/genome"
 )
 
 // Engine orchestrates the evolutionary loop.

@@ -23,11 +23,14 @@ import (
 	"syscall"
 	"time"
 
+	analyzerprovider "github.com/kudmo/CoolPA/internal/analyzer/provider"
 	applierprovider "github.com/kudmo/CoolPA/internal/applier/providers"
 	"github.com/kudmo/CoolPA/internal/metrics/providers/cache"
 	"github.com/kudmo/CoolPA/internal/metrics/providers/prometheus"
 	"github.com/kudmo/CoolPA/internal/metrics/providers/prometheus/collector"
+	optimizerprovider "github.com/kudmo/CoolPA/internal/optimizer/provider"
 	"github.com/kudmo/CoolPA/internal/scaler"
+	"github.com/kudmo/CoolPA/internal/statistics"
 	"github.com/kudmo/CoolPA/logger"
 
 	"github.com/kudmo/CoolPA/config"
@@ -89,6 +92,36 @@ func main() {
 	// Wrap the Prometheus provider with caching for improved performance
 	metricsRepository := cache.NewCachedMetricsRepository(prometheusRepository, cacheConfig)
 
+	// Create Risk histogram
+	histStore := &statistics.HistStore{}
+
+	// Create an analyzer to detect anomalies of utilization and anomalies of SLO
+	analyzer := analyzerprovider.NewTopoRankAnalyzer(
+		analyzerprovider.TopoRankAnalyzerConfig{
+			SLO:                  float64(cfg.SLO),
+			Confidence:           0.05,
+			Window:               60 * time.Second,
+			AnomalyServicesCount: cfg.AnomalyServicesCount,
+			Alpha:                0.05,
+		},
+		metricsRepository,
+		histStore,
+	)
+
+	// Creating an optimizer to find the optimal reaction
+	optimizer := optimizerprovider.NewReactionOptimizer(
+		optimizerprovider.ReactionOptimizerConfig{
+			CpuStep:              100,
+			MemoryStep:           256,
+			ReplicasStep:         1,
+			TargetCpuUtilization: 0.40,
+			Lambda:               cfg.Lambda,
+			TimeWindow:           60 * time.Second,
+		},
+		metricsRepository,
+		histStore,
+	)
+
 	// Create Kubernetes applier for executing scaling operations
 	applier, err := applierprovider.NewK8sApplier()
 	if err != nil {
@@ -100,6 +133,8 @@ func main() {
 	scaler := scaler.NewScaler(
 		scalerConfig,
 		metricsRepository,
+		analyzer,
+		optimizer,
 		applier,
 	)
 

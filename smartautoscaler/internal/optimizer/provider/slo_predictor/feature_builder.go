@@ -5,7 +5,7 @@ import (
 	"math"
 
 	"github.com/kudmo/CoolPA/internal/metrics"
-	"github.com/kudmo/CoolPA/internal/optimizer/ga/genome"
+	"github.com/kudmo/CoolPA/internal/optimizer/provider/ga/genome"
 	"github.com/kudmo/CoolPA/utils"
 )
 

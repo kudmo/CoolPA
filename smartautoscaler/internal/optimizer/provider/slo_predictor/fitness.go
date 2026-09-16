@@ -6,7 +6,7 @@ import (
 	"sync"
 
 	"github.com/kudmo/CoolPA/internal/metrics"
-	"github.com/kudmo/CoolPA/internal/optimizer/ga/genome"
+	"github.com/kudmo/CoolPA/internal/optimizer/provider/ga/genome"
 	"github.com/kudmo/CoolPA/internal/statistics"
 	"github.com/kudmo/CoolPA/logger"
 	"github.com/kudmo/CoolPA/utils"
