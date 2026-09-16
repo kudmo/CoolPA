@@ -106,6 +106,7 @@ func main() {
 			Window:               60 * time.Second,
 			AnomalyServicesCount: cfg.AnomalyServicesCount,
 			Alpha:                0.05,
+			Beta:                 0.8,
 		},
 		metricsRepository,
 		histStore,

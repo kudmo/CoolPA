@@ -2,11 +2,6 @@ package analyzerprovider
 
 import "time"
 
-// BETA is a decay factor applied to previous request statistics
-// when comparing current and past RPS distributions. Values less
-// than 1 account for expected gradual decrease in traffic over time.
-const BETA = 0.8
-
 // TopoRankAnalyzerConfig holds parameters that control the behavior of the TopoRankAnalyzer
 type TopoRankAnalyzerConfig struct {
 	// The target 95th percentile latency in milliseconds.
@@ -29,4 +24,9 @@ type TopoRankAnalyzerConfig struct {
 	// threshold. A call is considered abnormal if its latency
 	// exceeds SLO * (1 - Alpha).
 	Alpha float64
+
+	// Beta is a decay factor applied to previous request statistics
+	// when comparing current and past RPS distributions. Values less
+	// than 1 account for expected gradual decrease in traffic over time.
+	Beta float64
 }

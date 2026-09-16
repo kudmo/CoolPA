@@ -407,6 +407,7 @@ func TestAnalyzeRPSlowing(t *testing.T) {
 	mockRepo.On("GetGlobalTotalCpuLimit", mock.Anything).Return(10.0, nil)
 	mockRepo.On("GetGlobalTotalMemoryLimit", mock.Anything).Return(4096.0, nil)
 
+	BETA := 0.8
 	prevStats := &welchtest.Stats{
 		N:    100,
 		Mean: 100 / BETA,
@@ -419,6 +420,7 @@ func TestAnalyzeRPSlowing(t *testing.T) {
 			Window:               time.Hour,
 			Confidence:           0.05,
 			AnomalyServicesCount: 1,
+			Beta:                 BETA,
 		},
 		previousStatistics: map[string]*welchtest.Stats{serviceName: prevStats},
 	}
@@ -465,6 +467,7 @@ func TestAnalyzeUnderutilization(t *testing.T) {
 	mockRepo.On("GetGlobalTotalCpuLimit", mock.Anything).Return(10.0, nil)
 	mockRepo.On("GetGlobalTotalMemoryLimit", mock.Anything).Return(4096.0, nil)
 
+	BETA := 0.8
 	prevStats := &welchtest.Stats{
 		N:    100,
 		Mean: 100 / BETA,
@@ -477,6 +480,7 @@ func TestAnalyzeUnderutilization(t *testing.T) {
 			Window:               time.Hour,
 			Confidence:           0.05,
 			AnomalyServicesCount: 1,
+			Beta:                 BETA,
 		},
 		previousStatistics: map[string]*welchtest.Stats{serviceName: prevStats},
 	}

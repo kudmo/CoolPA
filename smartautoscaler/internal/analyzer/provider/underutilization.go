@@ -50,10 +50,10 @@ func (a *TopoRankAnalyzer) analyzeRPSlowing(ctx context.Context) []underutilizat
 		if _, ok := a.previousStatistics[service]; !ok {
 			continue
 		}
-		// Apply BETA factor to previous statistics to model expected decay.
+		// Apply Beta factor to previous statistics to model expected decay.
 		oldStats.N = a.previousStatistics[service].N
-		oldStats.Mean = a.previousStatistics[service].Mean * BETA
-		oldStats.M2 = a.previousStatistics[service].M2 * BETA * BETA
+		oldStats.Mean = a.previousStatistics[service].Mean * a.config.Beta
+		oldStats.M2 = a.previousStatistics[service].M2 * a.config.Beta * a.config.Beta
 
 		welch_result := welchtest.WelchTTest(newStats, oldStats)
 		if welch_result.TStatistic < 0 && welch_result.PValue <= a.config.Confidence {
