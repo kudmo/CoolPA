@@ -3,7 +3,7 @@ package constraints
 import (
 	"math"
 
-	"github.com/kudmo/CoolPA/internal/optimizer/ga/genome"
+	"github.com/kudmo/CoolPA/internal/optimizer/provider/ga/genome"
 )
 
 // Repair adjusts genome genes to obey service-level policy bounds.

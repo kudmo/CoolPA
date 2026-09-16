@@ -3,7 +3,7 @@ package fitness
 import (
 	"context"
 
-	"github.com/kudmo/CoolPA/internal/optimizer/ga/genome"
+	"github.com/kudmo/CoolPA/internal/optimizer/provider/ga/genome"
 )
 
 // Fitness evaluates genomes by building features, predicting SLO risk per-service

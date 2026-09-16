@@ -13,9 +13,7 @@ import (
 	contextutil "github.com/kudmo/CoolPA/context"
 	"github.com/kudmo/CoolPA/internal/analyzer"
 	"github.com/kudmo/CoolPA/internal/applier"
-	"github.com/kudmo/CoolPA/internal/metrics"
 	"github.com/kudmo/CoolPA/internal/optimizer"
-	"github.com/kudmo/CoolPA/internal/statistics"
 	"github.com/kudmo/CoolPA/logger"
 )
 
@@ -28,48 +26,26 @@ type Scaler struct {
 	isRunning        bool
 	lastReactionTime time.Time
 
-	metricsProvider metrics.MetricsRepository
-	histStore       *statistics.HistStore
-
-	analyzer        *analyzer.Analyzer
-	optimizer       *optimizer.ReactionOptimizer
+	analyzer        analyzer.Analyzer
+	optimizer       optimizer.Optimizer
 	reactionApplier applier.Applier
 }
 
 // NewScaler creates a Scaler with the given configuration, metrics
 // provider, and reaction applier. It initializes the analyzer and
 // optimizer components with default parameters.
-func NewScaler(config ScalerConfig, metricsProvider metrics.MetricsRepository, applier applier.Applier) *Scaler {
-	histStore := &statistics.HistStore{}
+func NewScaler(
+	config ScalerConfig,
+	analyzer analyzer.Analyzer,
+	optimizer optimizer.Optimizer,
+	applier applier.Applier,
+) *Scaler {
 	return &Scaler{
 		stopChan:        make(chan struct{}),
-		metricsProvider: metricsProvider,
 		config:          config,
-		histStore:       histStore,
 		reactionApplier: applier,
-		analyzer: analyzer.NewAnalyzer(
-			analyzer.AnalyzerConfig{
-				SLO:                  config.SLO,
-				Confidence:           0.05,
-				Window:               60 * time.Second,
-				AnomalyServicesCount: config.AnomalyServicesCount,
-				Alpha:                0.05,
-			},
-			metricsProvider,
-			histStore,
-		),
-		optimizer: optimizer.NewReactionOptimizer(
-			optimizer.ReactionOptimizerConfig{
-				CpuStep:              100,
-				MemoryStep:           256,
-				ReplicasStep:         1,
-				TargetCpuUtilization: 0.40,
-				Lambda:               config.Lambda,
-				TimeWindow:           60 * time.Second,
-			},
-			metricsProvider,
-			histStore,
-		),
+		analyzer:        analyzer,
+		optimizer:       optimizer,
 	}
 }
 
