@@ -132,7 +132,6 @@ func main() {
 	// Create the main scaler instance
 	scaler := scaler.NewScaler(
 		scalerConfig,
-		metricsRepository,
 		analyzer,
 		optimizer,
 		applier,
