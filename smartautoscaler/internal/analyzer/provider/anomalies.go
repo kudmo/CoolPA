@@ -5,6 +5,7 @@ import (
 	"math"
 	"sort"
 
+	"github.com/kudmo/CoolPA/internal/metrics"
 	"github.com/kudmo/CoolPA/logger"
 	"github.com/kudmo/CoolPA/utils"
 	"github.com/kudmo/toporank/api"
@@ -13,30 +14,31 @@ import (
 
 // call represents a directed edge between two services.
 type call struct {
-	from string
-	to   string
+	from metrics.ServiceID
+	to   metrics.ServiceID
 }
 
 // findAbnormalCalls identifies service calls that are abnormal based on
 // latency thresholds. A call is abnormal if its average P95 latency exceeds
 // the SLO adjusted by Alpha, or if the ratio of P95 to P50 latency is high
 // (indicating tail latency issues). Returns the list of abnormal calls.
-func (a *TopoRankAnalyzer) findAbnormalCalls(ctx context.Context) []call {
+func (a *TopoRankAnalyzer) findAbnormalCalls(ctx context.Context, scalingNamespace string) []call {
 	var anomalous []call
 
-	services, _ := a.metricsProvider.ListServices(ctx)
+	services, _ := a.metricsProvider.ListServices(ctx, scalingNamespace)
 	for _, from_name := range services {
-		from, _ := a.metricsProvider.GetService(ctx, from_name)
-		for _, to_name := range from.OutboundCalls {
-			lat95_range, _ := a.metricsProvider.GetGraphLatencyP95Range(ctx, from_name, to_name, a.config.Window)
+		fromID := metrics.ServiceID{Name: from_name, Namespace: scalingNamespace}
+		from, _ := a.metricsProvider.GetService(ctx, fromID)
+		for _, toID := range from.OutboundCalls {
+			lat95_range, _ := a.metricsProvider.GetGraphLatencyP95Range(ctx, fromID, toID, a.config.Window)
 			lat95 := utils.Avg(lat95_range)
-			lat50_range, _ := a.metricsProvider.GetGraphLatencyP50Range(ctx, from_name, to_name, a.config.Window)
+			lat50_range, _ := a.metricsProvider.GetGraphLatencyP50Range(ctx, fromID, toID, a.config.Window)
 			lat50 := utils.Avg(lat50_range)
 
 			if lat95 > a.config.SLO*(1-a.config.Alpha) {
-				anomalous = append(anomalous, call{from_name, to_name})
+				anomalous = append(anomalous, call{fromID, toID})
 			} else if lat95/lat50 > 12 {
-				anomalous = append(anomalous, call{from_name, to_name})
+				anomalous = append(anomalous, call{fromID, toID})
 			}
 		}
 	}
@@ -47,14 +49,14 @@ func (a *TopoRankAnalyzer) findAbnormalCalls(ctx context.Context) []call {
 // calls and per‑service anomaly degrees. Edge weights are computed as the
 // maximum absolute Pearson correlation between the destination service’s
 // latency and various resource usage metrics. Returns nil if no abnormal calls.
-func (a *TopoRankAnalyzer) buildCorrelationGraphFromCalls(ctx context.Context, abnormalCalls []call, serviceAnomaly map[string]float64) (*types.CorrelationGraph, error) {
+func (a *TopoRankAnalyzer) buildCorrelationGraphFromCalls(ctx context.Context, scalingNamespace string, abnormalCalls []call, serviceAnomaly map[metrics.ServiceID]float64) (*types.CorrelationGraph, error) {
 	if len(abnormalCalls) == 0 {
 		return nil, nil
 	}
 
 	cg := types.NewCorrelationGraph()
 	for svc, degree := range serviceAnomaly {
-		if err := cg.AddNode(svc, degree); err != nil {
+		if err := cg.AddNode(svc.ToString(), degree); err != nil {
 			return nil, err
 		}
 	}
@@ -93,7 +95,7 @@ func (a *TopoRankAnalyzer) buildCorrelationGraphFromCalls(ctx context.Context, a
 			weight = math.Max(weight, math.Abs(utils.Pearson(latSeries, netTrans)))
 		}
 
-		if err := cg.AddEdge(c.from, c.to, weight); err != nil {
+		if err := cg.AddEdge(c.from.ToString(), c.to.ToString(), weight); err != nil {
 			return nil, err
 		}
 	}
@@ -105,10 +107,10 @@ func (a *TopoRankAnalyzer) buildCorrelationGraphFromCalls(ctx context.Context, a
 // involved in abnormal calls. The score is the total number of latency
 // samples (from inbound calls) that exceed the SLO. Only services that
 // participate in abnormal calls (as source or destination) are considered.
-func (a *TopoRankAnalyzer) computeAnomalyDegree(ctx context.Context, abnormalCalls []call) map[string]float64 {
-	serviceAnomaly := make(map[string]float64)
+func (a *TopoRankAnalyzer) computeAnomalyDegree(ctx context.Context, scalingNamespace string, abnormalCalls []call) map[metrics.ServiceID]float64 {
+	serviceAnomaly := make(map[metrics.ServiceID]float64)
 
-	affectedServices := make(map[string]bool)
+	affectedServices := make(map[metrics.ServiceID]bool)
 	for _, c := range abnormalCalls {
 		affectedServices[c.from] = true
 		affectedServices[c.to] = true
@@ -122,7 +124,7 @@ func (a *TopoRankAnalyzer) computeAnomalyDegree(ctx context.Context, abnormalCal
 
 		exceedCount := 0
 		for _, from := range node.InboundCalls {
-			latencySeries, _ := a.metricsProvider.GetGraphLatencyP95Range(ctx, from, node.Name, a.config.Window)
+			latencySeries, _ := a.metricsProvider.GetGraphLatencyP95Range(ctx, from, node.ID, a.config.Window)
 			for _, lat := range latencySeries {
 				if lat > a.config.SLO {
 					exceedCount++
@@ -138,15 +140,15 @@ func (a *TopoRankAnalyzer) computeAnomalyDegree(ctx context.Context, abnormalCal
 // buildAbnormalCorrelationGraph orchestrates the detection of abnormal calls,
 // computation of anomaly degrees, and construction of the correlation graph.
 // It returns nil if no anomaly degree is greater than zero.
-func (a *TopoRankAnalyzer) buildAbnormalCorrelationGraph(ctx context.Context) (*types.CorrelationGraph, error) {
-	abnormalCalls := a.findAbnormalCalls(ctx)
+func (a *TopoRankAnalyzer) buildAbnormalCorrelationGraph(ctx context.Context, scalingNamespace string) (*types.CorrelationGraph, error) {
+	abnormalCalls := a.findAbnormalCalls(ctx, scalingNamespace)
 	logger.Info("slo_violation", "found abnormal calls", "count", len(abnormalCalls))
-	serviceAnomaly := a.computeAnomalyDegree(ctx, abnormalCalls)
+	serviceAnomaly := a.computeAnomalyDegree(ctx, scalingNamespace, abnormalCalls)
 	logger.Info("slo_violation", "calculated anomaly degrees", "services", serviceAnomaly)
 
 	for _, anomaly := range serviceAnomaly {
 		if anomaly != 0 {
-			return a.buildCorrelationGraphFromCalls(ctx, abnormalCalls, serviceAnomaly)
+			return a.buildCorrelationGraphFromCalls(ctx, scalingNamespace, abnormalCalls, serviceAnomaly)
 		}
 	}
 	return nil, nil
@@ -156,10 +158,10 @@ func (a *TopoRankAnalyzer) buildAbnormalCorrelationGraph(ctx context.Context) (*
 // correlation graph and the TopoRank algorithm. It returns the names of the
 // top anomalous services (up to AnomalyServicesCount), excluding the
 // istio-ingressgateway if present. Returns an empty slice if no anomalies are found.
-func (a *TopoRankAnalyzer) analyzeWithSLOViolation(ctx context.Context) []string {
+func (a *TopoRankAnalyzer) analyzeWithSLOViolation(ctx context.Context, scalingNamespace string) []string {
 	result := make([]string, 0)
 
-	graph, err := a.buildAbnormalCorrelationGraph(ctx)
+	graph, err := a.buildAbnormalCorrelationGraph(ctx, scalingNamespace)
 	if err != nil {
 		logger.Error("analyzer", "failed to build abnormal correlation graph", "error", err)
 	} else {

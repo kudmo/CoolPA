@@ -202,7 +202,6 @@ func (m *MockMetricsRepository) GetGlobalServiceMaxMemory(ctx context.Context, n
 	return args.Get(0).(float64), args.Error(1)
 }
 
-// Вспомогательная функция для создания контекста с временем анализа
 func createAnalysisContext() context.Context {
 	return contextutil.WithAnalysisTime(context.Background(), time.Now())
 }

@@ -7,6 +7,10 @@ type ServiceID struct {
 	Name      string `json:"name"`
 }
 
+func (id *ServiceID) ToString() string {
+	return id.Namespace + "_" + id.Name
+}
+
 // ServiceInfo contains descriptive information about a service
 // that is relevant for autoscaling decisions. It includes the
 // service's unique identifier (namespace + name) and the unique

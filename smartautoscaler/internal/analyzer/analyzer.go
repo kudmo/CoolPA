@@ -5,5 +5,5 @@ import (
 )
 
 type Analyzer interface {
-	Analyze(ctx context.Context) AnalysisResult
+	Analyze(ctx context.Context, scalingNamespace string) AnalysisResult
 }

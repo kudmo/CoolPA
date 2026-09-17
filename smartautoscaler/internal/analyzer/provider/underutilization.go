@@ -4,6 +4,7 @@ import (
 	"context"
 	"sort"
 
+	"github.com/kudmo/CoolPA/internal/metrics"
 	"github.com/kudmo/CoolPA/logger"
 	"github.com/kudmo/CoolPA/utils"
 	"github.com/kudmo/CoolPA/utils/welchtest"
@@ -14,7 +15,7 @@ import (
 // the service is (Rate) to support scaling down decisions.
 type underutilizationAnalyzeResult struct {
 	// Service is the name of the service that was analyzed.
-	Service string
+	Service metrics.ServiceID
 
 	// Rate represents the degree of underutilization as a fraction
 	// of current allocated resources (e.g., CPU or memory).
@@ -27,12 +28,13 @@ type underutilizationAnalyzeResult struct {
 // using Welch's t-test. For each underutilized service, it calculates
 // the percentage of unused CPU or memory relative to the cluster total
 // and returns a list of candidates sorted by that percentage.
-func (a *TopoRankAnalyzer) analyzeRPSlowing(ctx context.Context) []underutilizationAnalyzeResult {
+func (a *TopoRankAnalyzer) analyzeRPSlowing(ctx context.Context, scalingNamespace string) []underutilizationAnalyzeResult {
 	anomalys := make([]underutilizationAnalyzeResult, 0)
-	services, _ := a.metricsProvider.ListServices(ctx)
-	for _, service := range services {
+	services, _ := a.metricsProvider.ListServices(ctx, scalingNamespace)
+	for _, service_name := range services {
+		serviceID := metrics.ServiceID{Name: service_name, Namespace: scalingNamespace}
 		// Build current statistics from the recent RPS range.
-		new, _ := a.metricsProvider.GetServiceRequestsCountRange(ctx, service, a.config.Window)
+		new, _ := a.metricsProvider.GetServiceRequestsCountRange(ctx, serviceID, a.config.Window)
 
 		newStats := welchtest.NewOnlineStats()
 		newStats.N = len(new)
@@ -47,19 +49,19 @@ func (a *TopoRankAnalyzer) analyzeRPSlowing(ctx context.Context) []underutilizat
 
 		// Skip services without a previous statistics baseline.
 		oldStats := welchtest.NewOnlineStats()
-		if _, ok := a.previousStatistics[service]; !ok {
+		if _, ok := a.previousStatistics[serviceID]; !ok {
 			continue
 		}
 		// Apply Beta factor to previous statistics to model expected decay.
-		oldStats.N = a.previousStatistics[service].N
-		oldStats.Mean = a.previousStatistics[service].Mean * a.config.Beta
-		oldStats.M2 = a.previousStatistics[service].M2 * a.config.Beta * a.config.Beta
+		oldStats.N = a.previousStatistics[serviceID].N
+		oldStats.Mean = a.previousStatistics[serviceID].Mean * a.config.Beta
+		oldStats.M2 = a.previousStatistics[serviceID].M2 * a.config.Beta * a.config.Beta
 
 		welch_result := welchtest.WelchTTest(newStats, oldStats)
 		if welch_result.TStatistic < 0 && welch_result.PValue <= a.config.Confidence {
-			service_cpu_limit, _ := a.metricsProvider.GetServiceCpuQuota(ctx, service)
-			service_mem_limit, _ := a.metricsProvider.GetServiceMemoryQuota(ctx, service)
-			replicas, _ := a.metricsProvider.GetServiceReplicasCountValue(ctx, service)
+			service_cpu_limit, _ := a.metricsProvider.GetServiceCpuQuota(ctx, serviceID)
+			service_mem_limit, _ := a.metricsProvider.GetServiceMemoryQuota(ctx, serviceID)
+			replicas, _ := a.metricsProvider.GetServiceReplicasCountValue(ctx, serviceID)
 
 			// Skip services already at minimum replicas (cannot scale down further).
 			if 1 >= replicas {
@@ -67,21 +69,21 @@ func (a *TopoRankAnalyzer) analyzeRPSlowing(ctx context.Context) []underutilizat
 			}
 
 			// Calculate underutilization as percentage of total cluster resources.
-			service_cpu_utilization_range, _ := a.metricsProvider.GetServiceCpuUsageRange(ctx, service, a.config.Window)
+			service_cpu_utilization_range, _ := a.metricsProvider.GetServiceCpuUsageRange(ctx, serviceID, a.config.Window)
 			service_cpu_utilization := utils.Avg(service_cpu_utilization_range)
 			service_cpu_underutilization_total := (service_cpu_limit - service_cpu_utilization) * replicas
-			total_cpu_limit, _ := a.metricsProvider.GetGlobalTotalCpuLimit(ctx)
+			total_cpu_limit, _ := a.metricsProvider.GetGlobalTotalCpuLimit(ctx, scalingNamespace)
 			service_cpu_underutilization_total_percent := service_cpu_underutilization_total / total_cpu_limit
 
-			service_mem_utilization_range, _ := a.metricsProvider.GetServiceMemoryUsageRange(ctx, service, a.config.Window)
+			service_mem_utilization_range, _ := a.metricsProvider.GetServiceMemoryUsageRange(ctx, serviceID, a.config.Window)
 			service_mem_utilization := utils.Avg(service_mem_utilization_range)
 			service_mem_underutilization_total := (service_mem_limit - service_mem_utilization) * replicas
-			total_mem_limit, _ := a.metricsProvider.GetGlobalTotalMemoryLimit(ctx)
+			total_mem_limit, _ := a.metricsProvider.GetGlobalTotalMemoryLimit(ctx, scalingNamespace)
 			service_mem_underutilization_total_percent := service_mem_underutilization_total / total_mem_limit
 
 			// Use the larger underutilization percentage as the rate.
 			anomalys = append(anomalys, underutilizationAnalyzeResult{
-				Service: service,
+				Service: serviceID,
 				Rate:    max(service_cpu_underutilization_total_percent, service_mem_underutilization_total_percent),
 			})
 		}
@@ -94,17 +96,17 @@ func (a *TopoRankAnalyzer) analyzeRPSlowing(ctx context.Context) []underutilizat
 // services. It calls analyzeRPSlowing, sorts the results by descending
 // underutilization rate, and returns up to AnomalyServicesCount service
 // names recommended for scaling down.
-func (a *TopoRankAnalyzer) analyzeUnderutilization(ctx context.Context) []string {
+func (a *TopoRankAnalyzer) analyzeUnderutilization(ctx context.Context, scalingNamespace string) []string {
 	result := make([]string, 0)
 
-	anomalys := a.analyzeRPSlowing(ctx)
+	anomalys := a.analyzeRPSlowing(ctx, scalingNamespace)
 
 	sort.Slice(anomalys, func(i, j int) bool {
 		return anomalys[i].Rate > anomalys[j].Rate
 	})
 
 	for i := 0; i < len(anomalys) && len(result) < a.config.AnomalyServicesCount; i++ {
-		result = append(result, anomalys[i].Service)
+		result = append(result, anomalys[i].Service.Name)
 	}
 
 	logger.Info("analyzer", "calculated underutilization", "services", result)

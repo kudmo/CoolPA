@@ -28,7 +28,7 @@ type TopoRankAnalyzer struct {
 	// previousStatistics stores the request rate statistics from the
 	// previous analysis cycle for each service, used as a baseline
 	// for detecting changes.
-	previousStatistics map[string]*welchtest.Stats
+	previousStatistics map[metrics.ServiceID]*welchtest.Stats
 }
 
 // NewTopoRankAnalyzer creates a new TopoRankAnalyzer with the given configuration,
@@ -42,7 +42,7 @@ func NewTopoRankAnalyzer(
 		metricsProvider:    metricsProvider,
 		config:             config,
 		histStore:          histStore,
-		previousStatistics: make(map[string]*welchtest.Stats),
+		previousStatistics: make(map[metrics.ServiceID]*welchtest.Stats),
 	}
 }
 
@@ -52,24 +52,24 @@ func NewTopoRankAnalyzer(
 // found, it checks for underutilized services, which triggers a
 // scale-down recommendation. The result contains the list of affected
 // services and the scaling direction (1, 0, or -1).
-func (a *TopoRankAnalyzer) Analyze(ctx context.Context) analyzer.AnalysisResult {
+func (a *TopoRankAnalyzer) Analyze(ctx context.Context, scalingNamespace string) analyzer.AnalysisResult {
 	result := analyzer.AnalysisResult{
 		Services: []string{},
 		Scale:    0,
 	}
-	bottlenecks := a.analyzeWithSLOViolation(ctx)
+	bottlenecks := a.analyzeWithSLOViolation(ctx, scalingNamespace)
 
 	if len(bottlenecks) > 0 {
 		result.Services = bottlenecks
 		result.Scale = 1
 	} else {
-		underutilized := a.analyzeUnderutilization(ctx)
+		underutilized := a.analyzeUnderutilization(ctx, scalingNamespace)
 		if len(underutilized) > 0 {
 			result.Services = underutilized
 			result.Scale = -1
 		}
 	}
-	a.updateStatistics(ctx, result)
+	a.updateStatistics(ctx, scalingNamespace, result)
 
 	return result
 }
@@ -81,19 +81,19 @@ func (a *TopoRankAnalyzer) Analyze(ctx context.Context) analyzer.AnalysisResult 
 // percentile latency. For every service in the result, it updates
 // the previous request count statistics using the request rate over
 // the configured time window.
-func (a *TopoRankAnalyzer) updateStatistics(ctx context.Context, analysisResult analyzer.AnalysisResult) {
-	services, _ := a.metricsProvider.ListServices(ctx)
+func (a *TopoRankAnalyzer) updateStatistics(ctx context.Context, scalingNamespace string, analysisResult analyzer.AnalysisResult) {
+	services, _ := a.metricsProvider.ListServices(ctx, scalingNamespace)
 	for _, svc := range services {
 		if a.histStore.GetHistogram(svc) == nil {
 			bounds := statistics.LogBounds(float64(a.config.SLO))
 			a.histStore.Register(svc, bounds)
 		}
-		lat_95, _ := a.metricsProvider.GetServiceAverageLatency95Value(ctx, svc)
+		lat_95, _ := a.metricsProvider.GetServiceAverageLatency95Value(ctx, metrics.ServiceID{Name: svc, Namespace: scalingNamespace})
 		a.histStore.GetHistogram(svc).Observe(lat_95, slices.Contains(analysisResult.Services, svc) && analysisResult.Scale == 1)
 	}
 
 	for _, s := range analysisResult.Services {
-		new, _ := a.metricsProvider.GetServiceRequestsCountRange(ctx, s, a.config.Window)
+		new, _ := a.metricsProvider.GetServiceRequestsCountRange(ctx, metrics.ServiceID{Name: s, Namespace: scalingNamespace}, a.config.Window)
 		newStats := welchtest.NewOnlineStats()
 		newStats.N = len(new)
 		for _, i := range new {
@@ -104,5 +104,6 @@ func (a *TopoRankAnalyzer) updateStatistics(ctx context.Context, analysisResult 
 		for _, i := range new {
 			newStats.M2 += (i - newStats.Mean) * (i - newStats.Mean)
 		}
+		a.previousStatistics[metrics.ServiceID{Name: s, Namespace: scalingNamespace}] = newStats
 	}
 }
