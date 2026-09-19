@@ -11,6 +11,8 @@ import (
 
 // AppConfig holds configuration parameters for the autoscaler.
 type AppConfig struct {
+	WebUiPort int `yaml:"web_ui_port,omitempty"`
+
 	// The namespace where the autoscaler will monitor and scale deployments.
 	// This field is required and cannot be empty.
 	ScalingNamespace string `yaml:"scaling_namespace"`

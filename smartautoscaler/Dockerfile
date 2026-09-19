@@ -42,6 +42,7 @@ RUN apt-get update && apt-get install -y \
 COPY --from=builder /usr/local/lib/libonnxruntime.so* /usr/local/lib/
 COPY --from=builder /app/latency_model.onnx /app/
 COPY --from=builder /app/smartautoscaler /app/
+COPY --from=builder /app/internal/web/templates/dashboard.html /app/web/templates/dashboard.html
 
 RUN ldconfig
 
