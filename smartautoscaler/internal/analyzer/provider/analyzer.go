@@ -82,16 +82,14 @@ func (a *TopoRankAnalyzer) Analyze(ctx context.Context) analyzer.AnalysisResult 
 // the previous request count statistics using the request rate over
 // the configured time window.
 func (a *TopoRankAnalyzer) updateStatistics(ctx context.Context, analysisResult analyzer.AnalysisResult) {
-	if analysisResult.Scale == 1 {
-		services, _ := a.metricsProvider.ListServices(ctx)
-		for _, svc := range services {
-			if a.histStore.GetHistogram(svc) == nil {
-				bounds := statistics.LogBounds(float64(a.config.SLO))
-				a.histStore.Register(svc, bounds)
-			}
-			lat_95, _ := a.metricsProvider.GetServiceAverageLatency95Value(ctx, svc)
-			a.histStore.GetHistogram(svc).Observe(lat_95, slices.Contains(analysisResult.Services, svc))
+	services, _ := a.metricsProvider.ListServices(ctx)
+	for _, svc := range services {
+		if a.histStore.GetHistogram(svc) == nil {
+			bounds := statistics.LogBounds(float64(a.config.SLO))
+			a.histStore.Register(svc, bounds)
 		}
+		lat_95, _ := a.metricsProvider.GetServiceAverageLatency95Value(ctx, svc)
+		a.histStore.GetHistogram(svc).Observe(lat_95, slices.Contains(analysisResult.Services, svc) && analysisResult.Scale == 1)
 	}
 
 	for _, s := range analysisResult.Services {
@@ -106,6 +104,5 @@ func (a *TopoRankAnalyzer) updateStatistics(ctx context.Context, analysisResult 
 		for _, i := range new {
 			newStats.M2 += (i - newStats.Mean) * (i - newStats.Mean)
 		}
-		a.previousStatistics[s] = newStats
 	}
 }
