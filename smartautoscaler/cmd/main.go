@@ -155,16 +155,21 @@ func main() {
 	}
 	logger.Info("main", "scaler started")
 
-	if cfg.WebUiPort != 0 {
-		webSrv, err := web.NewServer(&web.ScalerDataProvider{MetricsProvider: metricsRepository, HistStore: histStore})
+	if cfg.WebUIEnabled() {
+		webSrv, err := web.NewServer(&web.ScalerDataProvider{
+			MetricsProvider: metricsRepository,
+			HistStore:       histStore,
+		})
 		if err != nil {
-			logger.Error("main", "web server creating error", "error", err.Error())
+			logger.Error("main", "failed to create web server", "error", err)
+			os.Exit(1)
 		}
-		logger.Info("main", "web UI on", "port", cfg.WebUiPort)
+
+		addr := fmt.Sprintf(":%d", cfg.WebUiPort)
+		logger.Info("main", "web UI listening", "addr", addr)
 		go func() {
-			err := http.ListenAndServe(fmt.Sprintf(":%d", cfg.WebUiPort), webSrv.Handler())
-			if err != nil {
-				logger.Info("main", "web error", "error", err.Error())
+			if err := http.ListenAndServe(addr, webSrv.Handler()); err != nil {
+				logger.Error("main", "web server stopped", "error", err)
 			}
 		}()
 	}
