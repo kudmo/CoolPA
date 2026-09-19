@@ -18,6 +18,8 @@ package main
 import (
 	"context"
 	"flag"
+	"fmt"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
@@ -31,6 +33,7 @@ import (
 	optimizerprovider "github.com/kudmo/CoolPA/internal/optimizer/provider"
 	"github.com/kudmo/CoolPA/internal/scaler"
 	"github.com/kudmo/CoolPA/internal/statistics"
+	"github.com/kudmo/CoolPA/internal/web"
 	"github.com/kudmo/CoolPA/logger"
 
 	"github.com/kudmo/CoolPA/config"
@@ -151,6 +154,25 @@ func main() {
 		os.Exit(1)
 	}
 	logger.Info("main", "scaler started")
+
+	if cfg.WebUIEnabled() {
+		webSrv, err := web.NewServer(&web.ScalerDataProvider{
+			MetricsProvider: metricsRepository,
+			HistStore:       histStore,
+		})
+		if err != nil {
+			logger.Error("main", "failed to create web server", "error", err)
+			os.Exit(1)
+		}
+
+		addr := fmt.Sprintf(":%d", cfg.WebUiPort)
+		logger.Info("main", "web UI listening", "addr", addr)
+		go func() {
+			if err := http.ListenAndServe(addr, webSrv.Handler()); err != nil {
+				logger.Error("main", "web server stopped", "error", err)
+			}
+		}()
+	}
 
 	// Wait for shutdown signal
 	<-sigChan

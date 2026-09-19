@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Scaler Dashboard</title>
+    <script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+    <style>
+        :root { --border: #d0d7de; --bg-alt: #f6f8fa; --fg-muted: #57606a; }
+        * { box-sizing: border-box; }
+        body {
+            font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+            margin: 0; padding: 24px; background: #fff; color: #1f2328;
+        }
+        h1 { margin: 0 0 20px; font-size: 22px; }
+        .grid {
+            display: grid;
+            grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+            gap: 20px;
+        }
+        .card {
+            border: 1px solid var(--border); border-radius: 8px;
+            padding: 16px; background: #fff;
+        }
+        .card h2 {
+            margin: 0 0 12px; font-size: 16px; font-weight: 600;
+        }
+        #graph { width: 100%; height: 520px; border: 1px dashed var(--border); border-radius: 6px; }
+        .hist-list { display: flex; flex-direction: column; gap: 18px; max-height: 520px; overflow-y: auto; }
+        .hist-item { border-bottom: 1px solid var(--border); padding-bottom: 14px; }
+        .hist-item:last-child { border-bottom: none; }
+        .hist-title { font-family: ui-monospace, monospace; font-size: 13px; margin-bottom: 6px; }
+        .hist-empty { color: var(--fg-muted); font-size: 13px; font-style: italic; }
+        .legend { display: flex; gap: 16px; font-size: 12px; color: var(--fg-muted); margin-top: 6px; }
+        .legend span::before { content: ""; display: inline-block; width: 10px; height: 10px; margin-right: 4px; border-radius: 2px; vertical-align: middle; }
+        .legend .real::before { background: #0969da; }
+        .legend .interp::before { background: #bf8700; }
+        @media (max-width: 900px) {
+            .grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <h1>Контроллер масштабирования — состояние</h1>
+
+    <div class="grid">
+        <!-- 1) Граф вызовов -->
+        <section class="card">
+            <h2>Граф вызовов</h2>
+            <div id="graph"></div>
+        </section>
+
+        <!-- 2) Гистограммы -->
+        <section class="card">
+            <h2>Гистограммы по сервисам</h2>
+            <div class="hist-list" id="hist-list"></div>
+        </section>
+    </div>
+
+    <script>
+        const graphData     = {{ toJSON .Graph }};
+        const histogramData = {{ toJSON .Histograms }};
+
+        function fmtBound(v) {
+            if (v === null || v === undefined) return '+∞';
+            const n = Number(v);
+            if (!Number.isFinite(n)) return '+∞';
+            return n.toFixed(0);
+        }
+
+        (function renderGraph() {
+            const container = document.getElementById('graph');
+            if (!graphData || graphData.length === 0) {
+                container.innerHTML = '<p class="hist-empty">Нет данных о графе.</p>';
+                return;
+            }
+
+            const nodeIds = new Set();
+            const nodes = [];
+
+            for (const n of graphData) {
+                const id = n.service_name;
+                nodeIds.add(id);
+                nodes.push({
+                    id,
+                    label: n.service_name,
+                    title: id,
+                });
+            }
+
+            const edges = [];
+            for (const n of graphData) {
+                const from = n.service_name;
+                for (const to of (n.outbound_edges || [])) {
+                    if (nodeIds.has(to)) {
+                        edges.push({ from, to, arrows: 'to' });
+                    }
+                }
+            }
+
+            new vis.Network(
+                container,
+                {
+                    nodes: new vis.DataSet(nodes),
+                    edges: new vis.DataSet(edges),
+                },
+                {
+                    nodes: { shape: 'box', margin: 10, font: { size: 13 } },
+                    edges: { smooth: { type: 'continuous' }, color: '#8c959f' },
+                    physics: { stabilization: { iterations: 200 } },
+                    interaction: { hover: true },
+                }
+            );
+        })();
+
+        function renderHistogram(svgEl, buckets) {
+            const W = 420, H = 150, PAD = 28;
+            const PAD_BOTTOM = 40;
+            const innerW = W - PAD * 2;
+            const innerH = H - PAD - PAD_BOTTOM;
+
+            const maxVal = Math.max(
+                1,
+                ...buckets.map(b => Math.max(
+                    Number(b.bound_real_value)    || 0,
+                    Number(b.bound_interpolation) || 0,
+                ))
+            );
+            const barW = innerW / buckets.length;
+
+            const parts = [];
+            parts.push(`<svg viewBox="0 0 ${W} ${H}" width="100%" height="${H}">`);
+
+            parts.push(`<line x1="${PAD}" y1="${PAD + innerH}" x2="${PAD + innerW}" y2="${PAD + innerH}" stroke="#d0d7de"/>`);
+
+            buckets.forEach((b, i) => {
+                const x = PAD + i * barW;
+                const real   = Number(b.bound_real_value)    || 0;
+                const interp = Number(b.bound_interpolation) || 0;
+                const hReal   = (real   / maxVal) * innerH;
+                const hInterp = (interp / maxVal) * innerH;
+                const yReal   = PAD + innerH - hReal;
+                const yInterp = PAD + innerH - hInterp;
+
+                const tip = `upper=${fmtBound(b.bound_upper)} real=${real} interp=${interp}`;
+
+                parts.push(`<g>`);
+
+                if (hReal > 0.5) {
+                    parts.push(`<rect x="${x + 2}" y="${yReal}" width="${Math.max(1, barW - 4)}" height="${hReal}" fill="#0969da" fill-opacity="0.85"/>`);
+                } else {
+                    parts.push(`<rect x="${x + 2}" y="${PAD + innerH - 1.5}" width="${Math.max(1, barW - 4)}" height="1.5" fill="#0969da" fill-opacity="0.85"/>`);
+                }
+
+                if (hInterp > 0.5) {
+                    parts.push(`<rect x="${x + 2}" y="${yInterp}" width="${Math.max(1, barW - 4)}" height="${hInterp}" fill="none" stroke="#bf8700" stroke-width="1.5" stroke-dasharray="3 2"/>`);
+                } else if (interp > 0 || real === 0) {
+                    parts.push(`<rect x="${x + 2}" y="${PAD + innerH - 3}" width="${Math.max(1, barW - 4)}" height="1.5" fill="#bf8700"/>`);
+                }
+
+                parts.push(`<title>${tip}</title>`);
+                parts.push(`</g>`);
+
+                const cx = x + barW / 2;
+                const label = fmtBound(b.bound_upper);
+                parts.push(
+                    `<text x="${cx}" y="${PAD + innerH + 12}" font-size="9" text-anchor="middle" fill="#57606a">${label}</text>`
+                );
+
+                parts.push(
+                    `<line x1="${cx}" y1="${PAD + innerH}" x2="${cx}" y2="${PAD + innerH + 4}" stroke="#d0d7de"/>`
+                );
+            });
+
+            parts.push(`<text x="${PAD}" y="${H - 6}" font-size="10" fill="#57606a">0</text>`);
+            parts.push(`<text x="${PAD + innerW}" y="${H - 6}" font-size="10" text-anchor="end" fill="#57606a">+∞</text>`);
+
+            parts.push(`<text x="${PAD - 4}" y="${PAD + 8}" font-size="10" text-anchor="end" fill="#57606a">${maxVal.toFixed(1)}</text>`);
+
+            parts.push('</svg>');
+            svgEl.innerHTML = parts.join('');
+        }
+        (function renderAllHistograms() {
+            const list = document.getElementById('hist-list');
+            if (!histogramData || histogramData.length === 0) {
+                list.innerHTML = '<p class="hist-empty">Нет данных о гистограммах.</p>';
+                return;
+            }
+
+            const frag = document.createDocumentFragment();
+            for (const h of histogramData) {
+                const item = document.createElement('div');
+                item.className = 'hist-item';
+
+                const title = document.createElement('div');
+                title.className = 'hist-title';
+                title.textContent = h.service_id;
+                item.appendChild(title);
+
+                if (h.buckets && h.buckets.length > 0) {
+                    const svgWrap = document.createElement('div');
+                    item.appendChild(svgWrap);
+                    renderHistogram(svgWrap, h.buckets);
+                } else {
+                    const empty = document.createElement('div');
+                    empty.className = 'hist-empty';
+                    empty.textContent = 'Нет бакетов';
+                    item.appendChild(empty);
+                }
+
+                frag.appendChild(item);
+            }
+            list.appendChild(frag);
+
+            const legend = document.createElement('div');
+            legend.className = 'legend';
+            legend.innerHTML = '<span class="real">реальное значение</span><span class="interp">интерполяция</span>';
+            list.appendChild(legend);
+        })();
+    </script>
+</body>
+</html>
