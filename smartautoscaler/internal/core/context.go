@@ -1,11 +1,11 @@
-// Package contextutil provides utilities for managing and retrieving
+// Package core provides utilities for managing and retrieving
 // time-related information from context.Context.
 //
 // The package is primarily used to propagate analysis time information
 // through the application's call chain, allowing functions to access
 // the timestamp when a particular analysis operation began without
 // requiring explicit parameter passing.
-package contextutil
+package core
 
 import (
 	"context"
@@ -53,7 +53,7 @@ func WithAnalysisTime(ctx context.Context, t time.Time) context.Context {
 //
 // Example:
 //
-//	if analysisTime, ok := contextutil.GetAnalysisTime(ctx); ok {
+//	if analysisTime, ok := core.GetAnalysisTime(ctx); ok {
 //	    fmt.Printf("Analysis started at: %v\n", analysisTime)
 //	}
 func GetAnalysisTime(ctx context.Context) (time.Time, bool) {
@@ -84,7 +84,7 @@ func GetAnalysisTime(ctx context.Context) (time.Time, bool) {
 //
 // Example:
 //
-//	from, to, ok := contextutil.GetTimeRange(ctx, 10*time.Minute)
+//	from, to, ok := core.GetTimeRange(ctx, 10*time.Minute)
 //	if ok {
 //	    metrics := prometheus.QueryRange(from, to)
 //	}

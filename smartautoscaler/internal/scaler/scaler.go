@@ -10,9 +10,9 @@ import (
 	"fmt"
 	"time"
 
-	contextutil "github.com/kudmo/CoolPA/context"
 	"github.com/kudmo/CoolPA/internal/analyzer"
 	"github.com/kudmo/CoolPA/internal/applier"
+	"github.com/kudmo/CoolPA/internal/core"
 	"github.com/kudmo/CoolPA/internal/optimizer"
 	"github.com/kudmo/CoolPA/logger"
 )
@@ -68,7 +68,7 @@ func (d *Scaler) Start(ctx context.Context) error {
 		for {
 			select {
 			case <-ticker.C:
-				analysisCtx := contextutil.WithAnalysisTime(ctx, time.Now())
+				analysisCtx := core.WithAnalysisTime(ctx, time.Now())
 
 				// Skip if still in cooldown period.
 				timeSinceLastReaction := time.Since(d.lastReactionTime)

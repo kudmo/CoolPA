@@ -9,6 +9,7 @@ import (
 	"slices"
 
 	"github.com/kudmo/CoolPA/internal/analyzer"
+	"github.com/kudmo/CoolPA/internal/core"
 	"github.com/kudmo/CoolPA/internal/metrics"
 	"github.com/kudmo/CoolPA/internal/statistics"
 
@@ -28,7 +29,7 @@ type TopoRankAnalyzer struct {
 	// previousStatistics stores the request rate statistics from the
 	// previous analysis cycle for each service, used as a baseline
 	// for detecting changes.
-	previousStatistics map[metrics.ServiceID]*welchtest.Stats
+	previousStatistics map[core.ServiceID]*welchtest.Stats
 }
 
 // NewTopoRankAnalyzer creates a new TopoRankAnalyzer with the given configuration,
@@ -42,7 +43,7 @@ func NewTopoRankAnalyzer(
 		metricsProvider:    metricsProvider,
 		config:             config,
 		histStore:          histStore,
-		previousStatistics: make(map[metrics.ServiceID]*welchtest.Stats),
+		previousStatistics: make(map[core.ServiceID]*welchtest.Stats),
 	}
 }
 
@@ -88,12 +89,12 @@ func (a *TopoRankAnalyzer) updateStatistics(ctx context.Context, scalingNamespac
 			bounds := statistics.LogBounds(float64(a.config.SLO))
 			a.histStore.Register(svc, bounds)
 		}
-		lat_95, _ := a.metricsProvider.GetServiceAverageLatency95Value(ctx, metrics.ServiceID{Name: svc, Namespace: scalingNamespace})
+		lat_95, _ := a.metricsProvider.GetServiceAverageLatency95Value(ctx, core.ServiceID{Name: svc, Namespace: scalingNamespace})
 		a.histStore.GetHistogram(svc).Observe(lat_95, slices.Contains(analysisResult.Services, svc) && analysisResult.Scale == 1)
 	}
 
 	for _, s := range analysisResult.Services {
-		new, _ := a.metricsProvider.GetServiceRequestsCountRange(ctx, metrics.ServiceID{Name: s, Namespace: scalingNamespace}, a.config.Window)
+		new, _ := a.metricsProvider.GetServiceRequestsCountRange(ctx, core.ServiceID{Name: s, Namespace: scalingNamespace}, a.config.Window)
 		newStats := welchtest.NewOnlineStats()
 		newStats.N = len(new)
 		for _, i := range new {
@@ -104,6 +105,6 @@ func (a *TopoRankAnalyzer) updateStatistics(ctx context.Context, scalingNamespac
 		for _, i := range new {
 			newStats.M2 += (i - newStats.Mean) * (i - newStats.Mean)
 		}
-		a.previousStatistics[metrics.ServiceID{Name: s, Namespace: scalingNamespace}] = newStats
+		a.previousStatistics[core.ServiceID{Name: s, Namespace: scalingNamespace}] = newStats
 	}
 }

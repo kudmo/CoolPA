@@ -5,6 +5,7 @@ import (
 	"math"
 	"sync"
 
+	"github.com/kudmo/CoolPA/internal/core"
 	"github.com/kudmo/CoolPA/internal/metrics"
 	"github.com/kudmo/CoolPA/internal/optimizer/provider/ga/genome"
 	"github.com/kudmo/CoolPA/internal/statistics"
@@ -45,7 +46,7 @@ func (f *ResourceOptimizerFitness) calculateR2(ctx context.Context, gen *genome.
 	current := make([]genome.ServiceState, 0, len(gen.Genes))
 	services, _ := f.metricsProvider.ListServices(ctx, gen.Namespace)
 	for _, svc := range services {
-		svcID := metrics.ServiceID{Namespace: gen.Namespace, Name: svc}
+		svcID := core.ServiceID{Namespace: gen.Namespace, Name: svc}
 		replicas_count, _ := f.metricsProvider.GetServiceReplicasCountValue(ctx, svcID)
 		cpu_app_quota, _ := f.metricsProvider.GetServiceCpuQuota(ctx, svcID)
 		cpu_pod_quota, _ := f.metricsProvider.GetServicePodCpuQuota(ctx, svcID)
@@ -79,7 +80,7 @@ func (f *ResourceOptimizerFitness) calculateR1(ctx context.Context, g *genome.Re
 	prod := 1.0
 
 	for i, gene := range g.Genes {
-		lat_95_curr, _ := f.metricsProvider.GetServiceAverageLatency95Range(ctx, metrics.ServiceID{Namespace: g.Namespace, Name: gene.ServiceName}, f.config.Window)
+		lat_95_curr, _ := f.metricsProvider.GetServiceAverageLatency95Range(ctx, core.ServiceID{Namespace: g.Namespace, Name: gene.ServiceName}, f.config.Window)
 		lat_95_curr_avg := utils.Avg(lat_95_curr)
 		lat_95_new := lat_95_curr_avg * math.Pow(math.E, deltas[i])
 

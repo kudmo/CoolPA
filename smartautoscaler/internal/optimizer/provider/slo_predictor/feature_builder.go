@@ -4,6 +4,7 @@ import (
 	"context"
 	"math"
 
+	"github.com/kudmo/CoolPA/internal/core"
 	"github.com/kudmo/CoolPA/internal/metrics"
 	"github.com/kudmo/CoolPA/internal/optimizer/provider/ga/genome"
 	"github.com/kudmo/CoolPA/utils"
@@ -26,7 +27,7 @@ func (b *LatencyDeltaPredictorFeatureBuilder) Build(ctx context.Context, g *geno
 			continue
 		}
 
-		svcID := metrics.ServiceID{Namespace: g.Namespace, Name: sg.ServiceName}
+		svcID := core.ServiceID{Namespace: g.Namespace, Name: sg.ServiceName}
 		replicas_count, _ := b.metricsProvider.GetServiceReplicasCountValue(ctx, svcID)
 
 		if replicas_count == 0 {

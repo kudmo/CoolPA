@@ -7,6 +7,7 @@ import (
 	lru "github.com/hashicorp/golang-lru/v2"
 	"golang.org/x/sync/singleflight"
 
+	"github.com/kudmo/CoolPA/internal/core"
 	"github.com/kudmo/CoolPA/internal/metrics"
 )
 
@@ -64,7 +65,7 @@ func (c *CachedMetricsProvider) ListServices(ctx context.Context, namespace stri
 	return value.([]string), nil
 }
 
-func (c *CachedMetricsProvider) GetService(ctx context.Context, svc metrics.ServiceID) (metrics.ServiceInfo, error) {
+func (c *CachedMetricsProvider) GetService(ctx context.Context, svc core.ServiceID) (metrics.ServiceInfo, error) {
 	key := "service_info_" + svc.Namespace + "_" + svc.Name
 	value, err := c.get(ctx, key, func() (interface{}, error) {
 		return c.repo.GetService(ctx, svc)
@@ -75,7 +76,7 @@ func (c *CachedMetricsProvider) GetService(ctx context.Context, svc metrics.Serv
 	return value.(metrics.ServiceInfo), nil
 }
 
-func (c *CachedMetricsProvider) GetServiceReplicasCountValue(ctx context.Context, svc metrics.ServiceID) (float64, error) {
+func (c *CachedMetricsProvider) GetServiceReplicasCountValue(ctx context.Context, svc core.ServiceID) (float64, error) {
 	key := "replicas_count_" + svc.Namespace + "_" + svc.Name
 	value, err := c.get(ctx, key, func() (interface{}, error) {
 		return c.repo.GetServiceReplicasCountValue(ctx, svc)
@@ -86,7 +87,7 @@ func (c *CachedMetricsProvider) GetServiceReplicasCountValue(ctx context.Context
 	return value.(float64), nil
 }
 
-func (c *CachedMetricsProvider) GetServiceCpuUsageValue(ctx context.Context, svc metrics.ServiceID) (float64, error) {
+func (c *CachedMetricsProvider) GetServiceCpuUsageValue(ctx context.Context, svc core.ServiceID) (float64, error) {
 	key := "cpu_usage_" + svc.Namespace + "_" + svc.Name
 	value, err := c.get(ctx, key, func() (interface{}, error) {
 		return c.repo.GetServiceCpuUsageValue(ctx, svc)
@@ -97,7 +98,7 @@ func (c *CachedMetricsProvider) GetServiceCpuUsageValue(ctx context.Context, svc
 	return value.(float64), nil
 }
 
-func (c *CachedMetricsProvider) GetServiceMemoryUsageValue(ctx context.Context, svc metrics.ServiceID) (float64, error) {
+func (c *CachedMetricsProvider) GetServiceMemoryUsageValue(ctx context.Context, svc core.ServiceID) (float64, error) {
 	key := "memory_usage_" + svc.Namespace + "_" + svc.Name
 	value, err := c.get(ctx, key, func() (interface{}, error) {
 		return c.repo.GetServiceMemoryUsageValue(ctx, svc)
@@ -108,7 +109,7 @@ func (c *CachedMetricsProvider) GetServiceMemoryUsageValue(ctx context.Context, 
 	return value.(float64), nil
 }
 
-func (c *CachedMetricsProvider) GetServiceCpuQuota(ctx context.Context, svc metrics.ServiceID) (float64, error) {
+func (c *CachedMetricsProvider) GetServiceCpuQuota(ctx context.Context, svc core.ServiceID) (float64, error) {
 	key := "cpu_quota_" + svc.Namespace + "_" + svc.Name
 	value, err := c.get(ctx, key, func() (interface{}, error) {
 		return c.repo.GetServiceCpuQuota(ctx, svc)
@@ -119,7 +120,7 @@ func (c *CachedMetricsProvider) GetServiceCpuQuota(ctx context.Context, svc metr
 	return value.(float64), nil
 }
 
-func (c *CachedMetricsProvider) GetServiceMemoryQuota(ctx context.Context, svc metrics.ServiceID) (float64, error) {
+func (c *CachedMetricsProvider) GetServiceMemoryQuota(ctx context.Context, svc core.ServiceID) (float64, error) {
 	key := "memory_quota_" + svc.Namespace + "_" + svc.Name
 	value, err := c.get(ctx, key, func() (interface{}, error) {
 		return c.repo.GetServiceMemoryQuota(ctx, svc)
@@ -130,7 +131,7 @@ func (c *CachedMetricsProvider) GetServiceMemoryQuota(ctx context.Context, svc m
 	return value.(float64), nil
 }
 
-func (c *CachedMetricsProvider) GetServiceFSUsageValue(ctx context.Context, svc metrics.ServiceID) (float64, error) {
+func (c *CachedMetricsProvider) GetServiceFSUsageValue(ctx context.Context, svc core.ServiceID) (float64, error) {
 	key := "fs_usage_" + svc.Namespace + "_" + svc.Name
 	value, err := c.get(ctx, key, func() (interface{}, error) {
 		return c.repo.GetServiceFSUsageValue(ctx, svc)
@@ -141,7 +142,7 @@ func (c *CachedMetricsProvider) GetServiceFSUsageValue(ctx context.Context, svc 
 	return value.(float64), nil
 }
 
-func (c *CachedMetricsProvider) GetServiceFSWriteValue(ctx context.Context, svc metrics.ServiceID) (float64, error) {
+func (c *CachedMetricsProvider) GetServiceFSWriteValue(ctx context.Context, svc core.ServiceID) (float64, error) {
 	key := "fs_write_" + svc.Namespace + "_" + svc.Name
 	value, err := c.get(ctx, key, func() (interface{}, error) {
 		return c.repo.GetServiceFSWriteValue(ctx, svc)
@@ -152,7 +153,7 @@ func (c *CachedMetricsProvider) GetServiceFSWriteValue(ctx context.Context, svc 
 	return value.(float64), nil
 }
 
-func (c *CachedMetricsProvider) GetServiceFSReadValue(ctx context.Context, svc metrics.ServiceID) (float64, error) {
+func (c *CachedMetricsProvider) GetServiceFSReadValue(ctx context.Context, svc core.ServiceID) (float64, error) {
 	key := "fs_read_" + svc.Namespace + "_" + svc.Name
 	value, err := c.get(ctx, key, func() (interface{}, error) {
 		return c.repo.GetServiceFSReadValue(ctx, svc)
@@ -163,7 +164,7 @@ func (c *CachedMetricsProvider) GetServiceFSReadValue(ctx context.Context, svc m
 	return value.(float64), nil
 }
 
-func (c *CachedMetricsProvider) GetServiceNetworkReceiveValue(ctx context.Context, svc metrics.ServiceID) (float64, error) {
+func (c *CachedMetricsProvider) GetServiceNetworkReceiveValue(ctx context.Context, svc core.ServiceID) (float64, error) {
 	key := "network_receive_" + svc.Namespace + "_" + svc.Name
 	value, err := c.get(ctx, key, func() (interface{}, error) {
 		return c.repo.GetServiceNetworkReceiveValue(ctx, svc)
@@ -174,7 +175,7 @@ func (c *CachedMetricsProvider) GetServiceNetworkReceiveValue(ctx context.Contex
 	return value.(float64), nil
 }
 
-func (c *CachedMetricsProvider) GetServiceNetworkTransmitValue(ctx context.Context, svc metrics.ServiceID) (float64, error) {
+func (c *CachedMetricsProvider) GetServiceNetworkTransmitValue(ctx context.Context, svc core.ServiceID) (float64, error) {
 	key := "network_transmit_" + svc.Namespace + "_" + svc.Name
 	value, err := c.get(ctx, key, func() (interface{}, error) {
 		return c.repo.GetServiceNetworkTransmitValue(ctx, svc)
@@ -185,7 +186,7 @@ func (c *CachedMetricsProvider) GetServiceNetworkTransmitValue(ctx context.Conte
 	return value.(float64), nil
 }
 
-func (c *CachedMetricsProvider) GetServicePodCpuQuota(ctx context.Context, svc metrics.ServiceID) (float64, error) {
+func (c *CachedMetricsProvider) GetServicePodCpuQuota(ctx context.Context, svc core.ServiceID) (float64, error) {
 	key := "pod_cpu_quota_" + svc.Namespace + "_" + svc.Name
 	value, err := c.get(ctx, key, func() (interface{}, error) {
 		return c.repo.GetServicePodCpuQuota(ctx, svc)
@@ -196,7 +197,7 @@ func (c *CachedMetricsProvider) GetServicePodCpuQuota(ctx context.Context, svc m
 	return value.(float64), nil
 }
 
-func (c *CachedMetricsProvider) GetServicePodMemoryQuota(ctx context.Context, svc metrics.ServiceID) (float64, error) {
+func (c *CachedMetricsProvider) GetServicePodMemoryQuota(ctx context.Context, svc core.ServiceID) (float64, error) {
 	key := "pod_memory_quota_" + svc.Namespace + "_" + svc.Name
 	value, err := c.get(ctx, key, func() (interface{}, error) {
 		return c.repo.GetServicePodMemoryQuota(ctx, svc)
@@ -207,7 +208,7 @@ func (c *CachedMetricsProvider) GetServicePodMemoryQuota(ctx context.Context, sv
 	return value.(float64), nil
 }
 
-func (c *CachedMetricsProvider) GetServiceAverageLatency95Value(ctx context.Context, svc metrics.ServiceID) (float64, error) {
+func (c *CachedMetricsProvider) GetServiceAverageLatency95Value(ctx context.Context, svc core.ServiceID) (float64, error) {
 	key := "avg_latency_95_" + svc.Namespace + "_" + svc.Name
 	value, err := c.get(ctx, key, func() (interface{}, error) {
 		return c.repo.GetServiceAverageLatency95Value(ctx, svc)
@@ -218,7 +219,7 @@ func (c *CachedMetricsProvider) GetServiceAverageLatency95Value(ctx context.Cont
 	return value.(float64), nil
 }
 
-func (c *CachedMetricsProvider) GetServiceCpuUsageRange(ctx context.Context, svc metrics.ServiceID, rangeWindow time.Duration) ([]float64, error) {
+func (c *CachedMetricsProvider) GetServiceCpuUsageRange(ctx context.Context, svc core.ServiceID, rangeWindow time.Duration) ([]float64, error) {
 	key := "cpu_usage_range_" + svc.Namespace + "_" + svc.Name + "_" + rangeWindow.String()
 	value, err := c.get(ctx, key, func() (interface{}, error) {
 		return c.repo.GetServiceCpuUsageRange(ctx, svc, rangeWindow)
@@ -229,7 +230,7 @@ func (c *CachedMetricsProvider) GetServiceCpuUsageRange(ctx context.Context, svc
 	return value.([]float64), nil
 }
 
-func (c *CachedMetricsProvider) GetServiceMemoryUsageRange(ctx context.Context, svc metrics.ServiceID, rangeWindow time.Duration) ([]float64, error) {
+func (c *CachedMetricsProvider) GetServiceMemoryUsageRange(ctx context.Context, svc core.ServiceID, rangeWindow time.Duration) ([]float64, error) {
 	key := "memory_usage_range_" + svc.Namespace + "_" + svc.Name + "_" + rangeWindow.String()
 	value, err := c.get(ctx, key, func() (interface{}, error) {
 		return c.repo.GetServiceMemoryUsageRange(ctx, svc, rangeWindow)
@@ -240,7 +241,7 @@ func (c *CachedMetricsProvider) GetServiceMemoryUsageRange(ctx context.Context, 
 	return value.([]float64), nil
 }
 
-func (c *CachedMetricsProvider) GetServiceFSUsageRange(ctx context.Context, svc metrics.ServiceID, rangeWindow time.Duration) ([]float64, error) {
+func (c *CachedMetricsProvider) GetServiceFSUsageRange(ctx context.Context, svc core.ServiceID, rangeWindow time.Duration) ([]float64, error) {
 	key := "fs_usage_range_" + svc.Namespace + "_" + svc.Name + "_" + rangeWindow.String()
 	value, err := c.get(ctx, key, func() (interface{}, error) {
 		return c.repo.GetServiceFSUsageRange(ctx, svc, rangeWindow)
@@ -251,7 +252,7 @@ func (c *CachedMetricsProvider) GetServiceFSUsageRange(ctx context.Context, svc 
 	return value.([]float64), nil
 }
 
-func (c *CachedMetricsProvider) GetServiceFSWriteRange(ctx context.Context, svc metrics.ServiceID, rangeWindow time.Duration) ([]float64, error) {
+func (c *CachedMetricsProvider) GetServiceFSWriteRange(ctx context.Context, svc core.ServiceID, rangeWindow time.Duration) ([]float64, error) {
 	key := "fs_write_range_" + svc.Namespace + "_" + svc.Name + "_" + rangeWindow.String()
 	value, err := c.get(ctx, key, func() (interface{}, error) {
 		return c.repo.GetServiceFSWriteRange(ctx, svc, rangeWindow)
@@ -262,7 +263,7 @@ func (c *CachedMetricsProvider) GetServiceFSWriteRange(ctx context.Context, svc 
 	return value.([]float64), nil
 }
 
-func (c *CachedMetricsProvider) GetServiceFSReadRange(ctx context.Context, svc metrics.ServiceID, rangeWindow time.Duration) ([]float64, error) {
+func (c *CachedMetricsProvider) GetServiceFSReadRange(ctx context.Context, svc core.ServiceID, rangeWindow time.Duration) ([]float64, error) {
 	key := "fs_read_range_" + svc.Namespace + "_" + svc.Name + "_" + rangeWindow.String()
 	value, err := c.get(ctx, key, func() (interface{}, error) {
 		return c.repo.GetServiceFSReadRange(ctx, svc, rangeWindow)
@@ -273,7 +274,7 @@ func (c *CachedMetricsProvider) GetServiceFSReadRange(ctx context.Context, svc m
 	return value.([]float64), nil
 }
 
-func (c *CachedMetricsProvider) GetServiceNetworkReceiveRange(ctx context.Context, svc metrics.ServiceID, rangeWindow time.Duration) ([]float64, error) {
+func (c *CachedMetricsProvider) GetServiceNetworkReceiveRange(ctx context.Context, svc core.ServiceID, rangeWindow time.Duration) ([]float64, error) {
 	key := "network_receive_range_" + svc.Namespace + "_" + svc.Name + "_" + rangeWindow.String()
 	value, err := c.get(ctx, key, func() (interface{}, error) {
 		return c.repo.GetServiceNetworkReceiveRange(ctx, svc, rangeWindow)
@@ -284,7 +285,7 @@ func (c *CachedMetricsProvider) GetServiceNetworkReceiveRange(ctx context.Contex
 	return value.([]float64), nil
 }
 
-func (c *CachedMetricsProvider) GetServiceNetworkTransmitRange(ctx context.Context, svc metrics.ServiceID, rangeWindow time.Duration) ([]float64, error) {
+func (c *CachedMetricsProvider) GetServiceNetworkTransmitRange(ctx context.Context, svc core.ServiceID, rangeWindow time.Duration) ([]float64, error) {
 	key := "network_transmit_range_" + svc.Namespace + "_" + svc.Name + "_" + rangeWindow.String()
 	value, err := c.get(ctx, key, func() (interface{}, error) {
 		return c.repo.GetServiceNetworkTransmitRange(ctx, svc, rangeWindow)
@@ -295,7 +296,7 @@ func (c *CachedMetricsProvider) GetServiceNetworkTransmitRange(ctx context.Conte
 	return value.([]float64), nil
 }
 
-func (c *CachedMetricsProvider) GetServiceRequestsCountRange(ctx context.Context, svc metrics.ServiceID, rangeWindow time.Duration) ([]float64, error) {
+func (c *CachedMetricsProvider) GetServiceRequestsCountRange(ctx context.Context, svc core.ServiceID, rangeWindow time.Duration) ([]float64, error) {
 	key := "requests_count_range_" + svc.Namespace + "_" + svc.Name + "_" + rangeWindow.String()
 	value, err := c.get(ctx, key, func() (interface{}, error) {
 		return c.repo.GetServiceRequestsCountRange(ctx, svc, rangeWindow)
@@ -306,7 +307,7 @@ func (c *CachedMetricsProvider) GetServiceRequestsCountRange(ctx context.Context
 	return value.([]float64), nil
 }
 
-func (c *CachedMetricsProvider) GetGraphRequestsCountValue(ctx context.Context, svcFrom, svcTo metrics.ServiceID) (float64, error) {
+func (c *CachedMetricsProvider) GetGraphRequestsCountValue(ctx context.Context, svcFrom, svcTo core.ServiceID) (float64, error) {
 	key := "graph_requests_count_" + svcFrom.Namespace + "_" + svcFrom.Name + svcTo.Namespace + "_" + svcTo.Name
 	value, err := c.get(ctx, key, func() (interface{}, error) {
 		return c.repo.GetGraphRequestsCountValue(ctx, svcFrom, svcTo)
@@ -317,7 +318,7 @@ func (c *CachedMetricsProvider) GetGraphRequestsCountValue(ctx context.Context, 
 	return value.(float64), nil
 }
 
-func (c *CachedMetricsProvider) GetGraphLatencyP95Value(ctx context.Context, svcFrom, svcTo metrics.ServiceID) (float64, error) {
+func (c *CachedMetricsProvider) GetGraphLatencyP95Value(ctx context.Context, svcFrom, svcTo core.ServiceID) (float64, error) {
 	key := "graph_latency_p95_" + svcFrom.Namespace + "_" + svcFrom.Name + svcTo.Namespace + "_" + svcTo.Name
 	value, err := c.get(ctx, key, func() (interface{}, error) {
 		return c.repo.GetGraphLatencyP95Value(ctx, svcFrom, svcTo)
@@ -328,7 +329,7 @@ func (c *CachedMetricsProvider) GetGraphLatencyP95Value(ctx context.Context, svc
 	return value.(float64), nil
 }
 
-func (c *CachedMetricsProvider) GetGraphLatencyP50Value(ctx context.Context, svcFrom, svcTo metrics.ServiceID) (float64, error) {
+func (c *CachedMetricsProvider) GetGraphLatencyP50Value(ctx context.Context, svcFrom, svcTo core.ServiceID) (float64, error) {
 	key := "graph_latency_p50_" + svcFrom.Namespace + "_" + svcFrom.Name + svcTo.Namespace + "_" + svcTo.Name
 	value, err := c.get(ctx, key, func() (interface{}, error) {
 		return c.repo.GetGraphLatencyP50Value(ctx, svcFrom, svcTo)
@@ -339,7 +340,7 @@ func (c *CachedMetricsProvider) GetGraphLatencyP50Value(ctx context.Context, svc
 	return value.(float64), nil
 }
 
-func (c *CachedMetricsProvider) GetGraphRequestsCountRange(ctx context.Context, svcFrom, svcTo metrics.ServiceID, rangeWindow time.Duration) ([]float64, error) {
+func (c *CachedMetricsProvider) GetGraphRequestsCountRange(ctx context.Context, svcFrom, svcTo core.ServiceID, rangeWindow time.Duration) ([]float64, error) {
 	key := "graph_requests_count_range_" + svcFrom.Namespace + "_" + svcFrom.Name + svcTo.Namespace + "_" + svcTo.Name + "_" + rangeWindow.String()
 	value, err := c.get(ctx, key, func() (interface{}, error) {
 		return c.repo.GetGraphRequestsCountRange(ctx, svcFrom, svcTo, rangeWindow)
@@ -350,7 +351,7 @@ func (c *CachedMetricsProvider) GetGraphRequestsCountRange(ctx context.Context, 
 	return value.([]float64), nil
 }
 
-func (c *CachedMetricsProvider) GetGraphLatencyP95Range(ctx context.Context, svcFrom, svcTo metrics.ServiceID, rangeWindow time.Duration) ([]float64, error) {
+func (c *CachedMetricsProvider) GetGraphLatencyP95Range(ctx context.Context, svcFrom, svcTo core.ServiceID, rangeWindow time.Duration) ([]float64, error) {
 	key := "graph_latency_p95_range_" + svcFrom.Namespace + "_" + svcFrom.Name + svcTo.Namespace + "_" + svcTo.Name + "_" + rangeWindow.String()
 	value, err := c.get(ctx, key, func() (interface{}, error) {
 		return c.repo.GetGraphLatencyP95Range(ctx, svcFrom, svcTo, rangeWindow)
@@ -361,7 +362,7 @@ func (c *CachedMetricsProvider) GetGraphLatencyP95Range(ctx context.Context, svc
 	return value.([]float64), nil
 }
 
-func (c *CachedMetricsProvider) GetGraphLatencyP50Range(ctx context.Context, svcFrom, svcTo metrics.ServiceID, rangeWindow time.Duration) ([]float64, error) {
+func (c *CachedMetricsProvider) GetGraphLatencyP50Range(ctx context.Context, svcFrom, svcTo core.ServiceID, rangeWindow time.Duration) ([]float64, error) {
 	key := "graph_latency_p50_range_" + svcFrom.Namespace + "_" + svcFrom.Name + svcTo.Namespace + "_" + svcTo.Name + "_" + rangeWindow.String()
 	value, err := c.get(ctx, key, func() (interface{}, error) {
 		return c.repo.GetGraphLatencyP50Range(ctx, svcFrom, svcTo, rangeWindow)
@@ -372,7 +373,7 @@ func (c *CachedMetricsProvider) GetGraphLatencyP50Range(ctx context.Context, svc
 	return value.([]float64), nil
 }
 
-func (c *CachedMetricsProvider) GetServiceAverageLatency95Range(ctx context.Context, svc metrics.ServiceID, rangeWindow time.Duration) ([]float64, error) {
+func (c *CachedMetricsProvider) GetServiceAverageLatency95Range(ctx context.Context, svc core.ServiceID, rangeWindow time.Duration) ([]float64, error) {
 	key := "avg_latency_95_range_" + svc.Namespace + "_" + svc.Name + "_" + rangeWindow.String()
 	value, err := c.get(ctx, key, func() (interface{}, error) {
 		return c.repo.GetServiceAverageLatency95Range(ctx, svc, rangeWindow)

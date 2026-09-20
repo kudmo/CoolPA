@@ -4,7 +4,7 @@ import (
 	"context"
 	"sort"
 
-	"github.com/kudmo/CoolPA/internal/metrics"
+	"github.com/kudmo/CoolPA/internal/core"
 	"github.com/kudmo/CoolPA/logger"
 	"github.com/kudmo/CoolPA/utils"
 	"github.com/kudmo/CoolPA/utils/welchtest"
@@ -15,7 +15,7 @@ import (
 // the service is (Rate) to support scaling down decisions.
 type underutilizationAnalyzeResult struct {
 	// Service is the name of the service that was analyzed.
-	Service metrics.ServiceID
+	Service core.ServiceID
 
 	// Rate represents the degree of underutilization as a fraction
 	// of current allocated resources (e.g., CPU or memory).
@@ -32,7 +32,7 @@ func (a *TopoRankAnalyzer) analyzeRPSlowing(ctx context.Context, scalingNamespac
 	anomalys := make([]underutilizationAnalyzeResult, 0)
 	services, _ := a.metricsProvider.ListServices(ctx, scalingNamespace)
 	for _, service_name := range services {
-		serviceID := metrics.ServiceID{Name: service_name, Namespace: scalingNamespace}
+		serviceID := core.ServiceID{Name: service_name, Namespace: scalingNamespace}
 		// Build current statistics from the recent RPS range.
 		new, _ := a.metricsProvider.GetServiceRequestsCountRange(ctx, serviceID, a.config.Window)
 

@@ -9,6 +9,8 @@ package metrics
 import (
 	"context"
 	"time"
+
+	"github.com/kudmo/CoolPA/internal/core"
 )
 
 // MetricsRepository is the contract for providing metrics to the
@@ -23,93 +25,93 @@ type MetricsRepository interface {
 	ListServices(ctx context.Context, namespace string) ([]string, error)
 
 	// GetService returns detailed information about a specific service.
-	GetService(ctx context.Context, svc ServiceID) (ServiceInfo, error)
+	GetService(ctx context.Context, svc core.ServiceID) (ServiceInfo, error)
 
 	// GetServiceReplicasCountValue returns the current number of replicas
 	// for the given service.
-	GetServiceReplicasCountValue(ctx context.Context, svc ServiceID) (float64, error)
+	GetServiceReplicasCountValue(ctx context.Context, svc core.ServiceID) (float64, error)
 
 	// GetServiceCpuUsageValue returns the current CPU usage of the
 	// service (in CPU cores or millicores depending on implementation).
-	GetServiceCpuUsageValue(ctx context.Context, svc ServiceID) (float64, error)
+	GetServiceCpuUsageValue(ctx context.Context, svc core.ServiceID) (float64, error)
 
 	// GetServiceMemoryUsageValue returns the current memory usage of
 	// the service in bytes.
-	GetServiceMemoryUsageValue(ctx context.Context, svc ServiceID) (float64, error)
+	GetServiceMemoryUsageValue(ctx context.Context, svc core.ServiceID) (float64, error)
 
 	// The following methods return quotas (limits) for the service's
 	// container(s).
 
 	// GetServiceCpuQuota returns the CPU limit allocated to the service's
 	// container.
-	GetServiceCpuQuota(ctx context.Context, svc ServiceID) (float64, error)
+	GetServiceCpuQuota(ctx context.Context, svc core.ServiceID) (float64, error)
 
 	// GetServiceMemoryQuota returns the memory limit allocated to the
 	// service's container.
-	GetServiceMemoryQuota(ctx context.Context, svc ServiceID) (float64, error)
+	GetServiceMemoryQuota(ctx context.Context, svc core.ServiceID) (float64, error)
 
 	// GetServiceFSUsageValue returns the current filesystem usage of
 	// the service.
-	GetServiceFSUsageValue(ctx context.Context, svc ServiceID) (float64, error)
+	GetServiceFSUsageValue(ctx context.Context, svc core.ServiceID) (float64, error)
 
 	// GetServiceFSWriteValue returns the current filesystem write rate
 	// of the service.
-	GetServiceFSWriteValue(ctx context.Context, svc ServiceID) (float64, error)
+	GetServiceFSWriteValue(ctx context.Context, svc core.ServiceID) (float64, error)
 
 	// GetServiceFSReadValue returns the current filesystem read rate
 	// of the service.
-	GetServiceFSReadValue(ctx context.Context, svc ServiceID) (float64, error)
+	GetServiceFSReadValue(ctx context.Context, svc core.ServiceID) (float64, error)
 
 	// GetServiceNetworkReceiveValue returns the current network receive
 	// rate of the service.
-	GetServiceNetworkReceiveValue(ctx context.Context, svc ServiceID) (float64, error)
+	GetServiceNetworkReceiveValue(ctx context.Context, svc core.ServiceID) (float64, error)
 
 	// GetServiceNetworkTransmitValue returns the current network
 	// transmit rate of the service.
-	GetServiceNetworkTransmitValue(ctx context.Context, svc ServiceID) (float64, error)
+	GetServiceNetworkTransmitValue(ctx context.Context, svc core.ServiceID) (float64, error)
 
 	// Pod-level quotas (limits for the entire pod, not just container).
 
 	// GetServicePodCpuQuota returns the total CPU limit for the pod(s)
 	// of the service.
-	GetServicePodCpuQuota(ctx context.Context, svc ServiceID) (float64, error)
+	GetServicePodCpuQuota(ctx context.Context, svc core.ServiceID) (float64, error)
 
 	// GetServicePodMemoryQuota returns the total memory limit for the
 	// pod(s) of the service.
-	GetServicePodMemoryQuota(ctx context.Context, svc ServiceID) (float64, error)
+	GetServicePodMemoryQuota(ctx context.Context, svc core.ServiceID) (float64, error)
 
 	// GetServiceAverageLatency95Value returns the current 95th percentile
 	// latency for the service.
-	GetServiceAverageLatency95Value(ctx context.Context, svc ServiceID) (float64, error)
+	GetServiceAverageLatency95Value(ctx context.Context, svc core.ServiceID) (float64, error)
 
 	// The following methods return a time series of values over the
 	// specified rangeWindow ending at the current time. The slice is
 	// ordered chronologically. If no data is available, an empty slice
 	// and nil error are returned.
 
-	GetServiceCpuUsageRange(ctx context.Context, svc ServiceID, rangeWindow time.Duration) ([]float64, error)
-	GetServiceMemoryUsageRange(ctx context.Context, svc ServiceID, rangeWindow time.Duration) ([]float64, error)
-	GetServiceFSUsageRange(ctx context.Context, svc ServiceID, rangeWindow time.Duration) ([]float64, error)
-	GetServiceFSWriteRange(ctx context.Context, svc ServiceID, rangeWindow time.Duration) ([]float64, error)
-	GetServiceFSReadRange(ctx context.Context, svc ServiceID, rangeWindow time.Duration) ([]float64, error)
-	GetServiceNetworkReceiveRange(ctx context.Context, svc ServiceID, rangeWindow time.Duration) ([]float64, error)
-	GetServiceNetworkTransmitRange(ctx context.Context, svc ServiceID, rangeWindow time.Duration) ([]float64, error)
-	GetServiceRequestsCountRange(ctx context.Context, svc ServiceID, rangeWindow time.Duration) ([]float64, error)
+	GetServiceCpuUsageRange(ctx context.Context, svc core.ServiceID, rangeWindow time.Duration) ([]float64, error)
+	GetServiceMemoryUsageRange(ctx context.Context, svc core.ServiceID, rangeWindow time.Duration) ([]float64, error)
+	GetServiceFSUsageRange(ctx context.Context, svc core.ServiceID, rangeWindow time.Duration) ([]float64, error)
+	GetServiceFSWriteRange(ctx context.Context, svc core.ServiceID, rangeWindow time.Duration) ([]float64, error)
+	GetServiceFSReadRange(ctx context.Context, svc core.ServiceID, rangeWindow time.Duration) ([]float64, error)
+	GetServiceNetworkReceiveRange(ctx context.Context, svc core.ServiceID, rangeWindow time.Duration) ([]float64, error)
+	GetServiceNetworkTransmitRange(ctx context.Context, svc core.ServiceID, rangeWindow time.Duration) ([]float64, error)
+	GetServiceRequestsCountRange(ctx context.Context, svc core.ServiceID, rangeWindow time.Duration) ([]float64, error)
 
 	// Graph metrics represent interactions between two services.
 	// serviceFrom is the source, serviceTo is the destination.
 
-	GetGraphRequestsCountValue(ctx context.Context, svcFrom, svcTo ServiceID) (float64, error)
-	GetGraphLatencyP95Value(ctx context.Context, svcFrom, svcTo ServiceID) (float64, error)
-	GetGraphLatencyP50Value(ctx context.Context, svcFrom, svcTo ServiceID) (float64, error)
+	GetGraphRequestsCountValue(ctx context.Context, svcFrom, svcTo core.ServiceID) (float64, error)
+	GetGraphLatencyP95Value(ctx context.Context, svcFrom, svcTo core.ServiceID) (float64, error)
+	GetGraphLatencyP50Value(ctx context.Context, svcFrom, svcTo core.ServiceID) (float64, error)
 
-	GetGraphRequestsCountRange(ctx context.Context, svcFrom, svcTo ServiceID, rangeWindow time.Duration) ([]float64, error)
-	GetGraphLatencyP95Range(ctx context.Context, svcFrom, svcTo ServiceID, rangeWindow time.Duration) ([]float64, error)
-	GetGraphLatencyP50Range(ctx context.Context, svcFrom, svcTo ServiceID, rangeWindow time.Duration) ([]float64, error)
+	GetGraphRequestsCountRange(ctx context.Context, svcFrom, svcTo core.ServiceID, rangeWindow time.Duration) ([]float64, error)
+	GetGraphLatencyP95Range(ctx context.Context, svcFrom, svcTo core.ServiceID, rangeWindow time.Duration) ([]float64, error)
+	GetGraphLatencyP50Range(ctx context.Context, svcFrom, svcTo core.ServiceID, rangeWindow time.Duration) ([]float64, error)
 
 	// GetServiceAverageLatency95Range returns a time series of the
 	// service's 95th percentile latency.
-	GetServiceAverageLatency95Range(ctx context.Context, svc ServiceID, rangeWindow time.Duration) ([]float64, error)
+	GetServiceAverageLatency95Range(ctx context.Context, svc core.ServiceID, rangeWindow time.Duration) ([]float64, error)
 
 	// Global cluster-wide limits and per-service min/max constraints.
 

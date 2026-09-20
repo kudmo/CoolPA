@@ -3,6 +3,7 @@ package web
 import (
 	"context"
 
+	"github.com/kudmo/CoolPA/internal/core"
 	"github.com/kudmo/CoolPA/internal/metrics"
 	"github.com/kudmo/CoolPA/internal/statistics"
 )
@@ -34,7 +35,7 @@ func (p *ScalerDataProvider) GetGraph(ctx context.Context, namespace string) []S
 		}
 		visited[curr] = true
 
-		svcInfo, err := p.MetricsProvider.GetService(ctx, metrics.ServiceID{Name: curr, Namespace: namespace})
+		svcInfo, err := p.MetricsProvider.GetService(ctx, core.ServiceID{Name: curr, Namespace: namespace})
 
 		if err != nil {
 			continue

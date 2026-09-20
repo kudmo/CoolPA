@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
-	contextutil "github.com/kudmo/CoolPA/context"
+	"github.com/kudmo/CoolPA/internal/core"
 	"github.com/kudmo/CoolPA/internal/metrics"
 	"github.com/kudmo/CoolPA/utils/welchtest"
 	"github.com/kudmo/toporank/types"
@@ -24,147 +24,147 @@ func (m *MockMetricsRepository) ListServices(ctx context.Context, namespace stri
 	return args.Get(0).([]string), args.Error(1)
 }
 
-func (m *MockMetricsRepository) GetService(ctx context.Context, serviceName metrics.ServiceID) (metrics.ServiceInfo, error) {
+func (m *MockMetricsRepository) GetService(ctx context.Context, serviceName core.ServiceID) (metrics.ServiceInfo, error) {
 	args := m.Called(ctx, serviceName)
 	return args.Get(0).(metrics.ServiceInfo), args.Error(1)
 }
 
-func (m *MockMetricsRepository) GetServiceReplicasCountValue(ctx context.Context, serviceName metrics.ServiceID) (float64, error) {
+func (m *MockMetricsRepository) GetServiceReplicasCountValue(ctx context.Context, serviceName core.ServiceID) (float64, error) {
 	args := m.Called(ctx, serviceName)
 	return args.Get(0).(float64), args.Error(1)
 }
 
-func (m *MockMetricsRepository) GetServiceCpuUsageValue(ctx context.Context, serviceName metrics.ServiceID) (float64, error) {
+func (m *MockMetricsRepository) GetServiceCpuUsageValue(ctx context.Context, serviceName core.ServiceID) (float64, error) {
 	args := m.Called(ctx, serviceName)
 	return args.Get(0).(float64), args.Error(1)
 }
 
-func (m *MockMetricsRepository) GetServiceMemoryUsageValue(ctx context.Context, serviceName metrics.ServiceID) (float64, error) {
+func (m *MockMetricsRepository) GetServiceMemoryUsageValue(ctx context.Context, serviceName core.ServiceID) (float64, error) {
 	args := m.Called(ctx, serviceName)
 	return args.Get(0).(float64), args.Error(1)
 }
 
-func (m *MockMetricsRepository) GetServiceCpuQuota(ctx context.Context, serviceName metrics.ServiceID) (float64, error) {
+func (m *MockMetricsRepository) GetServiceCpuQuota(ctx context.Context, serviceName core.ServiceID) (float64, error) {
 	args := m.Called(ctx, serviceName)
 	return args.Get(0).(float64), args.Error(1)
 }
 
-func (m *MockMetricsRepository) GetServiceMemoryQuota(ctx context.Context, serviceName metrics.ServiceID) (float64, error) {
+func (m *MockMetricsRepository) GetServiceMemoryQuota(ctx context.Context, serviceName core.ServiceID) (float64, error) {
 	args := m.Called(ctx, serviceName)
 	return args.Get(0).(float64), args.Error(1)
 }
 
-func (m *MockMetricsRepository) GetServiceFSUsageValue(ctx context.Context, serviceName metrics.ServiceID) (float64, error) {
+func (m *MockMetricsRepository) GetServiceFSUsageValue(ctx context.Context, serviceName core.ServiceID) (float64, error) {
 	args := m.Called(ctx, serviceName)
 	return args.Get(0).(float64), args.Error(1)
 }
 
-func (m *MockMetricsRepository) GetServiceFSWriteValue(ctx context.Context, serviceName metrics.ServiceID) (float64, error) {
+func (m *MockMetricsRepository) GetServiceFSWriteValue(ctx context.Context, serviceName core.ServiceID) (float64, error) {
 	args := m.Called(ctx, serviceName)
 	return args.Get(0).(float64), args.Error(1)
 }
 
-func (m *MockMetricsRepository) GetServiceFSReadValue(ctx context.Context, serviceName metrics.ServiceID) (float64, error) {
+func (m *MockMetricsRepository) GetServiceFSReadValue(ctx context.Context, serviceName core.ServiceID) (float64, error) {
 	args := m.Called(ctx, serviceName)
 	return args.Get(0).(float64), args.Error(1)
 }
 
-func (m *MockMetricsRepository) GetServiceNetworkReceiveValue(ctx context.Context, serviceName metrics.ServiceID) (float64, error) {
+func (m *MockMetricsRepository) GetServiceNetworkReceiveValue(ctx context.Context, serviceName core.ServiceID) (float64, error) {
 	args := m.Called(ctx, serviceName)
 	return args.Get(0).(float64), args.Error(1)
 }
 
-func (m *MockMetricsRepository) GetServiceNetworkTransmitValue(ctx context.Context, serviceName metrics.ServiceID) (float64, error) {
+func (m *MockMetricsRepository) GetServiceNetworkTransmitValue(ctx context.Context, serviceName core.ServiceID) (float64, error) {
 	args := m.Called(ctx, serviceName)
 	return args.Get(0).(float64), args.Error(1)
 }
 
-func (m *MockMetricsRepository) GetServicePodCpuQuota(ctx context.Context, serviceName metrics.ServiceID) (float64, error) {
+func (m *MockMetricsRepository) GetServicePodCpuQuota(ctx context.Context, serviceName core.ServiceID) (float64, error) {
 	args := m.Called(ctx, serviceName)
 	return args.Get(0).(float64), args.Error(1)
 }
 
-func (m *MockMetricsRepository) GetServicePodMemoryQuota(ctx context.Context, serviceName metrics.ServiceID) (float64, error) {
+func (m *MockMetricsRepository) GetServicePodMemoryQuota(ctx context.Context, serviceName core.ServiceID) (float64, error) {
 	args := m.Called(ctx, serviceName)
 	return args.Get(0).(float64), args.Error(1)
 }
 
-func (m *MockMetricsRepository) GetServiceAverageLatency95Value(ctx context.Context, serviceName metrics.ServiceID) (float64, error) {
+func (m *MockMetricsRepository) GetServiceAverageLatency95Value(ctx context.Context, serviceName core.ServiceID) (float64, error) {
 	args := m.Called(ctx, serviceName)
 	return args.Get(0).(float64), args.Error(1)
 }
 
-func (m *MockMetricsRepository) GetServiceCpuUsageRange(ctx context.Context, serviceName metrics.ServiceID, rangeWindow time.Duration) ([]float64, error) {
+func (m *MockMetricsRepository) GetServiceCpuUsageRange(ctx context.Context, serviceName core.ServiceID, rangeWindow time.Duration) ([]float64, error) {
 	args := m.Called(ctx, serviceName, rangeWindow)
 	return args.Get(0).([]float64), args.Error(1)
 }
 
-func (m *MockMetricsRepository) GetServiceMemoryUsageRange(ctx context.Context, serviceName metrics.ServiceID, rangeWindow time.Duration) ([]float64, error) {
+func (m *MockMetricsRepository) GetServiceMemoryUsageRange(ctx context.Context, serviceName core.ServiceID, rangeWindow time.Duration) ([]float64, error) {
 	args := m.Called(ctx, serviceName, rangeWindow)
 	return args.Get(0).([]float64), args.Error(1)
 }
 
-func (m *MockMetricsRepository) GetServiceFSUsageRange(ctx context.Context, serviceName metrics.ServiceID, rangeWindow time.Duration) ([]float64, error) {
+func (m *MockMetricsRepository) GetServiceFSUsageRange(ctx context.Context, serviceName core.ServiceID, rangeWindow time.Duration) ([]float64, error) {
 	args := m.Called(ctx, serviceName, rangeWindow)
 	return args.Get(0).([]float64), args.Error(1)
 }
 
-func (m *MockMetricsRepository) GetServiceFSWriteRange(ctx context.Context, serviceName metrics.ServiceID, rangeWindow time.Duration) ([]float64, error) {
+func (m *MockMetricsRepository) GetServiceFSWriteRange(ctx context.Context, serviceName core.ServiceID, rangeWindow time.Duration) ([]float64, error) {
 	args := m.Called(ctx, serviceName, rangeWindow)
 	return args.Get(0).([]float64), args.Error(1)
 }
 
-func (m *MockMetricsRepository) GetServiceFSReadRange(ctx context.Context, serviceName metrics.ServiceID, rangeWindow time.Duration) ([]float64, error) {
+func (m *MockMetricsRepository) GetServiceFSReadRange(ctx context.Context, serviceName core.ServiceID, rangeWindow time.Duration) ([]float64, error) {
 	args := m.Called(ctx, serviceName, rangeWindow)
 	return args.Get(0).([]float64), args.Error(1)
 }
 
-func (m *MockMetricsRepository) GetServiceNetworkReceiveRange(ctx context.Context, serviceName metrics.ServiceID, rangeWindow time.Duration) ([]float64, error) {
+func (m *MockMetricsRepository) GetServiceNetworkReceiveRange(ctx context.Context, serviceName core.ServiceID, rangeWindow time.Duration) ([]float64, error) {
 	args := m.Called(ctx, serviceName, rangeWindow)
 	return args.Get(0).([]float64), args.Error(1)
 }
 
-func (m *MockMetricsRepository) GetServiceNetworkTransmitRange(ctx context.Context, serviceName metrics.ServiceID, rangeWindow time.Duration) ([]float64, error) {
+func (m *MockMetricsRepository) GetServiceNetworkTransmitRange(ctx context.Context, serviceName core.ServiceID, rangeWindow time.Duration) ([]float64, error) {
 	args := m.Called(ctx, serviceName, rangeWindow)
 	return args.Get(0).([]float64), args.Error(1)
 }
 
-func (m *MockMetricsRepository) GetServiceRequestsCountRange(ctx context.Context, serviceName metrics.ServiceID, rangeWindow time.Duration) ([]float64, error) {
+func (m *MockMetricsRepository) GetServiceRequestsCountRange(ctx context.Context, serviceName core.ServiceID, rangeWindow time.Duration) ([]float64, error) {
 	args := m.Called(ctx, serviceName, rangeWindow)
 	return args.Get(0).([]float64), args.Error(1)
 }
 
-func (m *MockMetricsRepository) GetGraphRequestsCountValue(ctx context.Context, serviceFrom, serviceTo metrics.ServiceID) (float64, error) {
+func (m *MockMetricsRepository) GetGraphRequestsCountValue(ctx context.Context, serviceFrom, serviceTo core.ServiceID) (float64, error) {
 	args := m.Called(ctx, serviceFrom, serviceTo)
 	return args.Get(0).(float64), args.Error(1)
 }
 
-func (m *MockMetricsRepository) GetGraphLatencyP95Value(ctx context.Context, serviceFrom, serviceTo metrics.ServiceID) (float64, error) {
+func (m *MockMetricsRepository) GetGraphLatencyP95Value(ctx context.Context, serviceFrom, serviceTo core.ServiceID) (float64, error) {
 	args := m.Called(ctx, serviceFrom, serviceTo)
 	return args.Get(0).(float64), args.Error(1)
 }
 
-func (m *MockMetricsRepository) GetGraphLatencyP50Value(ctx context.Context, serviceFrom, serviceTo metrics.ServiceID) (float64, error) {
+func (m *MockMetricsRepository) GetGraphLatencyP50Value(ctx context.Context, serviceFrom, serviceTo core.ServiceID) (float64, error) {
 	args := m.Called(ctx, serviceFrom, serviceTo)
 	return args.Get(0).(float64), args.Error(1)
 }
 
-func (m *MockMetricsRepository) GetGraphRequestsCountRange(ctx context.Context, serviceFrom, serviceTo metrics.ServiceID, rangeWindow time.Duration) ([]float64, error) {
+func (m *MockMetricsRepository) GetGraphRequestsCountRange(ctx context.Context, serviceFrom, serviceTo core.ServiceID, rangeWindow time.Duration) ([]float64, error) {
 	args := m.Called(ctx, serviceFrom, serviceTo, rangeWindow)
 	return args.Get(0).([]float64), args.Error(1)
 }
 
-func (m *MockMetricsRepository) GetGraphLatencyP95Range(ctx context.Context, serviceFrom, serviceTo metrics.ServiceID, rangeWindow time.Duration) ([]float64, error) {
+func (m *MockMetricsRepository) GetGraphLatencyP95Range(ctx context.Context, serviceFrom, serviceTo core.ServiceID, rangeWindow time.Duration) ([]float64, error) {
 	args := m.Called(ctx, serviceFrom, serviceTo, rangeWindow)
 	return args.Get(0).([]float64), args.Error(1)
 }
 
-func (m *MockMetricsRepository) GetGraphLatencyP50Range(ctx context.Context, serviceFrom, serviceTo metrics.ServiceID, rangeWindow time.Duration) ([]float64, error) {
+func (m *MockMetricsRepository) GetGraphLatencyP50Range(ctx context.Context, serviceFrom, serviceTo core.ServiceID, rangeWindow time.Duration) ([]float64, error) {
 	args := m.Called(ctx, serviceFrom, serviceTo, rangeWindow)
 	return args.Get(0).([]float64), args.Error(1)
 }
 
-func (m *MockMetricsRepository) GetServiceAverageLatency95Range(ctx context.Context, serviceName metrics.ServiceID, rangeWindow time.Duration) ([]float64, error) {
+func (m *MockMetricsRepository) GetServiceAverageLatency95Range(ctx context.Context, serviceName core.ServiceID, rangeWindow time.Duration) ([]float64, error) {
 	args := m.Called(ctx, serviceName, rangeWindow)
 	return args.Get(0).([]float64), args.Error(1)
 }
@@ -206,7 +206,7 @@ func (m *MockMetricsRepository) GetGlobalServiceMaxMemory(ctx context.Context, n
 
 func createTestContext() (context.Context, time.Time) {
 	now := time.Now()
-	ctx := contextutil.WithAnalysisTime(context.Background(), now)
+	ctx := core.WithAnalysisTime(context.Background(), now)
 	return ctx, now
 }
 
@@ -226,13 +226,13 @@ func TestFindAbnormalCalls_SLOViolation(t *testing.T) {
 
 	mockRepo := new(MockMetricsRepository)
 
-	svcA := metrics.ServiceID{Namespace: "test-namespace-1", Name: "service-a"}
-	svcB := metrics.ServiceID{Namespace: "test-namespace-2", Name: "service-b"}
+	svcA := core.ServiceID{Namespace: "test-namespace-1", Name: "service-a"}
+	svcB := core.ServiceID{Namespace: "test-namespace-2", Name: "service-b"}
 	mockRepo.On("ListServices", mock.Anything, svcA.Namespace).Return([]string{svcA.Name}, nil)
 
 	svcAInfo := metrics.ServiceInfo{
 		ID:            svcA,
-		OutboundCalls: []metrics.ServiceID{svcB},
+		OutboundCalls: []core.ServiceID{svcB},
 	}
 	mockRepo.On("GetService", mock.Anything, svcA).Return(svcAInfo, nil)
 
@@ -256,13 +256,13 @@ func TestFindAbnormalCalls_RatioViolation(t *testing.T) {
 
 	mockRepo := new(MockMetricsRepository)
 
-	svcA := metrics.ServiceID{Namespace: "test-namespace-1", Name: "service-a"}
-	svcB := metrics.ServiceID{Namespace: "test-namespace-2", Name: "service-b"}
+	svcA := core.ServiceID{Namespace: "test-namespace-1", Name: "service-a"}
+	svcB := core.ServiceID{Namespace: "test-namespace-2", Name: "service-b"}
 	mockRepo.On("ListServices", mock.Anything, svcA.Namespace).Return([]string{svcA.Name}, nil)
 
 	svcAInfo := metrics.ServiceInfo{
 		ID:            svcA,
-		OutboundCalls: []metrics.ServiceID{svcB},
+		OutboundCalls: []core.ServiceID{svcB},
 	}
 	mockRepo.On("GetService", mock.Anything, svcA).Return(svcAInfo, nil)
 
@@ -284,19 +284,19 @@ func TestComputeAnomalyDegree(t *testing.T) {
 
 	mockRepo := new(MockMetricsRepository)
 
-	svcA := metrics.ServiceID{Namespace: "test-namespace-1", Name: "service-a"}
-	svcB := metrics.ServiceID{Namespace: "test-namespace-1", Name: "service-b"}
+	svcA := core.ServiceID{Namespace: "test-namespace-1", Name: "service-a"}
+	svcB := core.ServiceID{Namespace: "test-namespace-1", Name: "service-b"}
 	abnormalCalls := []call{{from: svcB, to: svcA}}
 
 	svcAInfo := metrics.ServiceInfo{
 		ID:           svcA,
-		InboundCalls: []metrics.ServiceID{svcB},
+		InboundCalls: []core.ServiceID{svcB},
 	}
 	mockRepo.On("GetService", mock.Anything, svcA).Return(svcAInfo, nil)
 
 	svcBInfo := metrics.ServiceInfo{
 		ID:            svcB,
-		OutboundCalls: []metrics.ServiceID{svcA},
+		OutboundCalls: []core.ServiceID{svcA},
 	}
 	mockRepo.On("GetService", mock.Anything, svcB).Return(svcBInfo, nil)
 
@@ -316,10 +316,10 @@ func TestBuildCorrelationGraphFromCalls(t *testing.T) {
 
 	mockRepo := new(MockMetricsRepository)
 
-	svcA := metrics.ServiceID{Namespace: "test-namespace-1", Name: "service-a"}
-	svcB := metrics.ServiceID{Namespace: "test-namespace-2", Name: "service-b"}
+	svcA := core.ServiceID{Namespace: "test-namespace-1", Name: "service-a"}
+	svcB := core.ServiceID{Namespace: "test-namespace-2", Name: "service-b"}
 	abnormalCalls := []call{{from: svcA, to: svcB}}
-	serviceAnomaly := map[metrics.ServiceID]float64{svcA: 1.0, svcB: 2.0}
+	serviceAnomaly := map[core.ServiceID]float64{svcA: 1.0, svcB: 2.0}
 
 	latSeries := []float64{1, 2, 3, 4, 5}
 	mockRepo.On("GetGraphLatencyP95Range", mock.Anything, svcA, svcB, 1*time.Hour).
@@ -372,9 +372,9 @@ func TestBuildAbnormalCorrelationGraph_NoAbnormal(t *testing.T) {
 
 	mockRepo := new(MockMetricsRepository)
 
-	svcA := metrics.ServiceID{Namespace: "test-namespace-1", Name: "svc-a"}
+	svcA := core.ServiceID{Namespace: "test-namespace-1", Name: "svc-a"}
 	mockRepo.On("ListServices", mock.Anything, svcA.Namespace).Return([]string{svcA.Name}, nil)
-	svcInfo := metrics.ServiceInfo{ID: svcA, OutboundCalls: []metrics.ServiceID{}}
+	svcInfo := metrics.ServiceInfo{ID: svcA, OutboundCalls: []core.ServiceID{}}
 	mockRepo.On("GetService", mock.Anything, svcA).Return(svcInfo, nil)
 
 	a := newTestAnalyzer(mockRepo)
@@ -388,7 +388,7 @@ func TestAnalyzeRPSlowing(t *testing.T) {
 	ctx, _ := createTestContext()
 
 	mockRepo := new(MockMetricsRepository)
-	serviceID := metrics.ServiceID{Namespace: "test-namespace", Name: "svc1"}
+	serviceID := core.ServiceID{Namespace: "test-namespace", Name: "svc1"}
 
 	mockRepo.On("ListServices", mock.Anything, serviceID.Namespace).Return([]string{serviceID.Name}, nil)
 
@@ -432,7 +432,7 @@ func TestAnalyzeRPSlowing(t *testing.T) {
 			AnomalyServicesCount: 1,
 			Beta:                 BETA,
 		},
-		previousStatistics: map[metrics.ServiceID]*welchtest.Stats{serviceID: prevStats},
+		previousStatistics: map[core.ServiceID]*welchtest.Stats{serviceID: prevStats},
 	}
 
 	results := a.analyzeRPSlowing(ctx, serviceID.Namespace)
@@ -448,7 +448,7 @@ func TestAnalyzeUnderutilization(t *testing.T) {
 	ctx, _ := createTestContext()
 
 	mockRepo := new(MockMetricsRepository)
-	serviceID := metrics.ServiceID{Namespace: "test-namespace", Name: "svc1"}
+	serviceID := core.ServiceID{Namespace: "test-namespace", Name: "svc1"}
 
 	mockRepo.On("ListServices", mock.Anything, serviceID.Namespace).Return([]string{serviceID.Name}, nil)
 
@@ -492,7 +492,7 @@ func TestAnalyzeUnderutilization(t *testing.T) {
 			AnomalyServicesCount: 1,
 			Beta:                 BETA,
 		},
-		previousStatistics: map[metrics.ServiceID]*welchtest.Stats{serviceID: prevStats},
+		previousStatistics: map[core.ServiceID]*welchtest.Stats{serviceID: prevStats},
 	}
 
 	result := a.analyzeUnderutilization(ctx, serviceID.Namespace)

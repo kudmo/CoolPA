@@ -5,7 +5,7 @@ import (
 	"math"
 	"sort"
 
-	"github.com/kudmo/CoolPA/internal/metrics"
+	"github.com/kudmo/CoolPA/internal/core"
 	"github.com/kudmo/CoolPA/logger"
 	"github.com/kudmo/CoolPA/utils"
 	"github.com/kudmo/toporank/api"
@@ -14,8 +14,8 @@ import (
 
 // call represents a directed edge between two services.
 type call struct {
-	from metrics.ServiceID
-	to   metrics.ServiceID
+	from core.ServiceID
+	to   core.ServiceID
 }
 
 // findAbnormalCalls identifies service calls that are abnormal based on
@@ -27,7 +27,7 @@ func (a *TopoRankAnalyzer) findAbnormalCalls(ctx context.Context, scalingNamespa
 
 	services, _ := a.metricsProvider.ListServices(ctx, scalingNamespace)
 	for _, from_name := range services {
-		fromID := metrics.ServiceID{Name: from_name, Namespace: scalingNamespace}
+		fromID := core.ServiceID{Name: from_name, Namespace: scalingNamespace}
 		from, _ := a.metricsProvider.GetService(ctx, fromID)
 		for _, toID := range from.OutboundCalls {
 			lat95_range, _ := a.metricsProvider.GetGraphLatencyP95Range(ctx, fromID, toID, a.config.Window)
@@ -49,7 +49,7 @@ func (a *TopoRankAnalyzer) findAbnormalCalls(ctx context.Context, scalingNamespa
 // calls and per‑service anomaly degrees. Edge weights are computed as the
 // maximum absolute Pearson correlation between the destination service’s
 // latency and various resource usage metrics. Returns nil if no abnormal calls.
-func (a *TopoRankAnalyzer) buildCorrelationGraphFromCalls(ctx context.Context, scalingNamespace string, abnormalCalls []call, serviceAnomaly map[metrics.ServiceID]float64) (*types.CorrelationGraph, error) {
+func (a *TopoRankAnalyzer) buildCorrelationGraphFromCalls(ctx context.Context, scalingNamespace string, abnormalCalls []call, serviceAnomaly map[core.ServiceID]float64) (*types.CorrelationGraph, error) {
 	if len(abnormalCalls) == 0 {
 		return nil, nil
 	}
@@ -107,10 +107,10 @@ func (a *TopoRankAnalyzer) buildCorrelationGraphFromCalls(ctx context.Context, s
 // involved in abnormal calls. The score is the total number of latency
 // samples (from inbound calls) that exceed the SLO. Only services that
 // participate in abnormal calls (as source or destination) are considered.
-func (a *TopoRankAnalyzer) computeAnomalyDegree(ctx context.Context, scalingNamespace string, abnormalCalls []call) map[metrics.ServiceID]float64 {
-	serviceAnomaly := make(map[metrics.ServiceID]float64)
+func (a *TopoRankAnalyzer) computeAnomalyDegree(ctx context.Context, scalingNamespace string, abnormalCalls []call) map[core.ServiceID]float64 {
+	serviceAnomaly := make(map[core.ServiceID]float64)
 
-	affectedServices := make(map[metrics.ServiceID]bool)
+	affectedServices := make(map[core.ServiceID]bool)
 	for _, c := range abnormalCalls {
 		affectedServices[c.from] = true
 		affectedServices[c.to] = true

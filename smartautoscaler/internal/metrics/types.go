@@ -1,15 +1,6 @@
 package metrics
 
-// ServiceID uniquely identifies a service within the cluster.
-// The (Namespace, Name) pair is the service's unique ID.
-type ServiceID struct {
-	Namespace string `json:"namespace"`
-	Name      string `json:"name"`
-}
-
-func (id *ServiceID) ToString() string {
-	return id.Namespace + "_" + id.Name
-}
+import "github.com/kudmo/CoolPA/internal/core"
 
 // ServiceInfo contains descriptive information about a service
 // that is relevant for autoscaling decisions. It includes the
@@ -19,13 +10,13 @@ func (id *ServiceID) ToString() string {
 // dependency graph.
 type ServiceInfo struct {
 	// ID is the unique identifier of the service
-	ID ServiceID `json:"name"`
+	ID core.ServiceID `json:"name"`
 
 	// InboundCalls lists the services that call this service.
 	// These are incoming dependencies.
-	InboundCalls []ServiceID `json:"inbound_calls"`
+	InboundCalls []core.ServiceID `json:"inbound_calls"`
 
 	// OutboundCalls lists the services that this service calls.
 	// These are outgoing dependencies.
-	OutboundCalls []ServiceID `json:"outbound_calls"`
+	OutboundCalls []core.ServiceID `json:"outbound_calls"`
 }

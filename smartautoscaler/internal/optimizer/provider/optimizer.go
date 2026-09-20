@@ -8,6 +8,7 @@ import (
 	"github.com/kudmo/CoolPA/logger"
 	"github.com/kudmo/CoolPA/utils"
 
+	"github.com/kudmo/CoolPA/internal/core"
 	"github.com/kudmo/CoolPA/internal/metrics"
 	"github.com/kudmo/CoolPA/internal/optimizer"
 	gaconfig "github.com/kudmo/CoolPA/internal/optimizer/provider/ga/config"
@@ -66,9 +67,9 @@ func (ro *ReactionOptimizer) RunOptimization(ctx context.Context, scalingNamespa
 	replics_sum := 0
 
 	for _, svc := range services {
-		replicas_count, _ := ro.metricsProvider.GetServiceReplicasCountValue(ctx, metrics.ServiceID{Name: svc, Namespace: scalingNamespace})
-		cpu_pod_quota, _ := ro.metricsProvider.GetServicePodCpuQuota(ctx, metrics.ServiceID{Name: svc, Namespace: scalingNamespace})
-		mem_pod_quota, _ := ro.metricsProvider.GetServicePodMemoryQuota(ctx, metrics.ServiceID{Name: svc, Namespace: scalingNamespace})
+		replicas_count, _ := ro.metricsProvider.GetServiceReplicasCountValue(ctx, core.ServiceID{Name: svc, Namespace: scalingNamespace})
+		cpu_pod_quota, _ := ro.metricsProvider.GetServicePodCpuQuota(ctx, core.ServiceID{Name: svc, Namespace: scalingNamespace})
+		mem_pod_quota, _ := ro.metricsProvider.GetServicePodMemoryQuota(ctx, core.ServiceID{Name: svc, Namespace: scalingNamespace})
 		cpu_sum += cpu_pod_quota
 		mem_sum += mem_pod_quota
 		replics_sum += int(replicas_count)
@@ -147,21 +148,21 @@ func (ro *ReactionOptimizer) buildConstraints(
 	result := map[string]constraints.ServicePolicy{}
 
 	for _, svc := range services {
-		replicas_count, _ := ro.metricsProvider.GetServiceReplicasCountValue(ctx, metrics.ServiceID{Name: svc, Namespace: scalingNamespace})
+		replicas_count, _ := ro.metricsProvider.GetServiceReplicasCountValue(ctx, core.ServiceID{Name: svc, Namespace: scalingNamespace})
 		if replicas_count == 0 {
 			logger.Warn("optimizer/provider", "no pods found for service", "service", svc)
 			continue
 		}
 
-		cpu, _ := ro.metricsProvider.GetServiceCpuQuota(ctx, metrics.ServiceID{Name: svc, Namespace: scalingNamespace})
-		mem, _ := ro.metricsProvider.GetServiceMemoryQuota(ctx, metrics.ServiceID{Name: svc, Namespace: scalingNamespace})
+		cpu, _ := ro.metricsProvider.GetServiceCpuQuota(ctx, core.ServiceID{Name: svc, Namespace: scalingNamespace})
+		mem, _ := ro.metricsProvider.GetServiceMemoryQuota(ctx, core.ServiceID{Name: svc, Namespace: scalingNamespace})
 
 		policy := constraints.ServicePolicy{
 			AllowedReactions: ro.choosePossibleReactions(scalingNamespace, svc),
 		}
 
 		if mode == optimizer.ScaleUpMode {
-			cpuUsageRange, _ := ro.metricsProvider.GetServiceCpuUsageRange(ctx, metrics.ServiceID{Name: svc, Namespace: scalingNamespace}, ro.config.TimeWindow)
+			cpuUsageRange, _ := ro.metricsProvider.GetServiceCpuUsageRange(ctx, core.ServiceID{Name: svc, Namespace: scalingNamespace}, ro.config.TimeWindow)
 			cpuU := utils.Avg(cpuUsageRange)
 
 			desiredReplicas := int(math.Ceil(
@@ -206,16 +207,16 @@ func (ro *ReactionOptimizer) buildSeedGenome(
 			continue
 		}
 
-		replicas_count, _ := ro.metricsProvider.GetServiceReplicasCountValue(ctx, metrics.ServiceID{Name: svc, Namespace: scalingNamespace})
+		replicas_count, _ := ro.metricsProvider.GetServiceReplicasCountValue(ctx, core.ServiceID{Name: svc, Namespace: scalingNamespace})
 		if replicas_count == 0 {
 			logger.Warn("optimizer/provider", "no pods found for service", "service", svc)
 			continue
 		}
 
-		cpu_app_quota, _ := ro.metricsProvider.GetServiceCpuQuota(ctx, metrics.ServiceID{Name: svc, Namespace: scalingNamespace})
-		cpu_pod_quota, _ := ro.metricsProvider.GetServicePodCpuQuota(ctx, metrics.ServiceID{Name: svc, Namespace: scalingNamespace})
-		mem_app_quota, _ := ro.metricsProvider.GetServiceMemoryQuota(ctx, metrics.ServiceID{Name: svc, Namespace: scalingNamespace})
-		mem_pod_quota, _ := ro.metricsProvider.GetServicePodMemoryQuota(ctx, metrics.ServiceID{Name: svc, Namespace: scalingNamespace})
+		cpu_app_quota, _ := ro.metricsProvider.GetServiceCpuQuota(ctx, core.ServiceID{Name: svc, Namespace: scalingNamespace})
+		cpu_pod_quota, _ := ro.metricsProvider.GetServicePodCpuQuota(ctx, core.ServiceID{Name: svc, Namespace: scalingNamespace})
+		mem_app_quota, _ := ro.metricsProvider.GetServiceMemoryQuota(ctx, core.ServiceID{Name: svc, Namespace: scalingNamespace})
+		mem_pod_quota, _ := ro.metricsProvider.GetServicePodMemoryQuota(ctx, core.ServiceID{Name: svc, Namespace: scalingNamespace})
 
 		rt := genome.HPA
 		if len(sp.AllowedReactions) == 1 {
