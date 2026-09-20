@@ -159,7 +159,7 @@ func main() {
 		webSrv, err := web.NewServer(&web.ScalerDataProvider{
 			MetricsProvider: metricsRepository,
 			HistStore:       histStore,
-		})
+		}, cfg.ScalingNamespace)
 		if err != nil {
 			logger.Error("main", "failed to create web server", "error", err)
 			os.Exit(1)

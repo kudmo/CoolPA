@@ -12,8 +12,8 @@ type ScalerDataProvider struct {
 	HistStore       *statistics.HistStore
 }
 
-func (p *ScalerDataProvider) GetGraph(ctx context.Context) []ServiceNode {
-	services, _ := p.MetricsProvider.ListServices(ctx)
+func (p *ScalerDataProvider) GetGraph(ctx context.Context, namespace string) []ServiceNode {
+	services, _ := p.MetricsProvider.ListServices(ctx, namespace)
 	nodes := make([]ServiceNode, 0)
 
 	if len(services) == 0 {
@@ -34,35 +34,40 @@ func (p *ScalerDataProvider) GetGraph(ctx context.Context) []ServiceNode {
 		}
 		visited[curr] = true
 
-		svcInfo, err := p.MetricsProvider.GetService(ctx, curr)
+		svcInfo, err := p.MetricsProvider.GetService(ctx, metrics.ServiceID{Name: curr, Namespace: namespace})
 
 		if err != nil {
 			continue
 		}
 
 		for _, in := range svcInfo.InboundCalls {
-			if !visited[in] {
-				stack = append(stack, in)
+			if !visited[in.ToString()] {
+				stack = append(stack, in.ToString())
 			}
 		}
 
 		for _, out := range svcInfo.OutboundCalls {
-			if !visited[out] {
-				stack = append(stack, out)
+			if !visited[out.ToString()] {
+				stack = append(stack, out.ToString())
 			}
+		}
+
+		outboundEdges := make([]string, 0, len(svcInfo.OutboundCalls))
+		for _, v := range svcInfo.OutboundCalls {
+			outboundEdges = append(outboundEdges, v.ToString())
 		}
 
 		nodes = append(nodes, ServiceNode{
 			ServiceName:   curr,
-			OutboundEdges: svcInfo.OutboundCalls,
+			OutboundEdges: outboundEdges,
 		})
 	}
 
 	return nodes
 }
 
-func (p *ScalerDataProvider) GetHistograms(ctx context.Context) []ServiceHistogram {
-	services, _ := p.MetricsProvider.ListServices(ctx)
+func (p *ScalerDataProvider) GetHistograms(ctx context.Context, namespace string) []ServiceHistogram {
+	services, _ := p.MetricsProvider.ListServices(ctx, namespace)
 
 	res := make([]ServiceHistogram, 0)
 	for _, s := range services {

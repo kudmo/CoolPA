@@ -8,24 +8,20 @@ import (
 	"net/http"
 )
 
-// DataProvider — то, что ваш контроллер должен реализовать,
-// чтобы отдать данные для веб-страницы.
 type DataProvider interface {
-	GetGraph(ctx context.Context) []ServiceNode
-	GetHistograms(ctx context.Context) []ServiceHistogram
+	GetGraph(ctx context.Context, namespace string) []ServiceNode
+	GetHistograms(ctx context.Context, namespace string) []ServiceHistogram
 }
 
 type Server struct {
-	provider DataProvider
-	tmpl     *template.Template
-
-	NAMESPACE string
+	provider  DataProvider
+	namespace string
+	tmpl      *template.Template
 }
 
-func NewServer(provider DataProvider) (*Server, error) {
+func NewServer(provider DataProvider, namespace string) (*Server, error) {
 	tmpl, err := template.New("dashboard.html").
 		Funcs(template.FuncMap{
-			// toJSON — безопасная вставка JSON в <script>.
 			"toJSON": func(v any) (template.JS, error) {
 				b, err := json.Marshal(v)
 				if err != nil {
@@ -38,7 +34,7 @@ func NewServer(provider DataProvider) (*Server, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Server{provider: provider, tmpl: tmpl}, nil
+	return &Server{provider: provider, namespace: namespace, tmpl: tmpl}, nil
 }
 
 func (s *Server) Handler() http.Handler {
@@ -48,10 +44,12 @@ func (s *Server) Handler() http.Handler {
 }
 
 func (s *Server) dashboard(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
 	data := PageData{
-		Graph:      s.provider.GetGraph(r.Context()),
-		Histograms: s.provider.GetHistograms(r.Context()),
+		Graph:      s.provider.GetGraph(ctx, s.namespace),
+		Histograms: s.provider.GetHistograms(ctx, s.namespace),
 	}
+
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	if err := s.tmpl.ExecuteTemplate(w, "dashboard.html", data); err != nil {
 		log.Printf("template error: %v", err)
