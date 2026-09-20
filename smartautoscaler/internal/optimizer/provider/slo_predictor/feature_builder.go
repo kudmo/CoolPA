@@ -26,18 +26,18 @@ func (b *LatencyDeltaPredictorFeatureBuilder) Build(ctx context.Context, g *geno
 			continue
 		}
 
-		svc := sg.ServiceName
-		replicas_count, _ := b.metricsProvider.GetServiceReplicasCountValue(ctx, svc)
+		svcID := metrics.ServiceID{Namespace: g.Namespace, Name: sg.ServiceName}
+		replicas_count, _ := b.metricsProvider.GetServiceReplicasCountValue(ctx, svcID)
 
 		if replicas_count == 0 {
 			continue
 		}
 
-		containerCpuQuota, _ := b.metricsProvider.GetServiceCpuQuota(ctx, svc)
-		containerMemoryQuota, _ := b.metricsProvider.GetServiceMemoryQuota(ctx, svc)
+		containerCpuQuota, _ := b.metricsProvider.GetServiceCpuQuota(ctx, svcID)
+		containerMemoryQuota, _ := b.metricsProvider.GetServiceMemoryQuota(ctx, svcID)
 
-		cpuUsageRange, _ := b.metricsProvider.GetServiceCpuUsageRange(ctx, svc, b.config.Window)
-		memUsageRange, _ := b.metricsProvider.GetServiceMemoryUsageRange(ctx, svc, b.config.Window)
+		cpuUsageRange, _ := b.metricsProvider.GetServiceCpuUsageRange(ctx, svcID, b.config.Window)
+		memUsageRange, _ := b.metricsProvider.GetServiceMemoryUsageRange(ctx, svcID, b.config.Window)
 
 		cpu := utils.Avg(cpuUsageRange)
 		memory := utils.Avg(memUsageRange)
@@ -60,9 +60,9 @@ func (b *LatencyDeltaPredictorFeatureBuilder) Build(ctx context.Context, g *geno
 		totalCPULimitDelta := (replicas_count+sg.DeltaReplicas)*(cpuLimit+sg.DeltaCPU) - totalCPULimit
 		totalMemLimitDelta := (replicas_count+sg.DeltaReplicas)*(memLimit+sg.DeltaMemory) - totalMemLimit
 
-		netRecv, _ := b.metricsProvider.GetServiceNetworkReceiveRange(ctx, svc, b.config.Window)
+		netRecv, _ := b.metricsProvider.GetServiceNetworkReceiveRange(ctx, svcID, b.config.Window)
 		netRecvAvg := utils.Avg(netRecv)
-		netTrans, _ := b.metricsProvider.GetServiceNetworkTransmitRange(ctx, svc, b.config.Window)
+		netTrans, _ := b.metricsProvider.GetServiceNetworkTransmitRange(ctx, svcID, b.config.Window)
 		netTransAvg := utils.Avg(netTrans)
 
 		features := make([]float64, 11)

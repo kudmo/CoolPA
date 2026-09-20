@@ -70,7 +70,6 @@ func main() {
 
 	// Configure the Prometheus metrics provider
 	prometheusProviderConfig := prometheus.PrometheusMetricsProviderConfig{
-		ScalingNamespace: cfg.ScalingNamespace,
 		PrometheusConfig: collector.PrometheusCollectorConfig{
 			PrometheusURL: cfg.PrometheusURL,
 			RangeStep:     5 * time.Second,

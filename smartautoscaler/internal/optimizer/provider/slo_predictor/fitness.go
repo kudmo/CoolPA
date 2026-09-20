@@ -43,13 +43,14 @@ func (f *ResourceOptimizerFitness) Close() {
 
 func (f *ResourceOptimizerFitness) calculateR2(ctx context.Context, gen *genome.ReactionGenome) float64 {
 	current := make([]genome.ServiceState, 0, len(gen.Genes))
-	services, _ := f.metricsProvider.ListServices(ctx)
+	services, _ := f.metricsProvider.ListServices(ctx, gen.Namespace)
 	for _, svc := range services {
-		replicas_count, _ := f.metricsProvider.GetServiceReplicasCountValue(ctx, svc)
-		cpu_app_quota, _ := f.metricsProvider.GetServiceCpuQuota(ctx, svc)
-		cpu_pod_quota, _ := f.metricsProvider.GetServicePodCpuQuota(ctx, svc)
-		mem_app_quota, _ := f.metricsProvider.GetServiceMemoryQuota(ctx, svc)
-		mem_pod_quota, _ := f.metricsProvider.GetServicePodMemoryQuota(ctx, svc)
+		svcID := metrics.ServiceID{Namespace: gen.Namespace, Name: svc}
+		replicas_count, _ := f.metricsProvider.GetServiceReplicasCountValue(ctx, svcID)
+		cpu_app_quota, _ := f.metricsProvider.GetServiceCpuQuota(ctx, svcID)
+		cpu_pod_quota, _ := f.metricsProvider.GetServicePodCpuQuota(ctx, svcID)
+		mem_app_quota, _ := f.metricsProvider.GetServiceMemoryQuota(ctx, svcID)
+		mem_pod_quota, _ := f.metricsProvider.GetServicePodMemoryQuota(ctx, svcID)
 		current = append(current, genome.ServiceState{Name: svc, CurrentReplicas: int(replicas_count), CurrentAppCPU: cpu_app_quota, CurrentPodCPU: cpu_pod_quota, CurrentAppMemory: mem_app_quota, CurrentPodMemory: mem_pod_quota})
 	}
 	res := gen.DecodeAll(current)
@@ -63,9 +64,9 @@ func (f *ResourceOptimizerFitness) calculateR2(ctx context.Context, gen *genome.
 		mem_sum += float64(svc.Replicas) * svc.PodMemory
 		replics_sum += float64(svc.Replicas)
 	}
-	total_cpu_limit, _ := f.metricsProvider.GetGlobalTotalCpuLimit(ctx)
-	total_mem_limit, _ := f.metricsProvider.GetGlobalTotalMemoryLimit(ctx)
-	total_replicas_limit, _ := f.metricsProvider.GetGlobalTotalPodsLimit(ctx)
+	total_cpu_limit, _ := f.metricsProvider.GetGlobalTotalCpuLimit(ctx, gen.Namespace)
+	total_mem_limit, _ := f.metricsProvider.GetGlobalTotalMemoryLimit(ctx, gen.Namespace)
+	total_replicas_limit, _ := f.metricsProvider.GetGlobalTotalPodsLimit(ctx, gen.Namespace)
 
 	cpu_percent := cpu_sum / total_cpu_limit
 	mem_percent := mem_sum / total_mem_limit
@@ -78,7 +79,7 @@ func (f *ResourceOptimizerFitness) calculateR1(ctx context.Context, g *genome.Re
 	prod := 1.0
 
 	for i, gene := range g.Genes {
-		lat_95_curr, _ := f.metricsProvider.GetServiceAverageLatency95Range(ctx, gene.ServiceName, f.config.Window)
+		lat_95_curr, _ := f.metricsProvider.GetServiceAverageLatency95Range(ctx, metrics.ServiceID{Namespace: g.Namespace, Name: gene.ServiceName}, f.config.Window)
 		lat_95_curr_avg := utils.Avg(lat_95_curr)
 		lat_95_new := lat_95_curr_avg * math.Pow(math.E, deltas[i])
 

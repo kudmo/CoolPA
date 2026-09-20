@@ -45,7 +45,7 @@ func NewReactionOptimizer(
 // RunOptimization executes the genetic algorithm to compute target
 // states for the given services. Returns the optimized state or an
 // error if the engine fails.
-func (ro *ReactionOptimizer) RunOptimization(ctx context.Context, services []string, mode optimizer.ScaleMode) (optimizer.OptimizedState, error) {
+func (ro *ReactionOptimizer) RunOptimization(ctx context.Context, scalingNamespace string, services []string, mode optimizer.ScaleMode) (optimizer.OptimizedState, error) {
 	seed := int64(time.Now().Unix())
 
 	cfg := gaconfig.Config{
@@ -59,24 +59,24 @@ func (ro *ReactionOptimizer) RunOptimization(ctx context.Context, services []str
 		RandomSeed:       seed,
 	}
 
-	constraintsMap := ro.buildConstraints(ctx, services, mode)
+	constraintsMap := ro.buildConstraints(ctx, scalingNamespace, services, mode)
 
 	cpu_sum := 0.0
 	mem_sum := 0.0
 	replics_sum := 0
 
 	for _, svc := range services {
-		replicas_count, _ := ro.metricsProvider.GetServiceReplicasCountValue(ctx, svc)
-		cpu_pod_quota, _ := ro.metricsProvider.GetServicePodCpuQuota(ctx, svc)
-		mem_pod_quota, _ := ro.metricsProvider.GetServicePodMemoryQuota(ctx, svc)
+		replicas_count, _ := ro.metricsProvider.GetServiceReplicasCountValue(ctx, metrics.ServiceID{Name: svc, Namespace: scalingNamespace})
+		cpu_pod_quota, _ := ro.metricsProvider.GetServicePodCpuQuota(ctx, metrics.ServiceID{Name: svc, Namespace: scalingNamespace})
+		mem_pod_quota, _ := ro.metricsProvider.GetServicePodMemoryQuota(ctx, metrics.ServiceID{Name: svc, Namespace: scalingNamespace})
 		cpu_sum += cpu_pod_quota
 		mem_sum += mem_pod_quota
 		replics_sum += int(replicas_count)
 	}
 
-	total_cpu_limit, _ := ro.metricsProvider.GetGlobalTotalCpuLimit(ctx)
-	total_mem_limit, _ := ro.metricsProvider.GetGlobalTotalMemoryLimit(ctx)
-	total_replicas_limit, _ := ro.metricsProvider.GetGlobalTotalPodsLimit(ctx)
+	total_cpu_limit, _ := ro.metricsProvider.GetGlobalTotalCpuLimit(ctx, scalingNamespace)
+	total_mem_limit, _ := ro.metricsProvider.GetGlobalTotalMemoryLimit(ctx, scalingNamespace)
+	total_replicas_limit, _ := ro.metricsProvider.GetGlobalTotalPodsLimit(ctx, scalingNamespace)
 
 	ce := &constraints.ConstraintEngine{
 		ServicePolicies: constraintsMap,
@@ -100,7 +100,7 @@ func (ro *ReactionOptimizer) RunOptimization(ctx context.Context, services []str
 		Constraints: ce,
 	}
 
-	seedGenome := ro.buildSeedGenome(ctx, services, ce, mode)
+	seedGenome := ro.buildSeedGenome(ctx, scalingNamespace, services, ce, mode)
 
 	best, err := eng.Run(ctx, seedGenome)
 	if err != nil {
@@ -131,7 +131,7 @@ func (ro *ReactionOptimizer) RunOptimization(ctx context.Context, services []str
 }
 
 // choosePossibleReactions returns the allowed reaction types for a service.
-func (ro *ReactionOptimizer) choosePossibleReactions(service string) []genome.ReactionType {
+func (ro *ReactionOptimizer) choosePossibleReactions(scalingNamespace string, service string) []genome.ReactionType {
 	return []genome.ReactionType{genome.HPA, genome.VPA}
 }
 
@@ -139,6 +139,7 @@ func (ro *ReactionOptimizer) choosePossibleReactions(service string) []genome.Re
 // current mode (scale up or down) and current resource usage.
 func (ro *ReactionOptimizer) buildConstraints(
 	ctx context.Context,
+	scalingNamespace string,
 	services []string,
 	mode optimizer.ScaleMode,
 ) map[string]constraints.ServicePolicy {
@@ -146,21 +147,21 @@ func (ro *ReactionOptimizer) buildConstraints(
 	result := map[string]constraints.ServicePolicy{}
 
 	for _, svc := range services {
-		replicas_count, _ := ro.metricsProvider.GetServiceReplicasCountValue(ctx, svc)
+		replicas_count, _ := ro.metricsProvider.GetServiceReplicasCountValue(ctx, metrics.ServiceID{Name: svc, Namespace: scalingNamespace})
 		if replicas_count == 0 {
 			logger.Warn("optimizer/provider", "no pods found for service", "service", svc)
 			continue
 		}
 
-		cpu, _ := ro.metricsProvider.GetServiceCpuQuota(ctx, svc)
-		mem, _ := ro.metricsProvider.GetServiceMemoryQuota(ctx, svc)
+		cpu, _ := ro.metricsProvider.GetServiceCpuQuota(ctx, metrics.ServiceID{Name: svc, Namespace: scalingNamespace})
+		mem, _ := ro.metricsProvider.GetServiceMemoryQuota(ctx, metrics.ServiceID{Name: svc, Namespace: scalingNamespace})
 
 		policy := constraints.ServicePolicy{
-			AllowedReactions: ro.choosePossibleReactions(svc),
+			AllowedReactions: ro.choosePossibleReactions(scalingNamespace, svc),
 		}
 
 		if mode == optimizer.ScaleUpMode {
-			cpuUsageRange, _ := ro.metricsProvider.GetServiceCpuUsageRange(ctx, svc, ro.config.TimeWindow)
+			cpuUsageRange, _ := ro.metricsProvider.GetServiceCpuUsageRange(ctx, metrics.ServiceID{Name: svc, Namespace: scalingNamespace}, ro.config.TimeWindow)
 			cpuU := utils.Avg(cpuUsageRange)
 
 			desiredReplicas := int(math.Ceil(
@@ -168,17 +169,17 @@ func (ro *ReactionOptimizer) buildConstraints(
 			))
 			policy.MinReplicas = int(replicas_count) + ro.config.ReplicasStep
 			policy.MaxReplicas = max(policy.MinReplicas, min(int(replicas_count)+10, desiredReplicas+1))
-			policy.MaxCPU, _ = ro.metricsProvider.GetGlobalServiceMaxCpu(ctx)
+			policy.MaxCPU, _ = ro.metricsProvider.GetGlobalServiceMaxCpu(ctx, scalingNamespace)
 			policy.MinCPU = cpu + ro.config.CpuStep
-			policy.MaxMemory, _ = ro.metricsProvider.GetGlobalServiceMaxMemory(ctx)
+			policy.MaxMemory, _ = ro.metricsProvider.GetGlobalServiceMaxMemory(ctx, scalingNamespace)
 			policy.MinMemory = mem + ro.config.MemoryStep
 		} else {
 			policy.MaxReplicas = max(1, int(replicas_count)-ro.config.ReplicasStep)
 			policy.MinReplicas = max(1, int(replicas_count)-ro.config.ReplicasStep)
 			policy.MaxCPU = cpu - ro.config.CpuStep
-			policy.MinCPU, _ = ro.metricsProvider.GetGlobalServiceMinCpu(ctx)
+			policy.MinCPU, _ = ro.metricsProvider.GetGlobalServiceMinCpu(ctx, scalingNamespace)
 			policy.MaxMemory = mem - ro.config.MemoryStep
-			policy.MinMemory, _ = ro.metricsProvider.GetGlobalServiceMinMemory(ctx)
+			policy.MinMemory, _ = ro.metricsProvider.GetGlobalServiceMinMemory(ctx, scalingNamespace)
 		}
 
 		result[svc] = policy
@@ -191,6 +192,7 @@ func (ro *ReactionOptimizer) buildConstraints(
 // algorithm based on current service states and the scaling mode.
 func (ro *ReactionOptimizer) buildSeedGenome(
 	ctx context.Context,
+	scalingNamespace string,
 	services []string,
 	ce *constraints.ConstraintEngine,
 	mode optimizer.ScaleMode,
@@ -204,16 +206,16 @@ func (ro *ReactionOptimizer) buildSeedGenome(
 			continue
 		}
 
-		replicas_count, _ := ro.metricsProvider.GetServiceReplicasCountValue(ctx, svc)
+		replicas_count, _ := ro.metricsProvider.GetServiceReplicasCountValue(ctx, metrics.ServiceID{Name: svc, Namespace: scalingNamespace})
 		if replicas_count == 0 {
 			logger.Warn("optimizer/provider", "no pods found for service", "service", svc)
 			continue
 		}
 
-		cpu_app_quota, _ := ro.metricsProvider.GetServiceCpuQuota(ctx, svc)
-		cpu_pod_quota, _ := ro.metricsProvider.GetServicePodCpuQuota(ctx, svc)
-		mem_app_quota, _ := ro.metricsProvider.GetServiceMemoryQuota(ctx, svc)
-		mem_pod_quota, _ := ro.metricsProvider.GetServicePodMemoryQuota(ctx, svc)
+		cpu_app_quota, _ := ro.metricsProvider.GetServiceCpuQuota(ctx, metrics.ServiceID{Name: svc, Namespace: scalingNamespace})
+		cpu_pod_quota, _ := ro.metricsProvider.GetServicePodCpuQuota(ctx, metrics.ServiceID{Name: svc, Namespace: scalingNamespace})
+		mem_app_quota, _ := ro.metricsProvider.GetServiceMemoryQuota(ctx, metrics.ServiceID{Name: svc, Namespace: scalingNamespace})
+		mem_pod_quota, _ := ro.metricsProvider.GetServicePodMemoryQuota(ctx, metrics.ServiceID{Name: svc, Namespace: scalingNamespace})
 
 		rt := genome.HPA
 		if len(sp.AllowedReactions) == 1 {

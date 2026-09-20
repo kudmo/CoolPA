@@ -32,12 +32,13 @@ type ServiceGene struct {
 
 // ReactionGenome encodes scaling decisions for several services.
 type ReactionGenome struct {
-	Genes []*ServiceGene
+	Namespace string
+	Genes     []*ServiceGene
 }
 
 // Clone returns a deep copy of the genome.
 func (g *ReactionGenome) Clone() *ReactionGenome {
-	ng := &ReactionGenome{Genes: make([]*ServiceGene, len(g.Genes))}
+	ng := &ReactionGenome{Namespace: g.Namespace, Genes: make([]*ServiceGene, len(g.Genes))}
 	for i, sg := range g.Genes {
 		if sg == nil {
 			continue
@@ -131,7 +132,7 @@ func (g *ReactionGenome) Mutate(rng *rand.Rand, mutationRate, typeMutationRate f
 // Crossover performs service-level atomic crossover between two parents and returns two children.
 func (g *ReactionGenome) Crossover(other *ReactionGenome, rng *rand.Rand) (*ReactionGenome, *ReactionGenome) {
 	n := len(g.Genes)
-	if other == nil || len(other.Genes) != n {
+	if other == nil || len(other.Genes) != n || g.Namespace != other.Namespace {
 		return g.Clone(), other.Clone()
 	}
 	c1 := &ReactionGenome{Genes: make([]*ServiceGene, n)}
@@ -187,12 +188,13 @@ type CandidateServiceState struct {
 
 // CandidateState aggregates decoded per-service candidate states.
 type CandidateState struct {
-	Services []CandidateServiceState
+	Namespace string
+	Services  []CandidateServiceState
 }
 
 // Decode applies the genome deltas using current values stored in each gene.
 func (g *ReactionGenome) Decode() CandidateState {
-	out := CandidateState{Services: make([]CandidateServiceState, 0, len(g.Genes))}
+	out := CandidateState{Namespace: g.Namespace, Services: make([]CandidateServiceState, 0, len(g.Genes))}
 
 	for _, sg := range g.Genes {
 		if sg == nil {
@@ -232,7 +234,7 @@ func (g *ReactionGenome) DecodeAll(currentStates []ServiceState) CandidateState 
 			idx[sg.ServiceName] = sg
 		}
 	}
-	out := CandidateState{Services: make([]CandidateServiceState, 0, len(currentStates))}
+	out := CandidateState{Namespace: g.Namespace, Services: make([]CandidateServiceState, 0, len(currentStates))}
 	for _, cs := range currentStates {
 		var cand CandidateServiceState
 		cand.ServiceName = cs.Name

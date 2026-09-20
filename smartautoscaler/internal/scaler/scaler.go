@@ -79,7 +79,7 @@ func (d *Scaler) Start(ctx context.Context) error {
 				}
 
 				// Run analysis to detect services requiring scaling.
-				result := d.analyzer.Analyze(analysisCtx)
+				result := d.analyzer.Analyze(analysisCtx, d.config.Namespace)
 
 				if result.Scale != 0 {
 					mode := optimizer.ScaleUpMode
@@ -88,7 +88,7 @@ func (d *Scaler) Start(ctx context.Context) error {
 					}
 
 					logger.Info("scaler", "proposing scale for services", "services", result.Services)
-					optimizedState, _ := d.optimizer.RunOptimization(analysisCtx, result.Services, mode)
+					optimizedState, _ := d.optimizer.RunOptimization(analysisCtx, d.config.Namespace, result.Services, mode)
 					if err := d.scale(analysisCtx, optimizedState); err != nil {
 						logger.Error("scaler", "error while scaling", "error", err.Error())
 					}
