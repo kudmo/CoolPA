@@ -707,8 +707,8 @@ func (p *PrometheusMetricsProvider) GetGraphLatencyP95Value(ctx context.Context,
 					rate(istio_request_duration_milliseconds_bucket{
 						source_workload_namespace="%s",
 						source_workload="%s",
-						destination_workload="%s",
-						destination_workload_namespace="%s"
+						destination_workload_namespace="%s",
+						destination_workload="%s"
 					}[1m])
 				)
 			)`, svcFrom.Namespace, svcFrom.Name, svcTo.Namespace, svcTo.Name),
@@ -733,8 +733,8 @@ func (p *PrometheusMetricsProvider) GetGraphLatencyP50Value(ctx context.Context,
 					rate(istio_request_duration_milliseconds_bucket{
 						source_workload_namespace="%s",
 						source_workload="%s",
-						destination_workload="%s",
-						destination_workload_namespace="%s"
+						destination_workload_namespace="%s",
+						destination_workload="%s"
 					}[1m])
 				)
 			)`, svcFrom.Namespace, svcFrom.Name, svcTo.Namespace, svcTo.Name),
@@ -817,8 +817,8 @@ func (p *PrometheusMetricsProvider) GetGraphLatencyP95Range(ctx context.Context,
 					rate(istio_request_duration_milliseconds_bucket{
 						source_workload_namespace="%s",
 						source_workload="%s",
-						destination_workload="%s",
-						destination_workload_namespace="%s"
+						destination_workload_namespace="%s",
+						destination_workload="%s"
 					}[1m])
 				)
 			)`, svcFrom.Namespace, svcFrom.Name, svcTo.Namespace, svcTo.Name),
@@ -846,8 +846,8 @@ func (p *PrometheusMetricsProvider) GetGraphLatencyP50Range(ctx context.Context,
 					rate(istio_request_duration_milliseconds_bucket{
 						source_workload_namespace="%s",
 						source_workload="%s",
-						destination_workload="%s",
-						destination_workload_namespace="%s"
+						destination_workload_namespace="%s",
+						destination_workload="%s"
 					}[1m])
 				)
 			)`, svcFrom.Namespace, svcFrom.Name, svcTo.Namespace, svcTo.Name),

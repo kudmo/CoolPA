@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <title>Scaler Dashboard</title>
@@ -40,18 +40,18 @@
     </style>
 </head>
 <body>
-    <h1>Контроллер масштабирования — состояние</h1>
+    <h1>Autoscaler Controller — Current State</h1>
 
     <div class="grid">
-        <!-- 1) Граф вызовов -->
+        <!-- 1) Call graph -->
         <section class="card">
-            <h2>Граф вызовов</h2>
+            <h2>Call Graph</h2>
             <div id="graph"></div>
         </section>
 
-        <!-- 2) Гистограммы -->
+        <!-- 2) Histograms -->
         <section class="card">
-            <h2>Гистограммы по сервисам</h2>
+            <h2>Histograms per Service</h2>
             <div class="hist-list" id="hist-list"></div>
         </section>
     </div>
@@ -70,7 +70,7 @@
         (function renderGraph() {
             const container = document.getElementById('graph');
             if (!graphData || graphData.length === 0) {
-                container.innerHTML = '<p class="hist-empty">Нет данных о графе.</p>';
+                container.innerHTML = '<p class="hist-empty">No graph data.</p>';
                 return;
             }
 
@@ -92,10 +92,86 @@
                 const from = n.service_name;
                 for (const to of (n.outbound_edges || [])) {
                     if (nodeIds.has(to)) {
-                        edges.push({ from, to, arrows: 'to' });
+                        edges.push({
+                            from,
+                            to,
+                            arrows: {
+                                to: {
+                                    enabled: true,
+                                    scaleFactor: 1.4,
+                                },
+                            },
+                        });
                     }
                 }
             }
+
+            const adjacency = new Map();
+            for (const id of nodeIds) adjacency.set(id, []);
+            for (const e of edges) adjacency.get(e.from).push(e.to);
+
+            const hasCycle = (() => {
+                const state = new Map();
+                for (const id of nodeIds) state.set(id, 0);
+                const dfs = (u) => {
+                    state.set(u, 1);
+                    for (const v of adjacency.get(u) || []) {
+                        const s = state.get(v);
+                        if (s === 1) return true;
+                        if (s === 0 && dfs(v)) return true;
+                    }
+                    state.set(u, 2);
+                    return false;
+                };
+                for (const id of nodeIds) {
+                    if (state.get(id) === 0 && dfs(id)) return true;
+                }
+                return false;
+            })();
+
+            const layoutOptions = hasCycle
+                ? {
+                    physics: {
+                        enabled: true,
+                        solver: 'forceAtlas2Based',
+                        forceAtlas2Based: {
+                            gravitationalConstant: -120,
+                            centralGravity: 0.005,
+                            springLength: 260,
+                            springConstant: 0.04,
+                            damping: 0.6,
+                            avoidOverlap: 1,
+                        },
+                        stabilization: { iterations: 400, fit: true },
+                    },
+                    layout: { improvedLayout: true },
+                }
+                : {
+                    layout: {
+                        hierarchical: {
+                            enabled: true,
+                            direction: 'UD',
+                            sortMethod: 'directed',
+                            levelSeparation: 180,
+                            nodeSpacing: 220,
+                            treeSpacing: 260,
+                            blockShifting: true,
+                            edgeMinimization: true,
+                            parentCentralization: true,
+                        },
+                    },
+                    physics: {
+                        enabled: false,
+                    },
+                    edges: {
+                        smooth: {
+                            enabled: true,
+                            type: 'cubicBezier',
+                            forceDirection: 'vertical',
+                            roundness: 0.6,
+                        },
+                    },
+                };
 
             new vis.Network(
                 container,
@@ -104,10 +180,28 @@
                     edges: new vis.DataSet(edges),
                 },
                 {
-                    nodes: { shape: 'box', margin: 10, font: { size: 13 } },
-                    edges: { smooth: { type: 'continuous' }, color: '#8c959f' },
-                    physics: { stabilization: { iterations: 200 } },
-                    interaction: { hover: true },
+                    nodes: {
+                        shape: 'box',
+                        margin: { top: 10, right: 14, bottom: 10, left: 14 },
+                        font: { size: 14, face: 'ui-monospace, monospace' },
+                        borderWidth: 1,
+                        widthConstraint: { minimum: 120, maximum: 220 },
+                        shapeProperties: { borderRadius: 6 },
+                    },
+                    edges: {
+                        color: { color: '#8c959f', highlight: '#0969da' },
+                        width: 1.2,
+                        selectionWidth: 2,
+                        smooth: { enabled: true, type: 'continuous', roundness: 0.4 },
+                    },
+                    interaction: {
+                        hover: true,
+                        tooltipDelay: 120,
+                        navigationButtons: false,
+                        zoomView: true,
+                        dragView: true,
+                    },
+                    ...layoutOptions,
                 }
             );
         })();
@@ -179,10 +273,11 @@
             parts.push('</svg>');
             svgEl.innerHTML = parts.join('');
         }
+
         (function renderAllHistograms() {
             const list = document.getElementById('hist-list');
             if (!histogramData || histogramData.length === 0) {
-                list.innerHTML = '<p class="hist-empty">Нет данных о гистограммах.</p>';
+                list.innerHTML = '<p class="hist-empty">No histogram data.</p>';
                 return;
             }
 
@@ -203,7 +298,7 @@
                 } else {
                     const empty = document.createElement('div');
                     empty.className = 'hist-empty';
-                    empty.textContent = 'Нет бакетов';
+                    empty.textContent = 'No buckets';
                     item.appendChild(empty);
                 }
 
@@ -213,7 +308,7 @@
 
             const legend = document.createElement('div');
             legend.className = 'legend';
-            legend.innerHTML = '<span class="real">реальное значение</span><span class="interp">интерполяция</span>';
+            legend.innerHTML = '<span class="real">real value</span><span class="interp">interpolation</span>';
             list.appendChild(legend);
         })();
     </script>

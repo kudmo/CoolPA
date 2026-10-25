@@ -77,7 +77,7 @@ func (d *Scaler) Start(ctx context.Context) error {
 						"remaining", d.config.Cooldown-timeSinceLastReaction)
 					continue
 				}
-
+				logger.Info("decision", "analyze cycle", "namespace", d.config.Namespace)
 				// Run analysis to detect services requiring scaling.
 				result := d.analyzer.Analyze(analysisCtx, d.config.Namespace)
 

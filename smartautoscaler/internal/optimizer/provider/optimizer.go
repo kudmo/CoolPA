@@ -199,7 +199,7 @@ func (ro *ReactionOptimizer) buildSeedGenome(
 	mode optimizer.ScaleMode,
 ) *genome.ReactionGenome {
 
-	seed := &genome.ReactionGenome{Genes: []*genome.ServiceGene{}}
+	seed := &genome.ReactionGenome{Namespace: scalingNamespace, Genes: []*genome.ServiceGene{}}
 
 	for _, svc := range services {
 		sp, exists := ce.ServicePolicies[svc]

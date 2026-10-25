@@ -21,10 +21,13 @@ func (p *ScalerDataProvider) GetGraph(ctx context.Context, namespace string) []S
 		return nodes
 	}
 
-	visited := make(map[string]bool)
-	stack := make([]string, 0, len(services))
+	visited := make(map[core.ServiceID]bool)
+	stack := make([]core.ServiceID, 0, len(services))
 
-	stack = append(stack, services...)
+	for _, svc := range services {
+		svcID := core.ServiceID{Namespace: namespace, Name: svc}
+		stack = append(stack, svcID)
+	}
 
 	for len(stack) > 0 {
 		curr := stack[len(stack)-1]
@@ -35,21 +38,21 @@ func (p *ScalerDataProvider) GetGraph(ctx context.Context, namespace string) []S
 		}
 		visited[curr] = true
 
-		svcInfo, err := p.MetricsProvider.GetService(ctx, core.ServiceID{Name: curr, Namespace: namespace})
+		svcInfo, err := p.MetricsProvider.GetService(ctx, curr)
 
 		if err != nil {
 			continue
 		}
 
 		for _, in := range svcInfo.InboundCalls {
-			if !visited[in.ToString()] {
-				stack = append(stack, in.ToString())
+			if !visited[in] {
+				stack = append(stack, in)
 			}
 		}
 
 		for _, out := range svcInfo.OutboundCalls {
-			if !visited[out.ToString()] {
-				stack = append(stack, out.ToString())
+			if !visited[out] {
+				stack = append(stack, out)
 			}
 		}
 
@@ -59,7 +62,7 @@ func (p *ScalerDataProvider) GetGraph(ctx context.Context, namespace string) []S
 		}
 
 		nodes = append(nodes, ServiceNode{
-			ServiceName:   curr,
+			ServiceName:   svcInfo.ID.ToString(),
 			OutboundEdges: outboundEdges,
 		})
 	}

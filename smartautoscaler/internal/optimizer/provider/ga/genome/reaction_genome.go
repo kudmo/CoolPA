@@ -133,10 +133,15 @@ func (g *ReactionGenome) Mutate(rng *rand.Rand, mutationRate, typeMutationRate f
 func (g *ReactionGenome) Crossover(other *ReactionGenome, rng *rand.Rand) (*ReactionGenome, *ReactionGenome) {
 	n := len(g.Genes)
 	if other == nil || len(other.Genes) != n || g.Namespace != other.Namespace {
-		return g.Clone(), other.Clone()
+		c := g.Clone()
+		var c2 *ReactionGenome
+		if other != nil {
+			c2 = other.Clone()
+		}
+		return c, c2
 	}
-	c1 := &ReactionGenome{Genes: make([]*ServiceGene, n)}
-	c2 := &ReactionGenome{Genes: make([]*ServiceGene, n)}
+	c1 := &ReactionGenome{Namespace: g.Namespace, Genes: make([]*ServiceGene, n)}
+	c2 := &ReactionGenome{Namespace: g.Namespace, Genes: make([]*ServiceGene, n)}
 	for i := 0; i < n; i++ {
 		if rng.Float64() < 0.5 {
 			if g.Genes[i] != nil {

@@ -65,7 +65,7 @@ func (h *Histogram) findBin(latency float64) int {
 // Observe records a latency value and whether it violated the SLO.
 // The observation is added to the appropriate bin's counters.
 func (h *Histogram) Observe(latency float64, violation bool) {
-	idx := h.findBin(latency)
+	idx := min(len(h.Bins)-1, h.findBin(latency))
 	b := &h.Bins[idx]
 
 	b.total.Add(1)

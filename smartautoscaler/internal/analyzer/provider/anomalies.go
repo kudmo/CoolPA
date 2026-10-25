@@ -56,7 +56,7 @@ func (a *TopoRankAnalyzer) buildCorrelationGraphFromCalls(ctx context.Context, s
 
 	cg := types.NewCorrelationGraph()
 	for svc, degree := range serviceAnomaly {
-		if err := cg.AddNode(svc.ToString(), degree); err != nil {
+		if err := cg.AddNode(svc.Name, degree); err != nil {
 			return nil, err
 		}
 	}
@@ -95,7 +95,7 @@ func (a *TopoRankAnalyzer) buildCorrelationGraphFromCalls(ctx context.Context, s
 			weight = math.Max(weight, math.Abs(utils.Pearson(latSeries, netTrans)))
 		}
 
-		if err := cg.AddEdge(c.from.ToString(), c.to.ToString(), weight); err != nil {
+		if err := cg.AddEdge(c.from.Name, c.to.Name, weight); err != nil {
 			return nil, err
 		}
 	}

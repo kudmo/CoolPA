@@ -6,9 +6,8 @@ import (
 )
 
 type ServiceNode struct {
-	ServiceNamespace string   `json:"service_namespace"`
-	ServiceName      string   `json:"service_name"`
-	OutboundEdges    []string `json:"outbound_edges"`
+	ServiceName   string   `json:"service_name"`
+	OutboundEdges []string `json:"outbound_edges"`
 }
 
 type NullableFloat float64

@@ -8,5 +8,5 @@ type ServiceID struct {
 }
 
 func (id *ServiceID) ToString() string {
-	return id.Namespace + "_" + id.Name
+	return id.Namespace + "/" + id.Name
 }
